@@ -1,0 +1,275 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Department {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  teachers  Teacher[]
+
+  @@map("Department")
+}
+
+model Room {
+  id              String          @id @default(uuid()) @db.Uuid
+  name            String          @unique
+  capacity        Int?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  scheduleEntries ScheduleEntry[]
+
+  @@map("Room")
+}
+
+model TimeSlot {
+  id              String          @id @default(uuid()) @db.Uuid
+  order           Int             @unique
+  startTime       String
+  endTime         String
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  scheduleEntries ScheduleEntry[]
+
+  @@map("TimeSlot")
+}
+
+model Group {
+  id              String          @id @default(uuid()) @db.Uuid
+  name            String          @unique
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  lessons         Lesson[]
+  scheduleEntries ScheduleEntry[]
+  students        Student[]
+
+  @@map("Group")
+}
+
+model Student {
+  id         String       @id @default(uuid()) @db.Uuid
+  fullName   String
+  studentNo  String?      @unique
+  groupId    String?      @db.Uuid
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  attendance Attendance[]
+  group      Group?       @relation(fields: [groupId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  user       User?
+
+  @@map("Student")
+}
+
+model Teacher {
+  id              String          @id @default(uuid()) @db.Uuid
+  fullName        String
+  staffNo         String?         @unique
+  departmentId    String?         @db.Uuid
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  lessons         Lesson[]
+  scheduleEntries ScheduleEntry[]
+  department      Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  user            User?
+
+  @@map("Teacher")
+}
+
+model Subject {
+  id              String          @id @default(uuid()) @db.Uuid
+  name            String
+  code            String?         @unique
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  lessons         Lesson[]
+  scheduleEntries ScheduleEntry[]
+
+  @@map("Subject")
+}
+
+model Lesson {
+  id         String       @id @default(uuid()) @db.Uuid
+  startsAt   DateTime
+  endsAt     DateTime
+  room       String?
+  groupId    String       @db.Uuid
+  teacherId  String       @db.Uuid
+  subjectId  String       @db.Uuid
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  attendance Attendance[]
+  group      Group        @relation(fields: [groupId], references: [id])
+  subject    Subject      @relation(fields: [subjectId], references: [id])
+  teacher    Teacher      @relation(fields: [teacherId], references: [id])
+
+  @@map("Lesson")
+}
+
+model ScheduleEntry {
+  id            String    @id @default(uuid()) @db.Uuid
+  weekday       Weekday
+  groupId       String    @db.Uuid
+  teacherId     String    @db.Uuid
+  subjectId     String    @db.Uuid
+  timeSlotId    String    @db.Uuid
+  roomId        String?   @db.Uuid
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  group         Group     @relation(fields: [groupId], references: [id])
+  room          Room?     @relation(fields: [roomId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  subject       Subject   @relation(fields: [subjectId], references: [id])
+  teacher       Teacher   @relation(fields: [teacherId], references: [id])
+  timeSlot      TimeSlot  @relation(fields: [timeSlotId], references: [id])
+
+  @@unique([groupId, weekday, timeSlotId])
+  @@unique([teacherId, weekday, timeSlotId])
+  @@map("ScheduleEntry")
+}
+
+model Attendance {
+  id        String           @id @default(uuid()) @db.Uuid
+  status    AttendanceStatus
+  lessonId  String           @db.Uuid
+  studentId String           @db.Uuid
+  notedAt   DateTime         @default(now())
+  lesson    Lesson           @relation(fields: [lessonId], references: [id])
+  student   Student          @relation(fields: [studentId], references: [id])
+
+  @@unique([lessonId, studentId])
+  @@map("Attendance")
+}
+
+model User {
+  id                String           @id @default(uuid()) @db.Uuid
+  email             String           @unique
+  passwordHash      String?
+  role              UserRole
+  lastLoginAt       DateTime?
+  credentialsSentAt DateTime?
+  studentId         String?          @unique @db.Uuid
+  teacherId         String?          @unique @db.Uuid
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  loginCodes        LoginCode[]
+  student           Student?         @relation(fields: [studentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  teacher           Teacher?         @relation(fields: [teacherId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  invitations       UserInvitation[]
+  chatSessions      ChatSession[]
+  chats             Chat[]
+  profile           UserProfile?
+
+  @@map("User")
+}
+
+model ChatSession {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chats     Chat[]
+
+  @@index([userId, updatedAt])
+  @@map("ChatSession")
+}
+
+model Chat {
+  id        String     @id @default(uuid()) @db.Uuid
+  userId    String     @db.Uuid
+  sessionId String     @db.Uuid
+  message   String
+  sender    ChatSender
+  timestamp DateTime   @default(now())
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([userId, timestamp])
+  @@index([sessionId, timestamp])
+  @@map("Chat")
+}
+
+model UserProfile {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @unique @db.Uuid
+  interests   Json?
+  preferences Json?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("UserProfile")
+}
+
+model UserInvitation {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("UserInvitation")
+}
+
+model LoginCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("LoginCode")
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+
+  @@map("AttendanceStatus")
+}
+
+enum UserRole {
+  STUDENT
+  TEACHER
+  ADMIN
+
+  @@map("UserRole")
+}
+
+enum ChatSender {
+  USER
+  ASSISTANT
+  SYSTEM
+
+  @@map("ChatSender")
+}
+
+enum Weekday {
+  MON
+  TUE
+  WED
+  THU
+  FRI
+  SAT
+  SUN
+
+  @@map("Weekday")
+}

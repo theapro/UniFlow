@@ -1,0 +1,101 @@
+{
+  "common": {
+    "search": "Qidirish",
+    "create": "Yaratish",
+    "edit": "Tahrirlash",
+    "delete": "O'chirish",
+    "save": "Saqlash",
+    "cancel": "Bekor qilish",
+    "back": "Orqaga",
+    "loading": "Yuklanmoqda...",
+    "noData": "Ma'lumot yo'q",
+    "confirm": "Tasdiqlash",
+    "actions": "Harakatlar"
+  },
+  "nav": {
+    "dashboard": "Boshqaruv paneli",
+    "students": "Talabalar",
+    "groups": "Guruhlar",
+    "teachers": "O'qituvchilar",
+    "subjects": "Fanlar",
+    "schedule": "Dars jadvali",
+    "attendance": "Davomat",
+    "aiMonitor": "AI Monitoring"
+  },
+  "dashboard": {
+    "title": "Boshqaruv paneli",
+    "welcome": "UniFlow Admin ga xush kelibsiz",
+    "totalStudents": "Jami talabalar",
+    "totalTeachers": "Jami o'qituvchilar",
+    "totalSubjects": "Jami fanlar",
+    "todayAttendance": "Bugungi davomat"
+  },
+  "students": {
+    "title": "Talabalar",
+    "createTitle": "Talaba qo'shish",
+    "editTitle": "Talabani tahrirlash",
+    "detailTitle": "Talaba ma'lumotlari",
+    "fullName": "To'liq ism",
+    "studentNo": "Talaba raqami",
+    "group": "Guruh",
+    "email": "Elektron pochta",
+    "createdAt": "Yaratilgan sana",
+    "attendance": "Davomat",
+    "schedule": "Dars jadvali",
+    "deleteConfirm": "Ushbu talabani o'chirishga ishonchingiz komilmi?",
+    "createSuccess": "Talaba muvaffaqiyatli qo'shildi",
+    "updateSuccess": "Talaba muvaffaqiyatli yangilandi",
+    "deleteSuccess": "Talaba muvaffaqiyatli o'chirildi"
+  },
+  "teachers": {
+    "title": "O'qituvchilar",
+    "createTitle": "O'qituvchi qo'shish",
+    "editTitle": "O'qituvchini tahrirlash",
+    "detailTitle": "O'qituvchi ma'lumotlari",
+    "fullName": "To'liq ism",
+    "staffNo": "Xodim raqami",
+    "department": "Kafedra",
+    "email": "Elektron pochta",
+    "createdAt": "Yaratilgan sana",
+    "deleteConfirm": "Ushbu o'qituvchini o'chirishga ishonchingiz komilmi?",
+    "createSuccess": "O'qituvchi muvaffaqiyatli qo'shildi",
+    "updateSuccess": "O'qituvchi muvaffaqiyatli yangilandi",
+    "deleteSuccess": "O'qituvchi muvaffaqiyatli o'chirildi"
+  },
+  "subjects": {
+    "title": "Fanlar",
+    "createTitle": "Fan qo'shish",
+    "name": "Fan nomi",
+    "code": "Fan kodi",
+    "createSuccess": "Fan muvaffaqiyatli qo'shildi",
+    "deleteSuccess": "Fan muvaffaqiyatli o'chirildi"
+  },
+  "schedule": {
+    "title": "Dars jadvali",
+    "weekday": "Kun",
+    "timeSlot": "Vaqt",
+    "group": "Guruh",
+    "teacher": "O'qituvchi",
+    "subject": "Fan",
+    "room": "Xona"
+  },
+  "attendance": {
+    "title": "Davomat",
+    "lesson": "Dars",
+    "student": "Talaba",
+    "status": "Holat",
+    "date": "Sana",
+    "present": "Keldi",
+    "absent": "Kelmadi",
+    "late": "Kechikdi",
+    "excused": "Sababli"
+  },
+  "groups": {
+    "title": "Guruhlar",
+    "detailTitle": "Guruh",
+    "noGroupsTitle": "Guruhlar topilmadi",
+    "noGroupsDescription": "Avval guruh yarating, keyin bu yerda guruh bo'yicha talabalarni ko'rasiz",
+    "noStudentsDescription": "Ushbu guruhda talabalar topilmadi",
+    "openGroupHint": "Guruhni ochib talabalarni ko'ring"
+  }
+}
