@@ -11,6 +11,16 @@ import {
   StopCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useChatStore } from "@/store/chatStore";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
@@ -31,6 +41,11 @@ export function ChatInput({
 }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const { models, selectedModelId, setSelectedModel } = useChatStore();
+  const selectedModel = selectedModelId
+    ? models.find((m) => m.id === selectedModelId)
+    : null;
 
   const handleSubmit = () => {
     if (message.trim() && !isLoading && !isStreaming) {
@@ -99,13 +114,38 @@ export function ChatInput({
 
               {/* O'ng tomondagi iconlar */}
               <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  className="h-9 gap-1 rounded-full px-3 text-muted-foreground hover:text-foreground"
-                >
-                  <span className="text-sm font-medium">Fast</span>
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="h-9 gap-1 rounded-full px-3 text-muted-foreground hover:text-foreground"
+                      disabled={models.length === 0}
+                      aria-label="Select AI model"
+                    >
+                      <span className="text-sm font-medium">
+                        {selectedModel?.displayName ??
+                          (models.length === 0 ? "Model" : "Select")}
+                      </span>
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64">
+                    <DropdownMenuLabel>AI Model</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuRadioGroup
+                      value={selectedModelId ?? ""}
+                      onValueChange={(value) => {
+                        if (value) setSelectedModel(value);
+                      }}
+                    >
+                      {models.map((m) => (
+                        <DropdownMenuRadioItem key={m.id} value={m.id}>
+                          {m.displayName}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
                 {isStreaming ? (
                   <Button

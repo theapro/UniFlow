@@ -16,6 +16,12 @@ const aiController = new AiController(
 // All AI endpoints require auth (avoid leaking university/student data)
 router.use(authMiddleware);
 
+// Models allowed by admin policy for this user
+router.get("/models", aiController.listAllowedModels);
+
+// Personalized greeting for empty chat state
+router.get("/greeting", aiController.getGreeting);
+
 // Safe, aggregated context (authenticated)
 router.get("/context", aiController.getSystemContext);
 

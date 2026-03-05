@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { ChatStore, ChatSession, Message } from "@/types/chat";
+import { ChatStore, ChatSession, Message, AllowedAiModel } from "@/types/chat";
 import { generateId, generateChatTitle } from "@/lib/utils";
 import { auth } from "@/lib/auth";
 
@@ -30,6 +30,9 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
   isLoading: false,
   isStreaming: false,
 
+  models: [],
+  selectedModelId: null,
+
   loadSessions: async () => {
     const token = requireToken();
     const response = await fetch(`${BACKEND_URL}/api/ai/chat/sessions`, {
@@ -50,6 +53,44 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
       const currentSessionId =
         state.currentSessionId ?? sessions[0]?.id ?? null;
       return { sessions, currentSessionId };
+    });
+  },
+
+  loadModels: async () => {
+    const token = requireToken();
+    const response = await fetch(`${BACKEND_URL}/api/ai/models`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error("Failed to load models");
+    const json = await response.json();
+
+    const models: AllowedAiModel[] = Array.isArray(json?.data)
+      ? json.data
+          .map((m: any) => ({
+            id: String(m.id),
+            provider: String(m.provider ?? "groq"),
+            model: String(m.model ?? ""),
+            displayName: String(m.displayName ?? m.model ?? "Model"),
+            modality: (m.modality ?? "CHAT") as AllowedAiModel["modality"],
+          }))
+          .filter((m: AllowedAiModel) => m.model.length > 0)
+      : [];
+
+    set((state) => {
+      const selectedStillValid =
+        state.selectedModelId &&
+        models.some((m) => m.id === state.selectedModelId);
+      const selectedModelId = selectedStillValid
+        ? state.selectedModelId
+        : (models[0]?.id ?? null);
+      return { models, selectedModelId };
+    });
+  },
+
+  setSelectedModel: (modelId: string) => {
+    set((state) => {
+      if (!state.models.some((m) => m.id === modelId)) return state;
+      return { selectedModelId: modelId };
     });
   },
 
@@ -85,6 +126,19 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
   },
 
   createSession: async () => {
+    // Avoid creating multiple empty drafts
+    const state = get();
+    const existingDraft = state.sessions.find((s) => {
+      if (s.title !== "New Chat") return false;
+      const msgs = state.messages[s.id] ?? [];
+      return msgs.length === 0;
+    });
+
+    if (existingDraft) {
+      set({ currentSessionId: existingDraft.id });
+      return existingDraft.id;
+    }
+
     const token = requireToken();
     const response = await fetch(`${BACKEND_URL}/api/ai/chat/sessions`, {
       method: "POST",

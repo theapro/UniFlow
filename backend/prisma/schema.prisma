@@ -224,6 +224,24 @@ model UserInvitation {
   @@map("UserInvitation")
 }
 
+model AiModel {
+  id              String     @id @default(uuid()) @db.Uuid
+  provider        String
+  model           String
+  displayName     String
+  modality        AiModality @default(CHAT)
+  isEnabled       Boolean    @default(true)
+  enabledForUsers Boolean    @default(false)
+  enabledForAdmins Boolean   @default(true)
+  sortOrder       Int        @default(0)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@unique([provider, model])
+  @@index([provider, modality, isEnabled, enabledForUsers, sortOrder])
+  @@map("AiModel")
+}
+
 model LoginCode {
   id        String    @id @default(uuid()) @db.Uuid
   userId    String    @db.Uuid
@@ -260,6 +278,16 @@ enum ChatSender {
   SYSTEM
 
   @@map("ChatSender")
+}
+
+enum AiModality {
+  CHAT
+  VISION
+  STT
+  TTS
+  MODERATION
+
+  @@map("AiModality")
 }
 
 enum Weekday {

@@ -13,6 +13,7 @@
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset --force",
     "db:seed": "prisma db seed",
+    "ai:test-models": "tsx src/scripts/test-ai-models.ts",
     "prisma:studio": "prisma studio"
   },
   "dependencies": {

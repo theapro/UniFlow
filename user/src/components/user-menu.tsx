@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { ChevronsUpDown, LogOut } from "lucide-react";
 
 import { auth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -48,15 +48,21 @@ export function UserMenu({ user }: { user: CurrentUser }) {
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          className="h-9 px-2 gap-2"
+          className="h-auto w-full justify-start gap-2 px-2 py-2"
           aria-label="User menu"
         >
           <Avatar className="h-7 w-7">
             <AvatarFallback className="text-xs">{initials}</AvatarFallback>
           </Avatar>
-          <span className="hidden sm:inline text-sm font-medium">
-            {displayName}
-          </span>
+          <div className="min-w-0 flex-1 text-left">
+            <div className="truncate text-sm font-medium leading-none">
+              {displayName}
+            </div>
+            <div className="truncate text-xs text-muted-foreground">
+              {user.email}
+            </div>
+          </div>
+          <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">

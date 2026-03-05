@@ -16,6 +16,8 @@ import { AdminGroupController } from "../controllers/admin/AdminGroupController"
 import { AdminGroupService } from "../services/admin/AdminGroupService";
 import { AdminLessonController } from "../controllers/admin/AdminLessonController";
 import { AdminLessonService } from "../services/admin/AdminLessonService";
+import { AdminAiModelController } from "../controllers/admin/AdminAiModelController";
+import { AiModelService } from "../services/ai/AiModelService";
 
 const router = Router();
 
@@ -52,6 +54,7 @@ const adminGroupController = new AdminGroupController(new AdminGroupService());
 const adminLessonController = new AdminLessonController(
   new AdminLessonService(),
 );
+const adminAiModelController = new AdminAiModelController(new AiModelService());
 
 // Students
 router.get("/students", adminStudentController.list);
@@ -110,5 +113,9 @@ router.get("/lessons/:id", adminLessonController.getById);
 router.post("/lessons", adminLessonController.create);
 router.put("/lessons/:id", adminLessonController.update);
 router.delete("/lessons/:id", adminLessonController.remove);
+
+// AI Models
+router.get("/ai/models", adminAiModelController.list);
+router.patch("/ai/models/:id", adminAiModelController.update);
 
 export default router;

@@ -26,6 +26,7 @@ export const env = {
   groqModel: optional("GROQ_MODEL"),
   groqApiUrl: optional("GROQ_API_URL"),
   aiContextLimit: Number(process.env.AI_CONTEXT_LIMIT ?? 15),
+  aiMaxTokens: Number(process.env.AI_MAX_TOKENS ?? 2048),
 
   // Google Sign-In (ID token verification)
   googleClientId: optional("GOOGLE_CLIENT_ID"),

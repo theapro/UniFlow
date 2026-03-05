@@ -13,6 +13,7 @@ import {
   UsersIcon,
   GraduationCapIcon,
   LayersIcon,
+  SettingsIcon,
 } from "lucide-react";
 
 import { NavDocuments } from "@/components/nav-documents";
@@ -112,6 +113,11 @@ export function UniFlowSidebar({
               name: dict?.nav?.aiMonitor ?? "AI Monitor",
               url: `${dashboardBase}/ai-monitor`,
               icon: BrainIcon,
+            },
+            {
+              name: dict?.nav?.aiModels ?? "AI Models",
+              url: `${dashboardBase}/ai-models`,
+              icon: SettingsIcon,
             },
           ]}
         />

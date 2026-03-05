@@ -20,7 +20,8 @@
     "subjects": "Subjects",
     "schedule": "Schedule",
     "attendance": "Attendance",
-    "aiMonitor": "AI Monitor"
+    "aiMonitor": "AI Monitor",
+    "aiModels": "AI Models"
   },
   "dashboard": {
     "title": "Dashboard",

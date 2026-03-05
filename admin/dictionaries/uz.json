@@ -20,7 +20,8 @@
     "subjects": "Fanlar",
     "schedule": "Dars jadvali",
     "attendance": "Davomat",
-    "aiMonitor": "AI Monitoring"
+    "aiMonitor": "AI Monitoring",
+    "aiModels": "AI Modellar"
   },
   "dashboard": {
     "title": "Boshqaruv paneli",

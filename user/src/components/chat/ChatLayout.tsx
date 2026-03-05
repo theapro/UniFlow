@@ -25,6 +25,9 @@ export function ChatLayout() {
     setCurrentSession,
     loadSessions,
     loadMessages,
+    loadModels,
+    models,
+    selectedModelId,
   } = useChatStore();
 
   const [abortController, setAbortController] =
@@ -34,6 +37,10 @@ export function ChatLayout() {
   const inputRef = useRef<HTMLDivElement>(null);
   const [inputHeight, setInputHeight] = useState<number>(160);
   const [showWarning, setShowWarning] = useState(false);
+  const [emptyGreeting, setEmptyGreeting] = useState<string>(
+    "Qanday yordam bera olaman?",
+  );
+  const [greetingLoaded, setGreetingLoaded] = useState(false);
 
   const currentMessages = currentSessionId
     ? messages[currentSessionId] || []
@@ -44,8 +51,41 @@ export function ChatLayout() {
     if (sessions.length === 0) {
       loadSessions().catch((e) => console.error("Failed to load sessions", e));
     }
+    if (models.length === 0) {
+      loadModels().catch((e) => console.error("Failed to load models", e));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const selectedModel = selectedModelId
+    ? models.find((m) => m.id === selectedModelId)
+    : null;
+
+  useEffect(() => {
+    if (greetingLoaded) return;
+    if (currentMessages.length > 0) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/greeting", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = (await res.json()) as any;
+        const greeting = String(json?.data?.greeting ?? "").trim();
+        if (!cancelled && greeting.length > 0) {
+          setEmptyGreeting(greeting);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setGreetingLoaded(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentMessages.length, greetingLoaded]);
 
   // Load messages when session changes
   useEffect(() => {
@@ -134,7 +174,7 @@ export function ChatLayout() {
         body: JSON.stringify({
           sessionId,
           message: content,
-          model: "qwen/qwen3-32b",
+          model: selectedModel?.model,
           temperature: 0.7,
         }),
         signal: controller.signal,
@@ -152,6 +192,8 @@ export function ChatLayout() {
       }
 
       let accumulatedContent = "";
+      let buffer = "";
+      let doneSignal = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -160,14 +202,17 @@ export function ChatLayout() {
           break;
         }
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n");
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
 
         for (const line of lines) {
           const trimmedLine = line.trim();
 
-          if (!trimmedLine || trimmedLine === "data: [DONE]") {
-            continue;
+          if (!trimmedLine) continue;
+          if (trimmedLine === "data: [DONE]") {
+            doneSignal = true;
+            break;
           }
 
           if (trimmedLine.startsWith("data: ")) {
@@ -185,6 +230,8 @@ export function ChatLayout() {
             }
           }
         }
+
+        if (doneSignal) break;
       }
 
       if (!accumulatedContent) {
@@ -226,7 +273,7 @@ export function ChatLayout() {
           {currentMessages.length === 0 ? (
             <div className="flex h-[70vh] flex-col items-center justify-center p-8 text-center">
               <h2 className="text-3xl mb-10 font-bold tracking-tight text-foreground">
-                Qanday yordam bera olaman?
+                {emptyGreeting}
               </h2>
             </div>
           ) : (

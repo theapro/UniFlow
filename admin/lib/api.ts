@@ -177,3 +177,9 @@ export const attendanceApi = {
 
   remove: (id: string) => axios.delete(`/api/admin/attendance/${id}`),
 };
+
+export const aiModelsApi = {
+  list: () => axios.get("/api/admin/ai/models"),
+  update: (id: string, patch: any) =>
+    axios.patch(`/api/admin/ai/models/${id}`, patch),
+};

@@ -14,6 +14,7 @@ export class GroqChatService {
 
   async streamChat(params: {
     model?: string;
+    maxTokens?: number;
     temperature?: number;
     messages: LlmMessage[];
     callbacks: StreamCallbacks;
@@ -34,6 +35,15 @@ export class GroqChatService {
         model: params.model ?? process.env.GROQ_MODEL ?? "qwen/qwen3-32b",
         messages: params.messages,
         temperature: params.temperature ?? 0.7,
+        ...(typeof params.maxTokens === "number" &&
+        Number.isFinite(params.maxTokens)
+          ? {
+              max_tokens: Math.min(
+                Math.max(Math.floor(params.maxTokens), 1),
+                8192,
+              ),
+            }
+          : {}),
         stream: true,
       }),
       signal: params.abortSignal,

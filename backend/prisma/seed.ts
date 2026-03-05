@@ -134,10 +134,167 @@ async function seedReferenceData() {
   }
 }
 
+async function seedAiModels() {
+  // Curated list based on the provided model IDs list.
+  // Note: we only *use* CHAT models in the app today, but we store modalities
+  // so admin can manage them as the system expands.
+  const models: Array<{
+    provider: string;
+    model: string;
+    displayName: string;
+    modality: "CHAT" | "VISION" | "STT" | "TTS" | "MODERATION";
+    enabledForUsers: boolean;
+    sortOrder: number;
+  }> = [
+    // TEXT / CHAT
+    {
+      provider: "groq",
+      model: "openai/gpt-oss-120b",
+      displayName: "GPT OSS 120B",
+      modality: "CHAT",
+      enabledForUsers: true,
+      sortOrder: 10,
+    },
+    {
+      provider: "groq",
+      model: "openai/gpt-oss-20b",
+      displayName: "GPT OSS 20B",
+      modality: "CHAT",
+      enabledForUsers: true,
+      sortOrder: 20,
+    },
+    {
+      provider: "groq",
+      model: "qwen/qwen3-32b",
+      displayName: "Qwen 3 32B",
+      modality: "CHAT",
+      enabledForUsers: true,
+      sortOrder: 30,
+    },
+    {
+      provider: "groq",
+      model: "moonshotai/kimi-k2-instruct-0905",
+      displayName: "Kimi K2 Instruct",
+      modality: "CHAT",
+      enabledForUsers: true,
+      sortOrder: 40,
+    },
+    {
+      provider: "groq",
+      model: "meta-llama/llama-4-scout-17b-16e-instruct",
+      displayName: "Llama 4 Scout 17B Instruct",
+      modality: "CHAT",
+      enabledForUsers: true,
+      sortOrder: 50,
+    },
+    {
+      provider: "groq",
+      model: "llama-3.3-70b-versatile",
+      displayName: "Llama 3.3 70B Versatile",
+      modality: "CHAT",
+      enabledForUsers: true,
+      sortOrder: 60,
+    },
+
+    // TEXT TO SPEECH
+    {
+      provider: "groq",
+      model: "canopylabs/orpheus-v1-english",
+      displayName: "Orpheus v1 English (TTS)",
+      modality: "TTS",
+      enabledForUsers: false,
+      sortOrder: 200,
+    },
+
+    // SPEECH TO TEXT
+    {
+      provider: "groq",
+      model: "whisper-large-v3",
+      displayName: "Whisper Large v3 (STT)",
+      modality: "STT",
+      enabledForUsers: false,
+      sortOrder: 300,
+    },
+    {
+      provider: "groq",
+      model: "whisper-large-v3-turbo",
+      displayName: "Whisper Large v3 Turbo (STT)",
+      modality: "STT",
+      enabledForUsers: false,
+      sortOrder: 310,
+    },
+  ];
+
+  for (const m of models) {
+    // Create/update the correct record by (provider, model)
+    const createdOrUpdated = await prisma.aiModel.upsert({
+      where: { provider_model: { provider: m.provider, model: m.model } },
+      update: {
+        displayName: m.displayName,
+        modality: m.modality as any,
+        enabledForUsers: m.enabledForUsers,
+        sortOrder: m.sortOrder,
+        isEnabled: true,
+        enabledForAdmins: true,
+      },
+      create: {
+        provider: m.provider,
+        model: m.model,
+        displayName: m.displayName,
+        modality: m.modality as any,
+        enabledForUsers: m.enabledForUsers,
+        enabledForAdmins: true,
+        isEnabled: true,
+        sortOrder: m.sortOrder,
+      },
+      select: { id: true, model: true },
+    });
+
+    // If there is an older record with the same displayName but wrong/empty model,
+    // migrate it by deleting (so we don't leave model="" rows around).
+    const wrongByName = await prisma.aiModel.findFirst({
+      where: {
+        provider: m.provider,
+        displayName: m.displayName,
+        NOT: { id: createdOrUpdated.id },
+      },
+      select: { id: true, model: true },
+    });
+
+    if (wrongByName && wrongByName.model !== createdOrUpdated.model) {
+      await prisma.aiModel.delete({ where: { id: wrongByName.id } });
+    }
+  }
+
+  // Clean any accidental blank-model rows.
+  await prisma.aiModel.deleteMany({ where: { model: "" } });
+
+  // Remove legacy/non-existent model IDs from earlier seeds.
+  await prisma.aiModel.deleteMany({
+    where: {
+      provider: "groq",
+      model: {
+        in: [
+          "gpt-oss-120b",
+          "gpt-oss-20b",
+          "kimi-k2",
+          "llama-4-scout",
+          "llama-3.3-70b",
+          "llama-4-scout-vision",
+          "orpheus-english",
+          "orpheus-arabic-saudi",
+          "safety-gpt-oss-20b",
+        ],
+      },
+    },
+  });
+}
+
 async function main() {
   console.log("Seeding database...");
   await upsertAdmin();
   await seedReferenceData();
+  await seedAiModels();
   console.log("✓ Seed complete");
   console.log(
     `✓ Admin login: ${DEFAULTS.adminEmail} / ${DEFAULTS.adminPassword}`,

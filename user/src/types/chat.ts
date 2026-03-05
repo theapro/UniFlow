@@ -19,6 +19,10 @@ export type ChatStore = {
   isLoading: boolean;
   isStreaming: boolean;
 
+  // AI model policy (admin-controlled)
+  models: AllowedAiModel[];
+  selectedModelId: string | null;
+
   // Actions
   loadSessions: () => Promise<void>;
   loadMessages: (sessionId: string) => Promise<void>;
@@ -32,6 +36,17 @@ export type ChatStore = {
   setStreaming: (isStreaming: boolean) => void;
   clearMessages: (sessionId: string) => void;
   regenerateMessage: (sessionId: string) => void;
+
+  loadModels: () => Promise<void>;
+  setSelectedModel: (modelId: string) => void;
+};
+
+export type AllowedAiModel = {
+  id: string;
+  provider: string;
+  model: string;
+  displayName: string;
+  modality: "CHAT" | "VISION" | "STT" | "TTS" | "MODERATION";
 };
 
 export type GroqChatRequest = {

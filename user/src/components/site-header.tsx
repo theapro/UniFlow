@@ -7,7 +7,7 @@ export function SiteHeader({
   title = "Documents",
   right,
 }: {
-  title?: string;
+  title?: React.ReactNode;
   right?: React.ReactNode;
 }) {
   return (

@@ -4,7 +4,9 @@ import { ChatLayout } from "@/components/chat/ChatLayout";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { UserMenu, type CurrentUser } from "@/components/user-menu";
+import type { CurrentUser } from "@/components/user-menu";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { CurrentChatTitle } from "@/components/chat/CurrentChatTitle";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
@@ -55,11 +57,11 @@ async function DashboardWithUser({ token }: { token: string }) {
 
   return (
     <SidebarProvider className="h-svh overflow-hidden">
-      <ChatSidebar variant="inset" />
+      <ChatSidebar variant="inset" user={currentUser} />
       <SidebarInset className="overflow-hidden">
         <SiteHeader
-          title="AI Chat"
-          right={currentUser ? <UserMenu user={currentUser} /> : null}
+          title={<CurrentChatTitle fallback="AI Chat" />}
+          right={<ThemeToggle />}
         />
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="@container/main flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">

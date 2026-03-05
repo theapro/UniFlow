@@ -21,6 +21,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
@@ -28,6 +38,7 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
+  SidebarFooter,
   SidebarMenu,
   SidebarMenuAction,
   SidebarMenuButton,
@@ -35,11 +46,13 @@ import {
   SidebarSeparator,
   SidebarInput,
 } from "@/components/ui/sidebar";
+import { UserMenu, type CurrentUser } from "@/components/user-menu";
 
 export function ChatSidebar({
   className,
+  user,
   ...props
-}: React.ComponentProps<typeof Sidebar>) {
+}: React.ComponentProps<typeof Sidebar> & { user?: CurrentUser | null }) {
   const {
     sessions,
     currentSessionId,
@@ -51,10 +64,13 @@ export function ChatSidebar({
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
   const handleNewChat = async () => {
-    const newSessionId = await createSession();
-    setCurrentSession(newSessionId);
+    await createSession();
   };
 
   const handleRename = (sessionId: string, currentTitle: string) => {
@@ -75,128 +91,169 @@ export function ChatSidebar({
     setEditValue("");
   };
 
-  const handleDelete = async (sessionId: string) => {
-    if (confirm("Are you sure you want to delete this chat?")) {
-      await deleteSession(sessionId);
-    }
+  const handleDelete = (sessionId: string, title: string) => {
+    setDeleteTarget({ id: sessionId, title });
   };
 
   return (
-    <Sidebar
-      collapsible="offcanvas"
-      className={cn("text-sidebar-foreground", className)}
-      {...props}
-    >
-      <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild className="px-2">
-              <a href="/" className="flex items-center gap-2">
-                <span className="text-base font-semibold">UniFlow AI</span>
-              </a>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarHeader>
+    <>
+      <Sidebar
+        collapsible="offcanvas"
+        className={cn("text-sidebar-foreground", className)}
+        {...props}
+      >
+        <SidebarHeader>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild className="px-2">
+                <a href="/" className="flex items-center gap-2">
+                  <span className="text-base font-semibold">UniFlow AI</span>
+                </a>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
 
-      <SidebarSeparator />
+        <SidebarSeparator />
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Chats</SidebarGroupLabel>
-          <SidebarGroupAction onClick={handleNewChat} title="New chat">
-            <PlusCircle />
-          </SidebarGroupAction>
-          <SidebarGroupContent>
-            {sessions.length === 0 ? (
-              <div className="px-2 py-6 text-sm text-sidebar-foreground/70">
-                Start a new conversation.
-              </div>
-            ) : (
-              <SidebarMenu>
-                {sessions.map((session) => {
-                  const isActive = session.id === currentSessionId;
-                  const isEditing = editingId === session.id;
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Chats</SidebarGroupLabel>
+            <SidebarGroupAction onClick={handleNewChat} title="New chat">
+              <PlusCircle />
+            </SidebarGroupAction>
+            <SidebarGroupContent>
+              {sessions.length === 0 ? (
+                <div className="px-2 py-6 text-sm text-sidebar-foreground/70">
+                  Start a new conversation.
+                </div>
+              ) : (
+                <SidebarMenu>
+                  {sessions.map((session) => {
+                    const isActive = session.id === currentSessionId;
+                    const isEditing = editingId === session.id;
 
-                  return (
-                    <SidebarMenuItem key={session.id}>
-                      {isEditing ? (
-                        <div className="flex items-center gap-2 rounded-md px-2 py-1">
-                          <SidebarInput
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                handleSaveRename(session.id);
-                              } else if (e.key === "Escape") {
-                                handleCancelRename();
-                              }
-                            }}
-                            className="h-8"
-                            autoFocus
-                          />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleSaveRename(session.id)}
-                            title="Save"
-                          >
-                            <Check className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={handleCancelRename}
-                            title="Cancel"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <>
-                          <SidebarMenuButton
-                            isActive={isActive}
-                            onClick={() => setCurrentSession(session.id)}
-                            tooltip={session.title}
-                          >
-                            <span>{session.title}</span>
-                          </SidebarMenuButton>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <SidebarMenuAction showOnHover title="Actions">
-                                <MoreHorizontal />
-                              </SidebarMenuAction>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent side="right" align="start">
-                              <DropdownMenuItem
-                                onSelect={() =>
-                                  handleRename(session.id, session.title)
+                    return (
+                      <SidebarMenuItem key={session.id}>
+                        {isEditing ? (
+                          <div className="flex items-center gap-2 rounded-md px-2 py-1">
+                            <SidebarInput
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  handleSaveRename(session.id);
+                                } else if (e.key === "Escape") {
+                                  handleCancelRename();
                                 }
-                              >
-                                <Pencil className="mr-2 h-4 w-4" />
-                                Rename
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
-                                onSelect={() => handleDelete(session.id)}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </>
-                      )}
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            )}
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-    </Sidebar>
+                              }}
+                              className="h-8"
+                              autoFocus
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleSaveRename(session.id)}
+                              title="Save"
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={handleCancelRename}
+                              title="Cancel"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <SidebarMenuButton
+                              isActive={isActive}
+                              onClick={() => setCurrentSession(session.id)}
+                              tooltip={session.title}
+                            >
+                              <span>{session.title}</span>
+                            </SidebarMenuButton>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <SidebarMenuAction showOnHover title="Actions">
+                                  <MoreHorizontal />
+                                </SidebarMenuAction>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent side="right" align="start">
+                                <DropdownMenuItem
+                                  onSelect={() =>
+                                    handleRename(session.id, session.title)
+                                  }
+                                >
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  Rename
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onSelect={() =>
+                                    handleDelete(session.id, session.title)
+                                  }
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </>
+                        )}
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              )}
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+
+        <SidebarFooter>
+          {user ? (
+            <div className="border-t border-sidebar-border p-2">
+              <UserMenu user={user} />
+            </div>
+          ) : null}
+        </SidebarFooter>
+      </Sidebar>
+
+      <AlertDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete chat?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete
+              {deleteTarget?.title ? ` “${deleteTarget.title}”` : " this chat"}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (!deleteTarget) return;
+                const id = deleteTarget.id;
+                setDeleteTarget(null);
+                await deleteSession(id);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
