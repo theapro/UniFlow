@@ -19,7 +19,7 @@ interface StudentFormProps {
     } | null;
   };
   lang: string;
-  dict: any;
+  dict?: any;
   onSubmit: (data: CreateStudentInput | UpdateStudentInput) => Promise<void>;
 }
 
@@ -54,17 +54,34 @@ export function StudentForm({
     }
   };
 
+  const defaultDict = {
+    common: { save: "Save", cancel: "Cancel", loading: "Saving..." },
+    students: {
+      editTitle: "Edit Student",
+      createTitle: "Add New Student",
+      fullName: "Full Name",
+      email: "Email",
+      studentNo: "Student Number",
+      group: "Group",
+      importTitle: "Bulk Import",
+      importDescription:
+        "Upload your CSV/XLSX file to add multiple students at once.",
+    },
+  };
+
+  const d = dict ?? defaultDict;
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>
-          {student ? dict.students.editTitle : dict.students.createTitle}
+          {student ? d.students.editTitle : d.students.createTitle}
         </CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="fullName">{dict.students.fullName}</Label>
+            <Label htmlFor="fullName">{d.students.fullName}</Label>
             <Input
               id="fullName"
               value={fullName}
@@ -74,7 +91,7 @@ export function StudentForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">{dict.students.email || "Email"}</Label>
+            <Label htmlFor="email">{d.students.email || "Email"}</Label>
             <Input
               id="email"
               type="email"
@@ -86,7 +103,7 @@ export function StudentForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="studentNo">{dict.students.studentNo}</Label>
+            <Label htmlFor="studentNo">{d.students.studentNo}</Label>
             <Input
               id="studentNo"
               value={studentNo}
@@ -95,7 +112,7 @@ export function StudentForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="groupId">{dict.students.group}</Label>
+            <Label htmlFor="groupId">{d.students.group}</Label>
             <Input
               id="groupId"
               value={groupId}
@@ -106,14 +123,14 @@ export function StudentForm({
 
           <div className="flex gap-2">
             <Button type="submit" disabled={loading}>
-              {loading ? dict.common.loading : dict.common.save}
+              {loading ? d.common.loading : d.common.save}
             </Button>
             <Button
               type="button"
               variant="outline"
               onClick={() => router.back()}
             >
-              {dict.common.cancel}
+              {d.common.cancel}
             </Button>
           </div>
         </form>

@@ -2,10 +2,10 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-
 import { aiModelsApi } from "@/lib/api";
+
 import { PageHeader } from "@/components/shared/PageHeader";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -14,7 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type AiModel = {
   id: string;
@@ -28,14 +30,10 @@ type AiModel = {
   sortOrder: number;
 };
 
-export default function AiModelsPage({
-  params: { lang },
-}: {
-  params: { lang: string };
-}) {
+export default function AiModelsPage() {
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data: models, isLoading } = useQuery({
     queryKey: ["ai-models"],
     queryFn: async () => {
       const res = await aiModelsApi.list();
@@ -44,113 +42,85 @@ export default function AiModelsPage({
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (args: { id: string; patch: Partial<AiModel> }) => {
-      const res = await aiModelsApi.update(args.id, args.patch);
-      return res.data?.data as AiModel;
+    mutationFn: async ({ id, patch }: { id: string; patch: Partial<AiModel> }) => {
+      const res = await aiModelsApi.update(id, patch);
+      return res.data?.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ai-models"] });
     },
-    onError: (err: any) => {
-      console.error(err);
-      toast.error("Failed to update model");
-    },
+    onError: () => toast.error("Yangilashda xatolik yuz berdi"),
   });
 
-  const title = "AI Models";
+  const handleUpdate = (id: string, patch: Partial<AiModel>) => {
+    updateMutation.mutate({ id, patch });
+  };
 
   return (
-    <div className="space-y-4">
-      <PageHeader title={title} />
+    <div className=" container space-y-6">
+      <div className="flex flex-col gap-1">
+        <PageHeader title="AI Models" />
+        <p className="text-sm text-muted-foreground">
+          Tizimdagi modellarni boshqarish va foydalanuvchilar uchun ruxsatlarni sozlash.
+        </p>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Admin model policy</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Toggle which models are enabled globally, and which are available to
-            users.
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Models</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-sm text-muted-foreground">Loading...</div>
-          ) : !data || data.length === 0 ? (
-            <div className="text-sm text-muted-foreground">
-              No models found.
-            </div>
-          ) : (
-            <div className="w-full overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[220px]">Name</TableHead>
-                    <TableHead className="min-w-[100px]">Provider</TableHead>
-                    <TableHead className="min-w-[240px]">Model</TableHead>
-                    <TableHead className="min-w-[120px]">Modality</TableHead>
-                    <TableHead className="w-[90px] text-center">
-                      Enabled
-                    </TableHead>
-                    <TableHead className="w-[140px] text-center">
-                      User access
-                    </TableHead>
+      <Card className="border-none shadow-none bg-transparent">
+        <CardContent className="p-0">
+          <div className="rounded-md border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-[300px]">Model & Provider</TableHead>
+                  <TableHead>Modality</TableHead>
+                  <TableHead className="text-right">Enabled</TableHead>
+                  <TableHead className="text-right">User Access</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-10 w-full" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-12 ml-auto" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-12 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : models?.map((m) => (
+                  <TableRow key={m.id} className="group">
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-sm">{m.displayName}</span>
+                        <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
+                          {m.provider} • {m.model}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="font-normal text-[10px] px-2 py-0">
+                        {m.modality}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Switch
+                        checked={m.isEnabled}
+                        onCheckedChange={(v) => handleUpdate(m.id, { isEnabled: v })}
+                        disabled={updateMutation.isPending}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Switch
+                        checked={m.enabledForUsers}
+                        disabled={!m.isEnabled || updateMutation.isPending}
+                        onCheckedChange={(v) => handleUpdate(m.id, { enabledForUsers: v })}
+                      />
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.map((m) => {
-                    const isBusy =
-                      updateMutation.isPending &&
-                      updateMutation.variables?.id === m.id;
-                    return (
-                      <TableRow
-                        key={m.id}
-                        className={isBusy ? "opacity-60" : ""}
-                      >
-                        <TableCell className="font-medium">
-                          {m.displayName}
-                        </TableCell>
-                        <TableCell>{m.provider}</TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {m.model}
-                        </TableCell>
-                        <TableCell>{m.modality}</TableCell>
-                        <TableCell className="text-center">
-                          <Checkbox
-                            checked={m.isEnabled}
-                            onCheckedChange={(checked) =>
-                              updateMutation.mutate({
-                                id: m.id,
-                                patch: { isEnabled: Boolean(checked) },
-                              })
-                            }
-                          />
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Checkbox
-                            checked={m.enabledForUsers}
-                            disabled={!m.isEnabled}
-                            onCheckedChange={(checked) =>
-                              updateMutation.mutate({
-                                id: m.id,
-                                patch: { enabledForUsers: Boolean(checked) },
-                              })
-                            }
-                          />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

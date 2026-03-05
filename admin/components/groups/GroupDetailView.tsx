@@ -36,7 +36,7 @@ export function GroupDetailView({
   });
 
   return (
-    <div className="space-y-4">
+    <div className="container space-y-4">
       <PageHeader
         title={group?.name ?? dict?.groups?.detailTitle ?? "Group"}
         actions={

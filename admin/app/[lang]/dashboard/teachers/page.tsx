@@ -83,7 +83,7 @@ export default function TeachersPage({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 container">
       <PageHeader
         title={dict.teachers.title}
         actions={

@@ -23,7 +23,7 @@ export function GroupsView({ lang, dict }: { lang: string; dict: any }) {
   });
 
   return (
-    <div className="space-y-4">
+    <div className="container space-y-4">
       <PageHeader title={dict?.groups?.title ?? "Groups"} />
 
       {groupsLoading ? (
