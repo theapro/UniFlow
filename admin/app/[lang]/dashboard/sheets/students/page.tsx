@@ -1,11 +1,12 @@
 import { getDictionary, type Locale } from "@/lib/i18n";
-import { redirect } from "next/navigation";
+import { SheetsView } from "@/components/sheets/SheetsView";
 
 export default async function SheetsPage({
   params: { lang },
 }: {
   params: { lang: Locale };
 }) {
-  redirect(`/${lang}/dashboard/sheets/students`);
-  return null;
+  const dict = await getDictionary(lang);
+
+  return <SheetsView lang={lang} dict={dict} />;
 }

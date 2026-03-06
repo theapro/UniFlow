@@ -15,7 +15,8 @@ export type CreateStudentInput = {
   teacherIds?: string[];
   parentIds?: string[];
   note?: string | null;
-  groupId?: string | null;
+  groupId: string;
+  cohort?: string | null;
 };
 
 export type UpdateStudentInput = {
@@ -26,6 +27,7 @@ export type UpdateStudentInput = {
   status?: "ACTIVE" | "INACTIVE" | "GRADUATED" | "DROPPED";
   teacherIds?: string[];
   parentIds?: string[];
+  cohort?: string | null;
   note?: string | null;
   groupId?: string | null;
 };
@@ -88,10 +90,12 @@ export class AdminStudentService {
     const password = generateTemporaryPassword();
     const passwordHash = bcrypt.hashSync(password, 10);
 
-    if (input.groupId != null) {
-      if (typeof input.groupId !== "string" || !this.isUuid(input.groupId)) {
-        throw new Error("INVALID_GROUP_ID");
-      }
+    if (
+      !input.groupId ||
+      typeof input.groupId !== "string" ||
+      !this.isUuid(input.groupId)
+    ) {
+      throw new Error("INVALID_GROUP_ID");
     }
 
     const { student, user } = await prisma.$transaction(async (tx) => {
@@ -103,17 +107,11 @@ export class AdminStudentService {
         throw new Error("EMAIL_ALREADY_EXISTS");
       }
 
-      const group = input.groupId
-        ? await tx.group.findUnique({
-            where: { id: input.groupId },
-            select: {
-              id: true,
-              name: true,
-              cohort: { select: { year: true } },
-            },
-          })
-        : null;
-      if (input.groupId && !group) throw new Error("GROUP_NOT_FOUND");
+      const group = await tx.group.findUnique({
+        where: { id: input.groupId },
+        include: { cohort: { select: { year: true } } },
+      });
+      if (!group) throw new Error("GROUP_NOT_FOUND");
 
       const createdStudent = await tx.student.create({
         data: {
@@ -125,9 +123,11 @@ export class AdminStudentService {
           teacherIds: input.teacherIds ?? [],
           parentIds: input.parentIds ?? [],
           note: input.note ?? null,
-          groupId: group?.id ?? null,
-          groupName: group?.name ?? null,
-          cohort: group?.cohort?.year ? String(group.cohort.year) : null,
+          groupId: group.id,
+          groupName: group.name,
+          cohort:
+            input.cohort ||
+            (group.cohort?.year ? String(group.cohort.year) : null),
           updatedAt: new Date(),
         },
         include: { group: true },
@@ -221,11 +221,7 @@ export class AdminStudentService {
       const group = input.groupId
         ? await tx.group.findUnique({
             where: { id: input.groupId },
-            select: {
-              id: true,
-              name: true,
-              cohort: { select: { year: true } },
-            },
+            include: { cohort: { select: { year: true } } },
           })
         : null;
       if (input.groupId && !group) throw new Error("GROUP_NOT_FOUND");
@@ -245,12 +241,19 @@ export class AdminStudentService {
           ...(input.parentIds !== undefined
             ? { parentIds: input.parentIds }
             : {}),
+          ...(input.cohort !== undefined ? { cohort: input.cohort } : {}),
           ...(input.note !== undefined ? { note: input.note } : {}),
           ...(input.groupId !== undefined
             ? {
                 groupId: group?.id ?? null,
                 groupName: group?.name ?? null,
-                cohort: group?.cohort?.year ? String(group.cohort.year) : null,
+                ...(input.cohort !== undefined
+                  ? {}
+                  : {
+                      cohort: group?.cohort?.year
+                        ? String(group.cohort.year)
+                        : null,
+                    }),
               }
             : {}),
           updatedAt: new Date(),

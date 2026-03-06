@@ -2,6 +2,22 @@ import type { Request, Response } from "express";
 import { AdminStudentService } from "../../services/admin/AdminStudentService";
 import { created, fail, ok } from "../../utils/responses";
 
+function parseStudentStatus(
+  value: unknown,
+): "ACTIVE" | "INACTIVE" | "GRADUATED" | "DROPPED" | undefined {
+  if (typeof value !== "string") return undefined;
+  const v = value.toUpperCase();
+  if (
+    v === "ACTIVE" ||
+    v === "INACTIVE" ||
+    v === "GRADUATED" ||
+    v === "DROPPED"
+  ) {
+    return v;
+  }
+  return undefined;
+}
+
 export class AdminStudentController {
   constructor(private readonly studentService: AdminStudentService) {}
 
@@ -41,12 +57,24 @@ export class AdminStudentController {
 
   create = async (req: Request, res: Response) => {
     try {
-      const { fullName, email, studentNo, groupId } = req.body ?? {};
+      const {
+        fullName,
+        email,
+        studentNo,
+        groupId,
+        cohort,
+        phone,
+        status,
+        note,
+      } = req.body ?? {};
       if (!fullName || typeof fullName !== "string") {
         return fail(res, 400, "fullName is required");
       }
       if (!email || typeof email !== "string") {
         return fail(res, 400, "email is required");
+      }
+      if (!groupId || typeof groupId !== "string") {
+        return fail(res, 400, "groupId (group selection) is required");
       }
 
       const result = await this.studentService.create({
@@ -54,7 +82,11 @@ export class AdminStudentController {
         email,
         studentNo:
           typeof studentNo === "string" ? studentNo : (studentNo ?? null),
-        groupId: typeof groupId === "string" ? groupId : (groupId ?? null),
+        groupId,
+        cohort: typeof cohort === "string" ? cohort : (cohort ?? null),
+        phone: typeof phone === "string" ? phone : (phone ?? null),
+        status: parseStudentStatus(status),
+        note: typeof note === "string" ? note : (note ?? null),
       });
 
       return created(res, "Student created", result);
@@ -90,13 +122,26 @@ export class AdminStudentController {
 
   update = async (req: Request, res: Response) => {
     try {
-      const { fullName, email, studentNo, groupId } = req.body ?? {};
+      const {
+        fullName,
+        email,
+        studentNo,
+        groupId,
+        cohort,
+        phone,
+        status,
+        note,
+      } = req.body ?? {};
 
       const student = await this.studentService.update(req.params.id, {
         ...(fullName !== undefined ? { fullName } : {}),
         ...(email !== undefined ? { email } : {}),
         ...(studentNo !== undefined ? { studentNo } : {}),
         ...(groupId !== undefined ? { groupId } : {}),
+        ...(cohort !== undefined ? { cohort } : {}),
+        ...(phone !== undefined ? { phone } : {}),
+        ...(status !== undefined ? { status: parseStudentStatus(status) } : {}),
+        ...(note !== undefined ? { note } : {}),
       });
 
       return ok(res, "Student updated", student);

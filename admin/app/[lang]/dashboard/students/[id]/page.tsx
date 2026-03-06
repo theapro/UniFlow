@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { studentsApi } from "@/lib/api";
+import { groupsApi, studentsApi } from "@/lib/api";
 import { StudentForm } from "@/components/students/StudentForm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,15 @@ export default function StudentDetailPage({
     queryKey: ["students", id],
     queryFn: () => studentsApi.getById(id).then((res) => res.data.data),
   });
+
+  const { data: groupsResp } = useQuery({
+    queryKey: ["groups"],
+    queryFn: () => groupsApi.list({ take: 200 }),
+  });
+
+  const groups = Array.isArray(groupsResp?.data?.data)
+    ? groupsResp.data.data
+    : [];
 
   const updateMutation = useMutation({
     mutationFn: (data: any) => studentsApi.update(id, data),
@@ -78,6 +87,7 @@ export default function StudentDetailPage({
               student={student}
               lang={lang}
               dict={dict}
+              groups={groups}
               onSubmit={async (data) => {
                 await updateMutation.mutateAsync(data);
                 toast.success("Muvaffaqiyatli yangilandi");

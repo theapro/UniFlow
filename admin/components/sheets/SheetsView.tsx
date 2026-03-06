@@ -5,10 +5,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { sheetsApi } from "@/lib/api";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SyncLogs } from "./SyncLogs";
+import { ConflictManager } from "./ConflictManager";
+import { RefreshCcw, LayoutGrid, AlertTriangle, ListFilter } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type StudentsSheetsStatusResponse = {
   enabled: boolean;
@@ -103,31 +106,8 @@ type ConflictDetail = {
   dbPayload: any;
 };
 
-function safeStr(v: any) {
-  if (v === null || v === undefined) return "";
-  return String(v);
-}
-
-function fieldList() {
-  return [
-    "student_uuid",
-    "student_number",
-    "fullname",
-    "email",
-    "phone",
-    "status",
-    "teacher_ids",
-    "parent_ids",
-    "cohort",
-    "created_at",
-    "updated_at",
-    "note",
-    "group",
-  ] as const;
-}
-
 function formatDateTime(value: string | null | undefined) {
-  if (!value) return "—";
+  if (!value) return "-";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return String(value);
   return d.toLocaleString();
@@ -138,7 +118,6 @@ export function SheetsView({ lang, dict }: { lang: string; dict: any }) {
   const [selectedConflictId, setSelectedConflictId] = React.useState<
     string | null
   >(null);
-  const [mergePayload, setMergePayload] = React.useState<any | null>(null);
 
   const syncMutation = useMutation({
     mutationFn: () => sheetsApi.syncNow().then((r) => r.data.data),
@@ -195,26 +174,27 @@ export function SheetsView({ lang, dict }: { lang: string; dict: any }) {
       queryClient.invalidateQueries({ queryKey: ["sheets", "status"] });
       queryClient.invalidateQueries({ queryKey: ["sheets", "conflicts"] });
       setSelectedConflictId(null);
-      setMergePayload(null);
     },
   });
 
-  const title = dict?.nav?.sheets ?? "Sheets";
+  const title = dict?.nav?.sheets ?? "Students Sheets";
 
   return (
-    <div className="container space-y-4">
+    <div className="container space-y-6 max-w-7xl mx-auto py-4">
       <PageHeader
         title={title}
         description={
           dict?.sheets?.description ??
-          "Students Spreadsheet sync (Google Sheets -> DB)."
+          "Manage synchronization between Google Sheets and Database."
         }
         actions={
           <div className="flex gap-2">
             <Button
               onClick={() => syncMutation.mutate()}
               disabled={syncMutation.isPending}
+              className="font-semibold shadow-sm"
             >
+              <RefreshCcw className={"h-4 w-4 mr-2 " + (syncMutation.isPending ? "animate-spin" : "")} />
               {syncMutation.isPending ? "Syncing..." : "Force Sync"}
             </Button>
             <Button
@@ -234,424 +214,248 @@ export function SheetsView({ lang, dict }: { lang: string; dict: any }) {
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {dict?.sheets?.connectionTitle ?? "Students Spreadsheet"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {healthLoading ? (
-              <div>{dict?.common?.loading ?? "Loading..."}</div>
-            ) : health ? (
-              <>
-                <div className="flex flex-wrap gap-2">
-                  <Badge
-                    variant={health.config?.enabled ? "default" : "outline"}
-                  >
-                    {health.config?.enabled ? "Enabled" : "Disabled"}
-                  </Badge>
-                  <Badge
-                    variant={
-                      health.config?.workerEnabled ? "default" : "outline"
-                    }
-                  >
-                    {health.config?.workerEnabled
-                      ? "Worker enabled"
-                      : "Worker disabled"}
-                  </Badge>
-                  <Badge
-                    variant={
-                      (health.connection as any)?.ok
-                        ? "secondary"
-                        : "destructive"
-                    }
-                  >
-                    {(health.connection as any)?.attempted
-                      ? (health.connection as any)?.ok
-                        ? "Connected"
-                        : "Error"
-                      : "Not configured"}
-                  </Badge>
-                </div>
-
-                {health.connection.attempted && health.connection.ok ? (
-                  <div className="space-y-2">
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">
-                        Spreadsheet ID:
-                      </span>{" "}
-                      <span className="font-medium">
-                        {health.connection.spreadsheet.id ??
-                          health.config?.spreadsheetId ??
-                          "—"}
-                      </span>
-                    </div>
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">
-                        Spreadsheet:
-                      </span>{" "}
-                      <span className="font-medium">
-                        {health.connection.spreadsheet.title ?? "(untitled)"}
-                      </span>
-                    </div>
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">
-                        Detected groups (tabs):
-                      </span>{" "}
-                      <span className="font-medium">
-                        {health.connection.sheetTitles.length}
-                      </span>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {health.connection.sheetTitles.join(", ") || "—"}
-                    </div>
-                  </div>
-                ) : health.connection.attempted && !health.connection.ok ? (
-                  <div className="text-sm text-destructive">
-                    {health.connection.error}
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground">
-                    {health.connection.error}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="text-sm text-muted-foreground">No data</div>
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid w-[400px] grid-cols-2 mb-4 bg-muted/50 p-1">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <LayoutGrid className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="conflicts" className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            Conflicts
+            {((conflicts?.items ?? []).length > 0) && (
+              <Badge variant="destructive" className="ml-1 h-5 w-5 p-0 flex items-center justify-center rounded-full text-[10px]">
+                {(conflicts?.items.length)}
+              </Badge>
             )}
-          </CardContent>
-        </Card>
+          </TabsTrigger>
+        </TabsList>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {dict?.sheets?.queueTitle ?? "Synchronization"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {statusLoading ? (
-              <div>{dict?.common?.loading ?? "Loading..."}</div>
-            ) : status ? (
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
+        <TabsContent value="overview" className="space-y-6 outline-none">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-[1fr_2fr]">
+            <Card className="h-fit">
+              <CardHeader className="pb-3 border-b border-muted/30">
+                <CardTitle className="text-xl">
+                  {dict?.sheets?.connectionTitle ?? "Source Spreadsheet"}
+                </CardTitle>
+                <CardDescription>Target Google Sheet configuration</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-4">
+                {healthLoading ? (
+                  <div>{dict?.common?.loading ?? "Loading..."}</div>
+                ) : health ? (
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge
+                        variant={health.config?.enabled ? "default" : "outline"}
+                      >
+                        {health.config?.enabled ? "Enabled" : "Disabled"}
+                      </Badge>
+                      <Badge
+                        variant={
+                          health.config?.workerEnabled ? "default" : "outline"
+                        }
+                      >
+                        {health.config?.workerEnabled
+                          ? "Auto Sync"
+                          : "Manual Only"}
+                      </Badge>
+                      <Badge
+                        variant={
+                          (health.connection as any)?.ok
+                            ? "secondary"
+                            : "destructive"
+                        }
+                      >
+                        {(health.connection as any)?.attempted
+                          ? (health.connection as any)?.ok
+                            ? "Connected"
+                            : "Error"
+                          : "Not configured"}
+                      </Badge>
+                    </div>
+
+                    {health.connection.attempted && health.connection.ok ? (
+                      <div className="space-y-3 bg-muted/30 p-3 rounded-lg border border-muted">
+                        <div className="text-sm">
+                          <span className="text-muted-foreground block text-xs uppercase font-bold tracking-tight mb-0.5">
+                            Spreadsheet ID
+                          </span>{" "}
+                          <span className="font-mono text-[11px] break-all bg-background p-1 rounded border inline-block w-full">
+                            {health.connection.spreadsheet.id ??
+                              health.config?.spreadsheetId ??
+                              "-"}
+                          </span>
+                        </div>
+                        <div className="text-sm">
+                          <span className="text-muted-foreground block text-xs uppercase font-bold tracking-tight mb-0.5">
+                            Title
+                          </span>{" "}
+                          <span className="font-medium text-slate-800 dark:text-slate-200">
+                            {health.connection.spreadsheet.title ?? "(untitled)"}
+                          </span>
+                        </div>
+                        <div className="text-sm">
+                          <span className="text-muted-foreground block text-xs uppercase font-bold tracking-tight mb-0.5">
+                            Detected Groups (tabs)
+                          </span>{" "}
+                          <span className="font-medium">
+                            {health.connection.sheetTitles.length}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {health.connection.sheetTitles.map((title, i) => (
+                             <Badge key={i} variant="outline" className="text-[10px] py-0">{title}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ) : health.connection.attempted && !health.connection.ok ? (
+                      <div className="text-sm flex gap-2 p-3 rounded-lg bg-red-50 text-red-900 border border-red-100 dark:bg-red-950/20 dark:text-red-200 dark:border-red-900">
+                        <AlertTriangle className="h-5 w-5 shrink-0" />
+                        {health.connection.error}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground italic">
+                        {health.connection.error}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-sm text-muted-foreground italic">No source configuration found.</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <div className="space-y-6">
+              <Card>
+                <CardHeader className="pb-3 border-b border-muted/30 flex-row items-center justify-between space-y-0">
+                  <div>
+                    <CardTitle className="text-xl">
+                      {dict?.sheets?.queueTitle ?? "Sync Performance"}
+                    </CardTitle>
+                    <CardDescription>Real-time status of data synchronization.</CardDescription>
+                  </div>
                   <Badge
+                    className="font-mono text-[10px]"
                     variant={
-                      status.lastStatus === "SUCCESS"
+                      status?.lastStatus === "SUCCESS"
                         ? "secondary"
-                        : status.lastStatus === "FAILED"
+                        : status?.lastStatus === "FAILED"
                           ? "destructive"
                           : "outline"
                     }
                   >
-                    {status.lastStatus ?? "No sync yet"}
+                    STATUS: {status?.lastStatus ?? "IDLE"}
                   </Badge>
-                  <Badge
-                    variant={status.dbToSheetsEnabled ? "default" : "outline"}
-                  >
-                    {status.dbToSheetsEnabled
-                      ? "DB->Sheets enabled"
-                      : "DB->Sheets disabled"}
-                  </Badge>
-                  <Badge variant={status.detectDeletes ? "default" : "outline"}>
-                    {status.detectDeletes
-                      ? "Detect deletes"
-                      : "No delete detect"}
-                  </Badge>
-                  <Badge
-                    variant={status.worker?.running ? "secondary" : "outline"}
-                  >
-                    {status.worker?.running
-                      ? "Worker running"
-                      : "Worker stopped"}
-                  </Badge>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg border p-3">
-                    <div className="text-xs text-muted-foreground">
-                      Students in DB
-                    </div>
-                    <div className="text-lg font-semibold tabular-nums">
-                      {status.syncedStudents}
-                    </div>
-                  </div>
-                  <div className="rounded-lg border p-3">
-                    <div className="text-xs text-muted-foreground">
-                      Rows in Sheets
-                    </div>
-                    <div className="text-lg font-semibold tabular-nums">
-                      {status.spreadsheetRows}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg border p-3">
-                    <div className="text-xs text-muted-foreground">
-                      Open conflicts
-                    </div>
-                    <div className="text-lg font-semibold tabular-nums">
-                      {status.openConflicts ?? conflicts?.items?.length ?? 0}
-                    </div>
-                  </div>
-                  <div className="rounded-lg border p-3">
-                    <div className="text-xs text-muted-foreground">
-                      Spreadsheet ID
-                    </div>
-                    <div className="text-sm font-medium break-all">
-                      {status.spreadsheetId ?? "—"}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg border p-3">
-                    <div className="text-xs text-muted-foreground">
-                      Detected groups
-                    </div>
-                    <div className="text-lg font-semibold tabular-nums">
-                      {status.detectedGroups.length}
-                    </div>
-                  </div>
-                  <div className="rounded-lg border p-3">
-                    <div className="text-xs text-muted-foreground">
-                      Last run
-                    </div>
-                    <div className="text-sm font-medium">
-                      {status.lastRunId ? status.lastRunId.slice(0, 8) : "—"}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-sm text-muted-foreground">
-                  Last sync: {formatDateTime(status.lastSyncAt)}
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  Worker heartbeat:{" "}
-                  {formatDateTime(status.worker?.lastHeartbeatAt)}
-                </div>
-                {status.lastError ? (
-                  <div className="text-sm text-destructive">
-                    {status.lastError}
-                  </div>
-                ) : null}
-
-                <div className="space-y-2">
-                  <div className="text-sm font-medium">Last sync logs</div>
-                  <div className="space-y-1">
-                    {(status.recentLogs ?? []).slice(0, 10).map((l, idx) => (
-                      <div key={idx} className="text-xs text-muted-foreground">
-                        <span className="tabular-nums">
-                          {formatDateTime(l.createdAt)}
-                        </span>{" "}
-                        <span>{l.level}</span> <span>{l.direction}</span>{" "}
-                        <span>{l.message}</span>
-                      </div>
-                    ))}
-                    {status.recentLogs?.length ? null : (
-                      <div className="text-xs text-muted-foreground">—</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground">No data</div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Conflicts</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {(conflicts?.items ?? []).length ? (
-              <div className="space-y-2">
-                {(conflicts?.items ?? []).map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedConflictId(c.id);
-                      setMergePayload(null);
-                    }}
-                    className={
-                      "w-full rounded-md border p-3 text-left hover:bg-muted/50 " +
-                      (selectedConflictId === c.id ? "border-primary" : "")
-                    }
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-sm font-medium">
-                        {c.studentId ? c.studentId.slice(0, 8) : "(no uuid)"} —{" "}
-                        {c.sheetTitle ?? "(unknown tab)"}
-                      </div>
-                      <Badge variant="destructive">OPEN</Badge>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {formatDateTime(c.detectedAt)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {c.message ?? "Conflict detected"}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground">
-                No open conflicts
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Conflict Resolution</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {!conflictDetail ? (
-              <div className="text-sm text-muted-foreground">
-                Select a conflict to view details.
-              </div>
-            ) : (
-              <>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge
-                    variant={
-                      conflictDetail.status === "OPEN"
-                        ? "destructive"
-                        : "secondary"
-                    }
-                  >
-                    {conflictDetail.status}
-                  </Badge>
-                  <div className="text-sm text-muted-foreground">
-                    {conflictDetail.sheetTitle ?? "(unknown tab)"} row{" "}
-                    {conflictDetail.rowNumber ?? "—"}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="font-medium">Field</div>
-                  <div className="font-medium">Sheet</div>
-                  <div className="font-medium">DB</div>
-                  {fieldList().map((f) => {
-                    const s = safeStr(conflictDetail.sheetPayload?.[f]);
-                    const d = safeStr(conflictDetail.dbPayload?.[f]);
-                    const different = s !== d;
-                    return (
-                      <React.Fragment key={f}>
-                        <div className="text-muted-foreground">{f}</div>
-                        <div
-                          className={
-                            different
-                              ? "text-foreground"
-                              : "text-muted-foreground"
-                          }
-                        >
-                          {s || "—"}
-                        </div>
-                        <div
-                          className={
-                            different
-                              ? "text-foreground"
-                              : "text-muted-foreground"
-                          }
-                        >
-                          {d || "—"}
-                        </div>
-                      </React.Fragment>
-                    );
-                  })}
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    onClick={() =>
-                      resolveMutation.mutate({ resolution: "KEEP_SHEET" })
-                    }
-                    disabled={resolveMutation.isPending}
-                  >
-                    Keep Sheet
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      resolveMutation.mutate({ resolution: "KEEP_DB" })
-                    }
-                    disabled={resolveMutation.isPending}
-                  >
-                    Keep DB
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      const base =
-                        conflictDetail.sheetPayload ??
-                        conflictDetail.dbPayload ??
-                        {};
-                      setMergePayload({ ...base });
-                    }}
-                    disabled={resolveMutation.isPending}
-                  >
-                    Merge
-                  </Button>
-                </div>
-
-                {mergePayload ? (
-                  <div className="space-y-2 rounded-md border p-3">
-                    <div className="text-sm font-medium">Merge payload</div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {fieldList()
-                        .filter((f) => f !== "student_uuid")
-                        .map((f) => (
-                          <div key={f} className="space-y-1">
-                            <div className="text-xs text-muted-foreground">
-                              {f}
-                            </div>
-                            <Input
-                              value={safeStr(mergePayload[f])}
-                              onChange={(e) =>
-                                setMergePayload((p: any) => ({
-                                  ...(p ?? {}),
-                                  [f]: e.target.value,
-                                }))
-                              }
-                            />
+                </CardHeader>
+                <CardContent className="pt-6">
+                  {statusLoading ? (
+                    <div>{dict?.common?.loading ?? "Loading..."}</div>
+                  ) : status ? (
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="rounded-xl border bg-card p-4 shadow-sm">
+                          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
+                             Students in DB
                           </div>
-                        ))}
+                          <div className="text-2xl font-black tabular-nums">
+                            {status.syncedStudents}
+                          </div>
+                        </div>
+                        <div className="rounded-xl border bg-card p-4 shadow-sm">
+                          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
+                            Rows in Sheets
+                          </div>
+                          <div className="text-2xl font-black tabular-nums">
+                            {status.spreadsheetRows}
+                          </div>
+                        </div>
+                        <div className="rounded-xl border bg-card p-4 shadow-sm border-orange-200 bg-orange-50/20 dark:border-orange-950 dark:bg-orange-950/10">
+                          <div className="text-xs font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider mb-2">
+                            Open Conflicts
+                          </div>
+                          <div className="text-2xl font-black tabular-nums text-orange-600 dark:text-orange-400">
+                            {status.openConflicts ?? conflicts?.items?.length ?? 0}
+                          </div>
+                        </div>
+                        <div className="rounded-xl border bg-card p-4 shadow-sm">
+                          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
+                            Detected Groups
+                          </div>
+                          <div className="text-2xl font-black tabular-nums">
+                            {status.detectedGroups.length}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-2 text-xs divide-y">
+                        <div className="flex justify-between py-1.5 px-1">
+                          <span className="text-muted-foreground">Last Run ID</span>
+                          <span className="font-mono">{status.lastRunId ? status.lastRunId.slice(0, 12) : "-"}</span>
+                        </div>
+                        <div className="flex justify-between py-1.5 px-1">
+                          <span className="text-muted-foreground">Last Synchronization</span>
+                          <span className="font-medium">{formatDateTime(status.lastSyncAt)}</span>
+                        </div>
+                        <div className="flex justify-between py-1.5 px-1">
+                          <span className="text-muted-foreground">Worker Pulsar (Heartbeat)</span>
+                          <span className="font-medium text-emerald-600">
+                             {status.worker?.running ? (
+                                <span className="flex items-center gap-1.5">
+                                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                   {formatDateTime(status.worker?.lastHeartbeatAt)}
+                                </span>
+                             ) : "Stopped"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {status.lastError ? (
+                        <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm font-medium">
+                          {status.lastError}
+                        </div>
+                      ) : null}
                     </div>
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() =>
-                          resolveMutation.mutate({
-                            resolution: "MERGE",
-                            mergedPayload: mergePayload,
-                          })
-                        }
-                        disabled={resolveMutation.isPending}
-                      >
-                        Apply Merge
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => setMergePayload(null)}
-                        disabled={resolveMutation.isPending}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground italic">Sync status information is unavailable.</div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="conflicts" className="outline-none">
+          <ConflictManager 
+              conflicts={conflicts?.items ?? []}
+              conflictDetail={conflictDetail}
+              selectedConflictId={selectedConflictId}
+              setSelectedConflictId={setSelectedConflictId}
+              isResolving={resolveMutation.isPending}
+              onResolve={(data) => resolveMutation.mutate(data)}
+              dict={dict}
+            />
+        </TabsContent>
+      </Tabs>
+
+      {/* NEW: Logs section moved to bottom and expanded */}
+      <Card className="mt-8 border-t-2 border-t-primary/20">
+        <CardHeader className="flex flex-row items-center justify-between pb-2 bg-muted/10">
+          <div>
+            <CardTitle className="text-xl flex items-center gap-2">
+              <ListFilter className="h-5 w-5 text-primary" />
+              Synchronization Logs
+            </CardTitle>
+            <CardDescription>Historical activity of the Sheets sync engine</CardDescription>
+          </div>
+          <Badge variant="outline" className="font-mono text-[10px]">
+            {status?.recentLogs?.length ?? 0} ENTRIES
+          </Badge>
+        </CardHeader>
+        <CardContent className="pt-4">
+             <SyncLogs logs={status?.recentLogs ?? []} dict={dict} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

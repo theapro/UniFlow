@@ -415,16 +415,53 @@ export class StudentsSheetsSyncService {
         if (seenStudentIdsInTab.has(studentUuid)) {
           skipped++;
           log({
-            level: "WARN",
+            level: "ERROR",
             direction: "SHEETS_TO_DB",
-            action: "ROW_SKIPPED",
+            action: "DUPLICATE_UUID",
             sheetTitle: groupTabName,
             studentId: studentUuid,
-            message: `Row ${rowNumber} skipped (duplicate student_uuid in same tab)`,
+            message: `Row ${rowNumber} skipped: student_uuid ${studentUuid} already exists in this tab`,
           });
           continue;
         }
         seenStudentIdsInTab.add(studentUuid);
+
+        const studentNumber = getCell(row, sheet.header, "student_number");
+        const studentEmail = getCell(row, sheet.header, "email");
+
+        // Check for duplicate student number or email within the same tab
+        const studentNoKey = studentNumber ? `SN:${studentNumber}` : null;
+        const emailKey = studentEmail
+          ? `EM:${studentEmail.toLowerCase()}`
+          : null;
+
+        if (studentNoKey && seenStudentIdsInTab.has(studentNoKey)) {
+          skipped++;
+          log({
+            level: "ERROR",
+            direction: "SHEETS_TO_DB",
+            action: "DUPLICATE_STUDENT_NUMBER",
+            sheetTitle: groupTabName,
+            studentId: studentUuid,
+            message: `Row ${rowNumber} skipped: student_number '${studentNumber}' is already used in this tab`,
+          });
+          continue;
+        }
+        if (emailKey && seenStudentIdsInTab.has(emailKey)) {
+          skipped++;
+          log({
+            level: "ERROR",
+            direction: "SHEETS_TO_DB",
+            action: "DUPLICATE_EMAIL",
+            sheetTitle: groupTabName,
+            studentId: studentUuid,
+            message: `Row ${rowNumber} skipped: email '${studentEmail}' is already used in this tab`,
+          });
+          continue;
+        }
+
+        if (studentNoKey) seenStudentIdsInTab.add(studentNoKey);
+        if (emailKey) seenStudentIdsInTab.add(emailKey);
 
         sheetsRows++;
         seenStudentIds.add(studentUuid);
@@ -449,6 +486,62 @@ export class StudentsSheetsSyncService {
 
         const prev = stateByStudentId.get(studentUuid);
         if (prev?.rowHash === rowHash) {
+          // Check if DB changed while sheet stayed same
+          const dbStudent = await this.prisma.student.findUnique({
+            where: { id: studentUuid },
+            include: { group: { select: { name: true } } },
+          });
+
+          const dbPayloadForHash = dbStudent
+            ? {
+                student_uuid: dbStudent.id,
+                student_number: dbStudent.studentNumber ?? "",
+                fullname: dbStudent.fullName,
+                email: dbStudent.email ?? "",
+                phone: dbStudent.phone ?? "",
+                status: dbStudent.status,
+                teacher_ids: [...(dbStudent.teacherIds ?? [])].sort().join(","),
+                parent_ids: [...(dbStudent.parentIds ?? [])].sort().join(","),
+                cohort: dbStudent.cohort ?? "",
+                created_at: safeIso(dbStudent.createdAt),
+                updated_at: safeIso(dbStudent.updatedAt),
+                note: dbStudent.note ?? "",
+                group: dbStudent.group?.name ?? dbStudent.groupName ?? "",
+              }
+            : null;
+
+          const dbHash = dbPayloadForHash ? sha256(dbPayloadForHash) : null;
+          if (dbHash && dbHash !== prev.rowHash) {
+            // DB changed, but sheet is same as prev sync. DB should overwrite sheet via outbox.
+            try {
+              await this.prisma.studentsSheetsOutboxEvent.upsert({
+                where: {
+                  spreadsheetId_studentId: {
+                    spreadsheetId,
+                    studentId: studentUuid,
+                  },
+                },
+                update: {
+                  type: "UPSERT",
+                  targetSheetTitle: groupTabName,
+                  status: "PENDING",
+                  nextAttemptAt: now,
+                  lastError: null,
+                },
+                create: {
+                  spreadsheetId,
+                  studentId: studentUuid,
+                  type: "UPSERT",
+                  targetSheetTitle: groupTabName,
+                  status: "PENDING",
+                  nextAttemptAt: now,
+                },
+              });
+            } catch (e) {
+              // ignore outbox error
+            }
+          }
+
           await this.prisma.studentsSheetsRowState.update({
             where: {
               spreadsheetId_sheetTitle_studentId: {
@@ -477,8 +570,8 @@ export class StudentsSheetsSyncService {
           continue;
         }
 
-        const studentNumber = rowPayloadRaw.student_number.trim() || null;
-        const email = rowPayloadRaw.email.trim() || null;
+        const studentNumberVal = rowPayloadRaw.student_number.trim() || null;
+        const emailVal = rowPayloadRaw.email.trim() || null;
         const phone = rowPayloadRaw.phone.trim() || null;
         const status = parseStatus(rowPayloadRaw.status);
         const teacherIds = parseCsvIds(rowPayloadRaw.teacher_ids);
@@ -652,9 +745,9 @@ export class StudentsSheetsSyncService {
         await this.prisma.student.upsert({
           where: { id: studentUuid },
           update: {
-            studentNumber,
+            studentNumber: studentNumberVal,
             fullName,
-            email,
+            email: emailVal,
             phone,
             status,
             teacherIds,
@@ -667,9 +760,9 @@ export class StudentsSheetsSyncService {
           },
           create: {
             id: studentUuid,
-            studentNumber,
+            studentNumber: studentNumberVal,
             fullName,
-            email,
+            email: emailVal,
             phone,
             status,
             teacherIds,

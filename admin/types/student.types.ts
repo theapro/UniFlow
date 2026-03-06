@@ -27,11 +27,12 @@ export interface CreateStudentInput {
   fullName: string;
   email: string;
   studentNo?: string | null;
-  groupId?: string | null;
+  groupId: string;
   phone?: string | null;
   status?: "ACTIVE" | "INACTIVE" | "GRADUATED" | "DROPPED";
   teacherIds?: string[];
   parentIds?: string[];
+  cohort?: string | null;
   note?: string | null;
 }
 
@@ -44,5 +45,6 @@ export interface UpdateStudentInput {
   status?: "ACTIVE" | "INACTIVE" | "GRADUATED" | "DROPPED";
   teacherIds?: string[];
   parentIds?: string[];
+  cohort?: string | null;
   note?: string | null;
 }
