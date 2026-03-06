@@ -9,6 +9,7 @@ import {
   BrainIcon,
   CalendarIcon,
   ClipboardCheckIcon,
+  FileSpreadsheet,
   LayoutDashboardIcon,
   UsersIcon,
   GraduationCapIcon,
@@ -118,6 +119,11 @@ export function UniFlowSidebar({
               name: dict?.nav?.aiModels ?? "AI Models",
               url: `${dashboardBase}/ai-models`,
               icon: SettingsIcon,
+            },
+            {
+              name: dict?.nav?.sheets ?? "Sheets",
+              url: `${dashboardBase}/sheets`,
+              icon: FileSpreadsheet,
             },
           ]}
         />

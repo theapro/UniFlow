@@ -4,11 +4,17 @@ import bcrypt from "bcryptjs";
 import { generateTemporaryPassword } from "../../utils/password";
 import { ResendEmailService } from "../email/ResendEmailService";
 import { env } from "../../config/env";
+import { StudentsSheetsOutboxService } from "../students-sheets/StudentsSheetsOutboxService";
 
 export type CreateStudentInput = {
   fullName: string;
   email: string;
   studentNo?: string | null;
+  phone?: string | null;
+  status?: "ACTIVE" | "INACTIVE" | "GRADUATED" | "DROPPED";
+  teacherIds?: string[];
+  parentIds?: string[];
+  note?: string | null;
   groupId?: string | null;
 };
 
@@ -16,6 +22,11 @@ export type UpdateStudentInput = {
   fullName?: string;
   email?: string;
   studentNo?: string | null;
+  phone?: string | null;
+  status?: "ACTIVE" | "INACTIVE" | "GRADUATED" | "DROPPED";
+  teacherIds?: string[];
+  parentIds?: string[];
+  note?: string | null;
   groupId?: string | null;
 };
 
@@ -37,7 +48,8 @@ export class AdminStudentService {
       ? {
           OR: [
             { fullName: { contains: params.q, mode: "insensitive" } },
-            { studentNo: { contains: params.q, mode: "insensitive" } },
+            { studentNumber: { contains: params.q, mode: "insensitive" } },
+            { email: { contains: params.q, mode: "insensitive" } },
           ],
         }
       : {};
@@ -91,21 +103,32 @@ export class AdminStudentService {
         throw new Error("EMAIL_ALREADY_EXISTS");
       }
 
-      if (input.groupId) {
-        const group = await tx.group.findUnique({
-          where: { id: input.groupId },
-          select: { id: true },
-        });
-        if (!group) {
-          throw new Error("GROUP_NOT_FOUND");
-        }
-      }
+      const group = input.groupId
+        ? await tx.group.findUnique({
+            where: { id: input.groupId },
+            select: {
+              id: true,
+              name: true,
+              cohort: { select: { year: true } },
+            },
+          })
+        : null;
+      if (input.groupId && !group) throw new Error("GROUP_NOT_FOUND");
 
       const createdStudent = await tx.student.create({
         data: {
           fullName: input.fullName,
-          studentNo: input.studentNo ?? null,
-          groupId: input.groupId ?? null,
+          studentNumber: input.studentNo ?? null,
+          email: input.email,
+          phone: input.phone ?? null,
+          status: input.status ?? "ACTIVE",
+          teacherIds: input.teacherIds ?? [],
+          parentIds: input.parentIds ?? [],
+          note: input.note ?? null,
+          groupId: group?.id ?? null,
+          groupName: group?.name ?? null,
+          cohort: group?.cohort?.year ? String(group.cohort.year) : null,
+          updatedAt: new Date(),
         },
         include: { group: true },
       });
@@ -165,6 +188,17 @@ export class AdminStudentService {
       },
     });
 
+    try {
+      const outbox = new StudentsSheetsOutboxService(prisma);
+      await outbox.enqueueUpsert({
+        studentId: student.id,
+        targetSheetTitle: createdStudent?.group?.name ?? null,
+      });
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn("[SheetsSync][Outbox] failed to enqueue student create", e);
+    }
+
     return {
       student: createdStudent,
       credentials: {
@@ -184,24 +218,42 @@ export class AdminStudentService {
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      if (input.groupId) {
-        const group = await tx.group.findUnique({
-          where: { id: input.groupId },
-          select: { id: true },
-        });
-        if (!group) {
-          throw new Error("GROUP_NOT_FOUND");
-        }
-      }
+      const group = input.groupId
+        ? await tx.group.findUnique({
+            where: { id: input.groupId },
+            select: {
+              id: true,
+              name: true,
+              cohort: { select: { year: true } },
+            },
+          })
+        : null;
+      if (input.groupId && !group) throw new Error("GROUP_NOT_FOUND");
 
       const updatedStudent = await tx.student.update({
         where: { id },
         data: {
           ...(input.fullName !== undefined ? { fullName: input.fullName } : {}),
           ...(input.studentNo !== undefined
-            ? { studentNo: input.studentNo }
+            ? { studentNumber: input.studentNo }
             : {}),
-          ...(input.groupId !== undefined ? { groupId: input.groupId } : {}),
+          ...(input.phone !== undefined ? { phone: input.phone } : {}),
+          ...(input.status !== undefined ? { status: input.status } : {}),
+          ...(input.teacherIds !== undefined
+            ? { teacherIds: input.teacherIds }
+            : {}),
+          ...(input.parentIds !== undefined
+            ? { parentIds: input.parentIds }
+            : {}),
+          ...(input.note !== undefined ? { note: input.note } : {}),
+          ...(input.groupId !== undefined
+            ? {
+                groupId: group?.id ?? null,
+                groupName: group?.name ?? null,
+                cohort: group?.cohort?.year ? String(group.cohort.year) : null,
+              }
+            : {}),
+          updatedAt: new Date(),
         },
         include: { group: true, user: { select: { id: true, email: true } } },
       });
@@ -284,7 +336,7 @@ export class AdminStudentService {
       });
     }
 
-    return prisma.student.findUnique({
+    const updated = await prisma.student.findUnique({
       where: { id },
       include: {
         group: true,
@@ -293,6 +345,19 @@ export class AdminStudentService {
         },
       },
     });
+
+    try {
+      const outbox = new StudentsSheetsOutboxService(prisma);
+      await outbox.enqueueUpsert({
+        studentId: id,
+        targetSheetTitle: updated?.group?.name ?? null,
+      });
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn("[SheetsSync][Outbox] failed to enqueue student update", e);
+    }
+
+    return updated;
   }
 
   async resendCredentials(id: string) {
@@ -344,6 +409,11 @@ export class AdminStudentService {
   }
 
   async remove(id: string) {
+    const before = await prisma.student.findUnique({
+      where: { id },
+      include: { group: { select: { name: true } } },
+    });
+
     await prisma.$transaction(async (tx) => {
       // Remove dependent rows first to avoid FK constraint errors
       await tx.attendance.deleteMany({ where: { studentId: id } });
@@ -359,6 +429,23 @@ export class AdminStudentService {
 
       await tx.student.delete({ where: { id } });
     });
+
+    try {
+      const outbox = new StudentsSheetsOutboxService(prisma);
+      await outbox.enqueueDelete({
+        studentId: id,
+        lastKnownSheetTitle: before?.group?.name ?? null,
+        payload: before
+          ? {
+              student_uuid: before.id,
+              group: before.group?.name ?? null,
+            }
+          : undefined,
+      });
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn("[SheetsSync][Outbox] failed to enqueue student delete", e);
+    }
 
     return true;
   }

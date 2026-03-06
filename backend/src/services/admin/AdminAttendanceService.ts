@@ -58,7 +58,7 @@ export class AdminAttendanceService {
   }
 
   async create(input: CreateAttendanceInput) {
-    return prisma.attendance.create({
+    const record = await prisma.attendance.create({
       data: {
         lessonId: input.lessonId,
         studentId: input.studentId,
@@ -75,10 +75,14 @@ export class AdminAttendanceService {
         student: true,
       },
     });
+
+    // Legacy Sheets analytics sync removed.
+
+    return record;
   }
 
   async update(id: string, input: UpdateAttendanceInput) {
-    return prisma.attendance.update({
+    const record = await prisma.attendance.update({
       where: { id },
       data: {
         ...(input.status !== undefined ? { status: input.status } : {}),
@@ -94,6 +98,10 @@ export class AdminAttendanceService {
         student: true,
       },
     });
+
+    // Legacy Sheets analytics sync removed.
+
+    return record;
   }
 
   async remove(id: string) {
@@ -122,6 +130,10 @@ export class AdminAttendanceService {
       }),
     );
 
-    return prisma.$transaction(operations);
+    const result = await prisma.$transaction(operations);
+
+    // Legacy Sheets analytics sync removed.
+
+    return result;
   }
 }

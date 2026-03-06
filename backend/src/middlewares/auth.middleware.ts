@@ -40,7 +40,7 @@ export async function authMiddleware(
         role: true,
         studentId: true,
         teacherId: true,
-        student: { select: { fullName: true, studentNo: true } },
+        student: { select: { fullName: true, studentNumber: true } },
         teacher: { select: { fullName: true, staffNo: true } },
       },
     });
@@ -58,7 +58,7 @@ export async function authMiddleware(
       ...(user.student
         ? {
             fullName: user.student.fullName,
-            studentNo: user.student.studentNo,
+            studentNo: user.student.studentNumber,
           }
         : {}),
       ...(user.teacher

@@ -46,55 +46,60 @@ function createThinkTagStripper() {
   let inThink = false;
   let carry = "";
 
-  function process(chunk: string): string {
-    if (!chunk) return "";
-
-    let s = carry + chunk;
-    carry = "";
-
+  function parse(): string {
     let out = "";
-    let i = 0;
 
-    while (i < s.length) {
+    while (carry.length > 0) {
       if (inThink) {
-        const endIdx = s.indexOf(THINK_CLOSE, i);
+        const endIdx = carry.indexOf(THINK_CLOSE);
         if (endIdx === -1) {
-          const tailLen = Math.min(THINK_CLOSE.length - 1, s.length - i);
-          carry = s.slice(s.length - tailLen);
+          // Keep a small suffix in case the close tag spans chunks.
+          const keep = THINK_CLOSE.length - 1;
+          carry = carry.slice(Math.max(0, carry.length - keep));
           return out;
         }
 
-        i = endIdx + THINK_CLOSE.length;
+        carry = carry.slice(endIdx + THINK_CLOSE.length);
         inThink = false;
         continue;
       }
 
-      const startIdx = s.indexOf(THINK_OPEN, i);
+      const startIdx = carry.indexOf(THINK_OPEN);
       if (startIdx === -1) {
-        const tailLen = Math.min(THINK_OPEN.length - 1, s.length - i);
-        out += s.slice(i, s.length - tailLen);
-        carry = s.slice(s.length - tailLen);
+        // Keep a small suffix in case the open tag spans chunks.
+        const keep = THINK_OPEN.length - 1;
+        if (carry.length <= keep) return out;
+
+        out += carry.slice(0, carry.length - keep);
+        carry = carry.slice(carry.length - keep);
         return out;
       }
 
-      out += s.slice(i, startIdx);
-      i = startIdx + THINK_OPEN.length;
+      out += carry.slice(0, startIdx);
+      carry = carry.slice(startIdx + THINK_OPEN.length);
       inThink = true;
     }
 
     return out;
   }
 
+  function process(chunk: string): string {
+    if (!chunk) return "";
+    carry += chunk;
+    return parse();
+  }
+
   function flush(): string {
     if (inThink) {
-      // If the stream ends while inside <think>, discard it.
       carry = "";
       return "";
     }
 
-    const out = carry;
+    // Drop any dangling partial open-tag fragments.
+    const idx = carry.indexOf(THINK_OPEN);
+    const safe = idx === -1 ? carry : carry.slice(0, idx);
     carry = "";
-    return out;
+    return safe;
   }
 
   return { process, flush };
@@ -158,7 +163,7 @@ export class AiController {
             select: {
               id: true,
               fullName: true,
-              studentNo: true,
+              studentNumber: true,
               group: { select: { id: true, name: true } },
             },
           })
@@ -188,7 +193,7 @@ export class AiController {
           ? {
               id: student.id,
               name: student.fullName,
-              studentNo: student.studentNo,
+              studentNo: student.studentNumber,
               group: student.group,
             }
           : null,
@@ -264,7 +269,7 @@ export class AiController {
         select: {
           id: true,
           fullName: true,
-          studentNo: true,
+          studentNumber: true,
           groupId: true,
           group: { select: { id: true, name: true } },
         },
@@ -285,7 +290,7 @@ export class AiController {
         student: {
           id: student.id,
           name: student.fullName,
-          studentNo: student.studentNo,
+          studentNo: student.studentNumber,
           group: student.group,
         },
       });
@@ -457,7 +462,7 @@ export class AiController {
           select: {
             id: true,
             fullName: true,
-            studentNo: true,
+            studentNumber: true,
             groupId: true,
             group: { select: { id: true, name: true } },
           },
@@ -479,7 +484,7 @@ export class AiController {
         studentContext = {
           id: student.id,
           name: student.fullName,
-          studentNo: student.studentNo,
+          studentNo: student.studentNumber,
           group: student.group,
         };
       } else if (user.studentId) {
@@ -488,7 +493,7 @@ export class AiController {
           select: {
             id: true,
             fullName: true,
-            studentNo: true,
+            studentNumber: true,
             group: { select: { id: true, name: true } },
           },
         });
@@ -496,7 +501,7 @@ export class AiController {
           studentContext = {
             id: student.id,
             name: student.fullName,
-            studentNo: student.studentNo,
+            studentNo: student.studentNumber,
             group: student.group,
           };
         }

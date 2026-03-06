@@ -21,7 +21,8 @@
     "schedule": "Schedule",
     "attendance": "Attendance",
     "aiMonitor": "AI Monitor",
-    "aiModels": "AI Models"
+    "aiModels": "AI Models",
+    "sheets": "Sheets"
   },
   "dashboard": {
     "title": "Dashboard",

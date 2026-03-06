@@ -183,3 +183,20 @@ export const aiModelsApi = {
   update: (id: string, patch: any) =>
     axios.patch(`/api/admin/ai/models/${id}`, patch),
 };
+
+export const sheetsApi = {
+  health: () => axios.get("/api/admin/students-sheets/health"),
+  status: () => axios.get("/api/admin/students-sheets/status"),
+  syncNow: () => axios.post("/api/admin/students-sheets/sync"),
+  conflicts: {
+    list: (params?: {
+      status?: "OPEN" | "RESOLVED";
+      take?: number;
+      skip?: number;
+    }) => axios.get("/api/admin/students-sheets/conflicts", { params }),
+    getById: (id: string) =>
+      axios.get(`/api/admin/students-sheets/conflicts/${id}`),
+    resolve: (id: string, data: any) =>
+      axios.post(`/api/admin/students-sheets/conflicts/${id}/resolve`, data),
+  },
+};

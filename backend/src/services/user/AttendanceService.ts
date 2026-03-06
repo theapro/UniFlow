@@ -7,7 +7,7 @@ export class AttendanceService {
     studentId: string,
     status: AttendanceStatus,
   ) {
-    return prisma.attendance.upsert({
+    const record = await prisma.attendance.upsert({
       where: {
         lessonId_studentId: {
           lessonId,
@@ -26,10 +26,15 @@ export class AttendanceService {
           include: {
             subject: true,
             group: true,
+            teacher: true,
           },
         },
       },
     });
+
+    // Legacy Sheets analytics sync removed.
+
+    return record;
   }
 
   async getAttendanceByLesson(lessonId: string) {

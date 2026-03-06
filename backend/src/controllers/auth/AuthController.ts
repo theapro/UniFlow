@@ -23,7 +23,7 @@ function buildUserData(user: {
   id: string;
   email: string;
   role: any;
-  student?: { fullName: string; studentNo: string | null } | null;
+  student?: { fullName: string; studentNumber: string | null } | null;
   teacher?: { fullName: string; staffNo: string | null } | null;
 }) {
   const userData: any = {
@@ -34,7 +34,8 @@ function buildUserData(user: {
 
   if (user.student) {
     userData.fullName = user.student.fullName;
-    userData.studentNo = user.student.studentNo;
+    // Keep the outward API contract stable.
+    userData.studentNo = user.student.studentNumber;
   } else if (user.teacher) {
     userData.fullName = user.teacher.fullName;
     userData.staffNo = user.teacher.staffNo;
@@ -384,7 +385,7 @@ export class AuthController {
         const student = await prisma.student.create({
           data: {
             fullName,
-            studentNo: studentNo || `S${Date.now()}`,
+            studentNumber: studentNo || `S${Date.now()}`,
           },
         });
 
@@ -405,7 +406,7 @@ export class AuthController {
           email: newUser.email,
           role: newUser.role,
           fullName: student.fullName,
-          studentNo: student.studentNo,
+          studentNo: student.studentNumber,
         };
       } else if (role === "TEACHER") {
         // Create teacher and user

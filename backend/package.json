@@ -5,15 +5,18 @@
   "main": "dist/server.js",
   "type": "commonjs",
   "scripts": {
+    "predev": "prisma generate",
     "dev": "tsx watch src/server.ts",
     "dev:legacy": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
+    "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset --force",
     "db:seed": "prisma db seed",
     "ai:test-models": "tsx src/scripts/test-ai-models.ts",
+    "students-sheets:worker": "tsx src/scripts/students-sheets-worker.ts",
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
@@ -23,6 +26,7 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "google-auth-library": "^9.15.1",
+    "googleapis": "^140.0.1",
     "jsonwebtoken": "^9.0.2",
     "resend": "^4.2.0"
   },

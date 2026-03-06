@@ -95,10 +95,66 @@ export function StudentTable({ students, lang, dict }: StudentTableProps) {
       cell: ({ row }) => (row.getValue("studentNo") as string) || "-",
     },
     {
+      accessorKey: "email",
+      header: "Email",
+      cell: ({ row }) => (row.getValue("email") as string) || "-",
+    },
+    {
+      accessorKey: "phone",
+      header: "Phone",
+      cell: ({ row }) => (row.getValue("phone") as string) || "-",
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => (row.getValue("status") as string) || "-",
+    },
+    {
       id: "group",
       header: dict.students.group,
       accessorFn: (student) => student.group?.name || "-",
       cell: ({ row }) => row.getValue("group") as string,
+    },
+    {
+      id: "cohort",
+      header: "Cohort",
+      accessorFn: (student) => student.cohort || "-",
+      cell: ({ row }) => row.getValue("cohort") as string,
+    },
+    {
+      id: "teacherIds",
+      header: "Teachers",
+      accessorFn: (student) => (student.teacherIds ?? []).join(", ") || "-",
+      cell: ({ row }) => row.getValue("teacherIds") as string,
+    },
+    {
+      id: "parentIds",
+      header: "Parents",
+      accessorFn: (student) => (student.parentIds ?? []).join(", ") || "-",
+      cell: ({ row }) => row.getValue("parentIds") as string,
+    },
+    {
+      accessorKey: "note",
+      header: "Note",
+      cell: ({ row }) => (row.getValue("note") as string) || "-",
+    },
+    {
+      accessorKey: "createdAt",
+      header: "Created",
+      cell: ({ row }) => {
+        const v = row.getValue("createdAt") as string;
+        const d = new Date(v);
+        return Number.isNaN(d.getTime()) ? v || "-" : d.toLocaleString();
+      },
+    },
+    {
+      accessorKey: "updatedAt",
+      header: "Updated",
+      cell: ({ row }) => {
+        const v = row.getValue("updatedAt") as string;
+        const d = new Date(v);
+        return Number.isNaN(d.getTime()) ? v || "-" : d.toLocaleString();
+      },
     },
     {
       id: "actions",
@@ -153,7 +209,19 @@ export function StudentTable({ students, lang, dict }: StudentTableProps) {
 
   return (
     <>
-      <DataTable data={students} columns={columns} />
+      <DataTable
+        data={students}
+        columns={columns}
+        initialColumnVisibility={{
+          studentNo: false,
+          cohort: false,
+          teacherIds: false,
+          parentIds: false,
+          note: false,
+          createdAt: false,
+          updatedAt: false,
+        }}
+      />
       <ConfirmDialog
         open={!!deleteId}
         onOpenChange={(open) => !open && setDeleteId(null)}

@@ -18,6 +18,7 @@ import { AdminLessonController } from "../controllers/admin/AdminLessonControlle
 import { AdminLessonService } from "../services/admin/AdminLessonService";
 import { AdminAiModelController } from "../controllers/admin/AdminAiModelController";
 import { AiModelService } from "../services/ai/AiModelService";
+import { AdminStudentsSheetsController } from "../controllers/admin/AdminStudentsSheetsController";
 
 const router = Router();
 
@@ -55,6 +56,7 @@ const adminLessonController = new AdminLessonController(
   new AdminLessonService(),
 );
 const adminAiModelController = new AdminAiModelController(new AiModelService());
+const adminStudentsSheetsController = new AdminStudentsSheetsController();
 
 // Students
 router.get("/students", adminStudentController.list);
@@ -117,5 +119,22 @@ router.delete("/lessons/:id", adminLessonController.remove);
 // AI Models
 router.get("/ai/models", adminAiModelController.list);
 router.patch("/ai/models/:id", adminAiModelController.update);
+
+// Students Spreadsheet (Google Sheets) Sync
+router.get("/students-sheets/health", adminStudentsSheetsController.getHealth);
+router.get("/students-sheets/status", adminStudentsSheetsController.getStatus);
+router.post("/students-sheets/sync", adminStudentsSheetsController.syncNow);
+router.get(
+  "/students-sheets/conflicts",
+  adminStudentsSheetsController.listConflicts,
+);
+router.get(
+  "/students-sheets/conflicts/:id",
+  adminStudentsSheetsController.getConflict,
+);
+router.post(
+  "/students-sheets/conflicts/:id/resolve",
+  adminStudentsSheetsController.resolveConflict,
+);
 
 export default router;

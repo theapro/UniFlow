@@ -3,6 +3,13 @@ export interface Student {
   fullName: string;
   studentNo: string | null;
   groupId: string | null;
+  email?: string | null;
+  phone?: string | null;
+  status?: "ACTIVE" | "INACTIVE" | "GRADUATED" | "DROPPED";
+  teacherIds?: string[];
+  parentIds?: string[];
+  cohort?: string | null;
+  note?: string | null;
   user?: {
     email: string;
     lastLoginAt?: string | null;
@@ -21,6 +28,11 @@ export interface CreateStudentInput {
   email: string;
   studentNo?: string | null;
   groupId?: string | null;
+  phone?: string | null;
+  status?: "ACTIVE" | "INACTIVE" | "GRADUATED" | "DROPPED";
+  teacherIds?: string[];
+  parentIds?: string[];
+  note?: string | null;
 }
 
 export interface UpdateStudentInput {
@@ -28,4 +40,9 @@ export interface UpdateStudentInput {
   email?: string;
   studentNo?: string | null;
   groupId?: string | null;
+  phone?: string | null;
+  status?: "ACTIVE" | "INACTIVE" | "GRADUATED" | "DROPPED";
+  teacherIds?: string[];
+  parentIds?: string[];
+  note?: string | null;
 }

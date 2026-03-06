@@ -112,6 +112,49 @@ npm run build
 npm start
 ```
 
+## Students Spreadsheet Sync (Google Sheets  Database)
+
+UniFlow supports a bidirectional sync between a Google Spreadsheet (tabs = group names) and the `Student` table using `student_uuid` as the primary key.
+
+### Environment variables
+
+Add to `.env` (see `.env.example`):
+
+```env
+# Enables the integration
+GOOGLE_SHEETS_STUDENTS_ENABLED="true"
+
+# Target spreadsheet
+GOOGLE_SHEETS_STUDENTS_SPREADSHEET_ID="<spreadsheet id>"
+
+# Runs the sync loop continuously
+GOOGLE_SHEETS_STUDENTS_WORKER_ENABLED="true"
+GOOGLE_SHEETS_STUDENTS_WORKER_INTERVAL_MS="60000"
+
+# Controls DB  Sheets writes (outbox processing)
+GOOGLE_SHEETS_STUDENTS_DB_TO_SHEETS_ENABLED="true"
+
+# If enabled, missing rows in Sheets can mark DB students INACTIVE
+GOOGLE_SHEETS_STUDENTS_DETECT_DELETES="false"
+
+# Optional: secure webhook trigger (Apps Script onEdit)
+GOOGLE_SHEETS_STUDENTS_WEBHOOK_SECRET=""
+```
+
+### How to run the worker
+
+- Dev (in-process): set `GOOGLE_SHEETS_STUDENTS_WORKER_ENABLED=true` and start the API with `npm run dev`.
+- Prod (recommended): run a separate process: `npm run students-sheets:worker`.
+
+### Webhook trigger (optional)
+
+You can trigger an immediate sync run by calling:
+
+- `POST /webhooks/students-sheets`
+- Provide the secret via header `x-uniflow-webhook-secret` or query `?secret=...` (only if `GOOGLE_SHEETS_STUDENTS_WEBHOOK_SECRET` is set).
+
+This is intended for Google Apps Script `onEdit` triggers; polling still runs in the worker.
+
 ## API Endpoints
 
 ### Admin Routes (`/api/admin/*`)

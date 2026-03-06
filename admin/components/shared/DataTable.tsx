@@ -47,16 +47,18 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
   columns: ColumnDef<TData, TValue>[];
   columnToggleLabel?: string;
+  initialColumnVisibility?: VisibilityState;
 }
 
 export function DataTable<TData, TValue>({
   data,
   columns,
   columnToggleLabel = "Customize Columns",
+  initialColumnVisibility,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({});
+    React.useState<VisibilityState>(initialColumnVisibility ?? {});
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
 
   const table = useReactTable({

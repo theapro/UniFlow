@@ -38,7 +38,7 @@ export class AiDataService {
       where: {
         OR: [
           { fullName: { contains: query, mode: "insensitive" } },
-          { studentNo: { contains: query, mode: "insensitive" } },
+          { studentNumber: { contains: query, mode: "insensitive" } },
         ],
       },
       include: { group: { select: { name: true } } },
@@ -50,7 +50,7 @@ export class AiDataService {
     return prisma.group.findFirst({
       where: { name: { equals: groupName, mode: "insensitive" } },
       include: {
-        students: { select: { fullName: true, studentNo: true } },
+        students: { select: { fullName: true, studentNumber: true } },
         lessons: {
           select: {
             startsAt: true,

@@ -43,27 +43,96 @@ model TimeSlot {
 model Group {
   id              String          @id @default(uuid()) @db.Uuid
   name            String          @unique
+  cohortId        String?         @db.Uuid
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   lessons         Lesson[]
   scheduleEntries ScheduleEntry[]
   students        Student[]
+  cohort          Cohort?         @relation(fields: [cohortId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([cohortId])
 
   @@map("Group")
 }
 
+model Cohort {
+  id        String   @id @default(uuid()) @db.Uuid
+  year      Int      @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  groups    Group[]
+
+  @@map("Cohort")
+}
+
+enum StudentStatus {
+  ACTIVE
+  INACTIVE
+  GRADUATED
+  DROPPED
+}
+
 model Student {
-  id         String       @id @default(uuid()) @db.Uuid
-  fullName   String
-  studentNo  String?      @unique
-  groupId    String?      @db.Uuid
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  attendance Attendance[]
-  group      Group?       @relation(fields: [groupId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  user       User?
+  // Primary synchronization key from Google Sheets: student_uuid
+  id            String        @id @default(uuid()) @db.Uuid
+  studentNumber String?       @unique
+  fullName      String
+  email         String?
+  phone         String?
+  status        StudentStatus @default(ACTIVE)
+  teacherIds    String[]      @default([])
+  parentIds     String[]      @default([])
+  // Spreadsheet column: cohort (free-form; e.g. 2023)
+  cohort        String?
+  // Spreadsheet column: group (tab name). Kept in sync with groupId relation.
+  groupName     String?       @map("group")
+  note          String?
+
+  groupId       String?       @db.Uuid
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @default(now())
+
+  attendance    Attendance[]
+  group         Group?        @relation(fields: [groupId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  user          User?
 
   @@map("Student")
+}
+
+enum StudentsSheetsConflictStatus {
+  OPEN
+  RESOLVED
+}
+
+enum StudentsSheetsConflictResolution {
+  KEEP_SHEET
+  KEEP_DB
+  MERGE
+}
+
+model StudentsSheetsConflict {
+  id            String                         @id @default(uuid()) @db.Uuid
+  spreadsheetId String
+  sheetTitle    String?
+  rowNumber     Int?
+  studentId     String?                        @db.Uuid
+  status        StudentsSheetsConflictStatus   @default(OPEN)
+  resolution    StudentsSheetsConflictResolution?
+  message       String?
+  sheetPayload  Json?
+  dbPayload     Json?
+  baseHash      String?
+  detectedAt    DateTime                       @default(now())
+  resolvedAt    DateTime?
+  createdAt     DateTime                       @default(now())
+  updatedAt     DateTime                       @updatedAt
+
+  @@unique([spreadsheetId, studentId])
+  @@index([spreadsheetId, status, detectedAt])
+  @@index([studentId])
+
+  @@map("StudentsSheetsConflict")
 }
 
 model Teacher {
@@ -196,6 +265,123 @@ model Chat {
   @@index([userId, timestamp])
   @@index([sessionId, timestamp])
   @@map("Chat")
+}
+
+
+enum StudentsSheetsSyncStatus {
+  SUCCESS
+  FAILED
+}
+
+model StudentsSheetsSyncState {
+  id              String                   @id @default(uuid()) @db.Uuid
+  spreadsheetId   String                   @unique
+  lastRunId       String?
+  lastStatus      StudentsSheetsSyncStatus?
+  lastSyncAt      DateTime?
+  lastSuccessAt   DateTime?
+  lastError       String?
+  detectedGroups  String[]                 @default([])
+  syncedStudents  Int                      @default(0)
+  spreadsheetRows Int                      @default(0)
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  @@map("StudentsSheetsSyncState")
+}
+
+enum StudentsSheetsOutboxType {
+  UPSERT
+  DELETE
+}
+
+enum StudentsSheetsOutboxStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+}
+
+enum StudentsSheetsLogLevel {
+  INFO
+  WARN
+  ERROR
+}
+
+enum StudentsSheetsLogDirection {
+  SHEETS_TO_DB
+  DB_TO_SHEETS
+  WORKER
+}
+
+model StudentsSheetsRowState {
+  id            String   @id @default(uuid()) @db.Uuid
+  spreadsheetId String
+  sheetTitle    String
+  studentId     String   @db.Uuid
+  rowNumber     Int
+  rowHash       String
+  lastSeenAt    DateTime @default(now())
+  deletedAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([spreadsheetId, sheetTitle, studentId])
+  @@index([spreadsheetId, sheetTitle])
+  @@index([studentId])
+
+  @@map("StudentsSheetsRowState")
+}
+
+model StudentsSheetsOutboxEvent {
+  id              String                   @id @default(uuid()) @db.Uuid
+  spreadsheetId   String
+  studentId       String                   @db.Uuid
+  type            StudentsSheetsOutboxType
+  targetSheetTitle String?
+  payload         Json?
+  status          StudentsSheetsOutboxStatus @default(PENDING)
+  attempts        Int                      @default(0)
+  nextAttemptAt   DateTime                 @default(now())
+  lastError       String?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  @@unique([spreadsheetId, studentId])
+  @@index([status, nextAttemptAt])
+
+  @@map("StudentsSheetsOutboxEvent")
+}
+
+model StudentsSheetsSyncLog {
+  id            String                   @id @default(uuid()) @db.Uuid
+  spreadsheetId String
+  runId         String
+  level         StudentsSheetsLogLevel   @default(INFO)
+  direction     StudentsSheetsLogDirection
+  action        String
+  sheetTitle    String?
+  studentId     String?                  @db.Uuid
+  message       String
+  meta          Json?
+  createdAt     DateTime                 @default(now())
+
+  @@index([spreadsheetId, createdAt])
+  @@index([runId, createdAt])
+
+  @@map("StudentsSheetsSyncLog")
+}
+
+model StudentsSheetsWorkerState {
+  key             String   @id
+  lastHeartbeatAt DateTime?
+  lastStartedAt   DateTime?
+  lastFinishedAt  DateTime?
+  lastError       String?
+  isRunning       Boolean  @default(false)
+  updatedAt       DateTime @updatedAt
+
+  @@map("StudentsSheetsWorkerState")
 }
 
 model UserProfile {

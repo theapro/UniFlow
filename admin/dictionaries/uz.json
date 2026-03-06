@@ -21,7 +21,8 @@
     "schedule": "Dars jadvali",
     "attendance": "Davomat",
     "aiMonitor": "AI Monitoring",
-    "aiModels": "AI Modellar"
+    "aiModels": "AI Modellar",
+    "sheets": "Sheets"
   },
   "dashboard": {
     "title": "Boshqaruv paneli",
