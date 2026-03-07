@@ -18,6 +18,9 @@ export class AdminGroupService {
     return prisma.group.findMany({
       where,
       orderBy: { name: "asc" },
+      include: {
+        _count: { select: { students: true } },
+      },
       take: params?.take ?? 100,
       skip: params?.skip ?? 0,
     });

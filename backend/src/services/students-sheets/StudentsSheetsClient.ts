@@ -1,6 +1,17 @@
 import { google } from "googleapis";
 import { env } from "../../config/env";
 
+function colIndexToA1(idx0: number): string {
+  let n = idx0 + 1;
+  let s = "";
+  while (n > 0) {
+    const r = (n - 1) % 26;
+    s = String.fromCharCode(65 + r) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
 export type StudentsSheetsClientOptions = {
   spreadsheetId: string;
   clientEmail: string;
@@ -82,6 +93,107 @@ export class StudentsSheetsClient {
       sheetTitles,
       sheetIdByTitle,
     };
+  }
+
+  async createSheetTab(opts: {
+    title: string;
+  }): Promise<{ sheetId: number | null }> {
+    const res = await this.sheets.spreadsheets.batchUpdate({
+      auth: this.auth,
+      spreadsheetId: this.spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            addSheet: {
+              properties: {
+                title: opts.title,
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    const reply = res.data.replies?.[0]?.addSheet;
+    const sheetId =
+      typeof reply?.properties?.sheetId === "number"
+        ? reply.properties.sheetId
+        : null;
+
+    // Invalidate cache; titles/IDs changed.
+    this.sheetIdByTitleCache = null;
+
+    return { sheetId };
+  }
+
+  async renameSheetTab(opts: {
+    fromTitle: string;
+    toTitle: string;
+  }): Promise<void> {
+    if (opts.fromTitle === opts.toTitle) return;
+    const sheetId = await this.getSheetIdByTitle(opts.fromTitle);
+
+    await this.sheets.spreadsheets.batchUpdate({
+      auth: this.auth,
+      spreadsheetId: this.spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            updateSheetProperties: {
+              properties: {
+                sheetId,
+                title: opts.toTitle,
+              },
+              fields: "title",
+            },
+          },
+        ],
+      },
+    });
+
+    this.sheetIdByTitleCache = null;
+  }
+
+  async deleteSheetTab(opts: { title: string }): Promise<void> {
+    const sheetId = await this.getSheetIdByTitle(opts.title);
+    await this.sheets.spreadsheets.batchUpdate({
+      auth: this.auth,
+      spreadsheetId: this.spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            deleteSheet: {
+              sheetId,
+            },
+          },
+        ],
+      },
+    });
+    this.sheetIdByTitleCache = null;
+  }
+
+  async setRowValues(opts: {
+    sheetName: string;
+    rowNumber: number;
+    values: string[];
+    startColIndex0?: number;
+  }): Promise<void> {
+    const start = Math.max(opts.startColIndex0 ?? 0, 0);
+    const endIdx0 = start + Math.max(opts.values.length - 1, 0);
+    const startCol = colIndexToA1(start);
+    const endCol = colIndexToA1(endIdx0);
+    const range = `${opts.sheetName}!${startCol}${opts.rowNumber}:${endCol}${opts.rowNumber}`;
+
+    await this.sheets.spreadsheets.values.update({
+      auth: this.auth,
+      spreadsheetId: this.spreadsheetId,
+      range,
+      valueInputOption: "RAW",
+      requestBody: {
+        majorDimension: "ROWS",
+        values: [opts.values],
+      },
+    });
   }
 
   async getSheetIdByTitle(sheetTitle: string): Promise<number> {

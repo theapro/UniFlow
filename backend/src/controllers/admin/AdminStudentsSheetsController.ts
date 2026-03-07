@@ -5,6 +5,7 @@ import { ok } from "../../utils/responses";
 import { StudentsSheetsClient } from "../../services/students-sheets/StudentsSheetsClient";
 import { StudentsSheetsSyncService } from "../../services/students-sheets/StudentsSheetsSyncService";
 import { StudentsSheetsConflictService } from "../../services/students-sheets/StudentsSheetsConflictService";
+import { StudentsSheetsGroupsService } from "../../services/students-sheets/StudentsSheetsGroupsService";
 
 function maskSpreadsheetId(id: string | undefined | null) {
   if (!id) return null;
@@ -158,6 +159,18 @@ export class AdminStudentsSheetsController {
       await svc.recordFailure(e);
       throw e;
     }
+  };
+
+  getGroupsStatus = async (_req: Request, res: Response) => {
+    const svc = new StudentsSheetsGroupsService(prisma);
+    const data = await svc.getGroupsStatus();
+    return ok(res, "Students Sheets groups status fetched", data);
+  };
+
+  syncGroupsNow = async (_req: Request, res: Response) => {
+    const svc = new StudentsSheetsGroupsService(prisma);
+    const result = await svc.syncGroupsNow();
+    return ok(res, "Students Sheets groups sync completed", result);
   };
 
   listConflicts = async (req: Request, res: Response) => {

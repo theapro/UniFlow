@@ -125,6 +125,14 @@ router.get("/students-sheets/health", adminStudentsSheetsController.getHealth);
 router.get("/students-sheets/status", adminStudentsSheetsController.getStatus);
 router.post("/students-sheets/sync", adminStudentsSheetsController.syncNow);
 router.get(
+  "/students-sheets/groups/status",
+  adminStudentsSheetsController.getGroupsStatus,
+);
+router.post(
+  "/students-sheets/groups/sync",
+  adminStudentsSheetsController.syncGroupsNow,
+);
+router.get(
   "/students-sheets/conflicts",
   adminStudentsSheetsController.listConflicts,
 );

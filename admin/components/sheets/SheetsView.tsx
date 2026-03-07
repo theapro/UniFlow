@@ -5,12 +5,23 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { sheetsApi } from "@/lib/api";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SyncLogs } from "./SyncLogs";
 import { ConflictManager } from "./ConflictManager";
-import { RefreshCcw, LayoutGrid, AlertTriangle, ListFilter } from "lucide-react";
+import {
+  RefreshCcw,
+  LayoutGrid,
+  AlertTriangle,
+  ListFilter,
+} from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type StudentsSheetsStatusResponse = {
@@ -73,6 +84,20 @@ type SheetsHealthResponse = {
         ok: false;
         error: string;
       };
+};
+
+type SheetsGroupsStatusResponse = {
+  enabled: boolean;
+  spreadsheetId: string | null;
+  allTabs: string[];
+  validGroupTabs: string[];
+  ignoredTabs: Array<{
+    title: string;
+    reason: "FILTERED" | "HEADER_MISMATCH";
+    missingColumns?: string[];
+  }>;
+  dbGroupsMissingTabs: Array<{ id: string; name: string }>;
+  validTabsMissingDbGroups: string[];
 };
 
 type ConflictListResponse = {
@@ -143,6 +168,26 @@ export function SheetsView({ lang, dict }: { lang: string; dict: any }) {
     refetchInterval: 15_000,
   });
 
+  const { data: groupsStatus } = useQuery({
+    queryKey: ["sheets", "groups", "status"],
+    queryFn: () =>
+      sheetsApi.groups
+        .status()
+        .then((r) => r.data.data as SheetsGroupsStatusResponse),
+    refetchInterval: 60_000,
+  });
+
+  const syncGroupsMutation = useMutation({
+    mutationFn: () => sheetsApi.groups.sync().then((r) => r.data.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["sheets", "groups", "status"],
+      });
+      queryClient.invalidateQueries({ queryKey: ["sheets", "status"] });
+      queryClient.invalidateQueries({ queryKey: ["groups"] });
+    },
+  });
+
   const { data: conflicts } = useQuery({
     queryKey: ["sheets", "conflicts", "open"],
     queryFn: () =>
@@ -194,7 +239,12 @@ export function SheetsView({ lang, dict }: { lang: string; dict: any }) {
               disabled={syncMutation.isPending}
               className="font-semibold shadow-sm"
             >
-              <RefreshCcw className={"h-4 w-4 mr-2 " + (syncMutation.isPending ? "animate-spin" : "")} />
+              <RefreshCcw
+                className={
+                  "h-4 w-4 mr-2 " +
+                  (syncMutation.isPending ? "animate-spin" : "")
+                }
+              />
               {syncMutation.isPending ? "Syncing..." : "Force Sync"}
             </Button>
             <Button
@@ -223,9 +273,12 @@ export function SheetsView({ lang, dict }: { lang: string; dict: any }) {
           <TabsTrigger value="conflicts" className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" />
             Conflicts
-            {((conflicts?.items ?? []).length > 0) && (
-              <Badge variant="destructive" className="ml-1 h-5 w-5 p-0 flex items-center justify-center rounded-full text-[10px]">
-                {(conflicts?.items.length)}
+            {(conflicts?.items ?? []).length > 0 && (
+              <Badge
+                variant="destructive"
+                className="ml-1 h-5 w-5 p-0 flex items-center justify-center rounded-full text-[10px]"
+              >
+                {conflicts?.items.length}
               </Badge>
             )}
           </TabsTrigger>
@@ -233,98 +286,221 @@ export function SheetsView({ lang, dict }: { lang: string; dict: any }) {
 
         <TabsContent value="overview" className="space-y-6 outline-none">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-[1fr_2fr]">
-            <Card className="h-fit">
-              <CardHeader className="pb-3 border-b border-muted/30">
-                <CardTitle className="text-xl">
-                  {dict?.sheets?.connectionTitle ?? "Source Spreadsheet"}
-                </CardTitle>
-                <CardDescription>Target Google Sheet configuration</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 pt-4">
-                {healthLoading ? (
-                  <div>{dict?.common?.loading ?? "Loading..."}</div>
-                ) : health ? (
-                  <>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge
-                        variant={health.config?.enabled ? "default" : "outline"}
-                      >
-                        {health.config?.enabled ? "Enabled" : "Disabled"}
-                      </Badge>
-                      <Badge
-                        variant={
-                          health.config?.workerEnabled ? "default" : "outline"
-                        }
-                      >
-                        {health.config?.workerEnabled
-                          ? "Auto Sync"
-                          : "Manual Only"}
-                      </Badge>
-                      <Badge
-                        variant={
-                          (health.connection as any)?.ok
-                            ? "secondary"
-                            : "destructive"
-                        }
-                      >
-                        {(health.connection as any)?.attempted
-                          ? (health.connection as any)?.ok
-                            ? "Connected"
-                            : "Error"
-                          : "Not configured"}
-                      </Badge>
-                    </div>
+            <div className="space-y-6">
+              <Card className="h-fit">
+                <CardHeader className="pb-3 border-b border-muted/30">
+                  <CardTitle className="text-xl">
+                    {dict?.sheets?.connectionTitle ?? "Source Spreadsheet"}
+                  </CardTitle>
+                  <CardDescription>
+                    Target Google Sheet configuration
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 pt-4">
+                  {healthLoading ? (
+                    <div>{dict?.common?.loading ?? "Loading..."}</div>
+                  ) : health ? (
+                    <>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge
+                          variant={
+                            health.config?.enabled ? "default" : "outline"
+                          }
+                        >
+                          {health.config?.enabled ? "Enabled" : "Disabled"}
+                        </Badge>
+                        <Badge
+                          variant={
+                            health.config?.workerEnabled ? "default" : "outline"
+                          }
+                        >
+                          {health.config?.workerEnabled
+                            ? "Auto Sync"
+                            : "Manual Only"}
+                        </Badge>
+                        <Badge
+                          variant={
+                            (health.connection as any)?.ok
+                              ? "secondary"
+                              : "destructive"
+                          }
+                        >
+                          {(health.connection as any)?.attempted
+                            ? (health.connection as any)?.ok
+                              ? "Connected"
+                              : "Error"
+                            : "Not configured"}
+                        </Badge>
+                      </div>
 
-                    {health.connection.attempted && health.connection.ok ? (
-                      <div className="space-y-3 bg-muted/30 p-3 rounded-lg border border-muted">
-                        <div className="text-sm">
-                          <span className="text-muted-foreground block text-xs uppercase font-bold tracking-tight mb-0.5">
-                            Spreadsheet ID
-                          </span>{" "}
-                          <span className="font-mono text-[11px] break-all bg-background p-1 rounded border inline-block w-full">
-                            {health.connection.spreadsheet.id ??
-                              health.config?.spreadsheetId ??
-                              "-"}
-                          </span>
+                      {health.connection.attempted && health.connection.ok ? (
+                        <div className="space-y-3 bg-muted/30 p-3 rounded-lg border border-muted">
+                          <div className="text-sm">
+                            <span className="text-muted-foreground block text-xs uppercase font-bold tracking-tight mb-0.5">
+                              Spreadsheet ID
+                            </span>{" "}
+                            <span className="font-mono text-[11px] break-all bg-background p-1 rounded border inline-block w-full">
+                              {health.connection.spreadsheet.id ??
+                                health.config?.spreadsheetId ??
+                                "-"}
+                            </span>
+                          </div>
+                          <div className="text-sm">
+                            <span className="text-muted-foreground block text-xs uppercase font-bold tracking-tight mb-0.5">
+                              Title
+                            </span>{" "}
+                            <span className="font-medium text-slate-800 dark:text-slate-200">
+                              {health.connection.spreadsheet.title ??
+                                "(untitled)"}
+                            </span>
+                          </div>
+                          <div className="text-sm">
+                            <span className="text-muted-foreground block text-xs uppercase font-bold tracking-tight mb-0.5">
+                              Tabs
+                            </span>{" "}
+                            <span className="font-medium">
+                              {health.connection.sheetTitles.length}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {health.connection.sheetTitles.map((title, i) => (
+                              <Badge
+                                key={i}
+                                variant="outline"
+                                className="text-[10px] py-0"
+                              >
+                                {title}
+                              </Badge>
+                            ))}
+                          </div>
                         </div>
-                        <div className="text-sm">
-                          <span className="text-muted-foreground block text-xs uppercase font-bold tracking-tight mb-0.5">
-                            Title
-                          </span>{" "}
-                          <span className="font-medium text-slate-800 dark:text-slate-200">
-                            {health.connection.spreadsheet.title ?? "(untitled)"}
-                          </span>
+                      ) : health.connection.attempted &&
+                        !health.connection.ok ? (
+                        <div className="text-sm flex gap-2 p-3 rounded-lg bg-red-50 text-red-900 border border-red-100 dark:bg-red-950/20 dark:text-red-200 dark:border-red-900">
+                          <AlertTriangle className="h-5 w-5 shrink-0" />
+                          {health.connection.error}
                         </div>
-                        <div className="text-sm">
-                          <span className="text-muted-foreground block text-xs uppercase font-bold tracking-tight mb-0.5">
-                            Detected Groups (tabs)
-                          </span>{" "}
-                          <span className="font-medium">
-                            {health.connection.sheetTitles.length}
-                          </span>
+                      ) : (
+                        <div className="text-sm text-muted-foreground italic">
+                          {health.connection.error}
                         </div>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {health.connection.sheetTitles.map((title, i) => (
-                             <Badge key={i} variant="outline" className="text-[10px] py-0">{title}</Badge>
-                          ))}
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-sm text-muted-foreground italic">
+                      No source configuration found.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3 border-b border-muted/30 flex-row items-center justify-between space-y-0">
+                  <div>
+                    <CardTitle className="text-xl">
+                      {dict?.groups?.title ?? "Groups"}
+                    </CardTitle>
+                    <CardDescription>
+                      {dict?.sheets?.groupsSectionDesc ??
+                        "Groups are derived from valid student tabs (header must match required columns)."}
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => syncGroupsMutation.mutate()}
+                    disabled={
+                      syncGroupsMutation.isPending || !groupsStatus?.enabled
+                    }
+                  >
+                    {syncGroupsMutation.isPending
+                      ? "Syncing..."
+                      : "Sync Groups"}
+                  </Button>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-4">
+                  {!groupsStatus?.enabled ? (
+                    <div className="text-sm text-muted-foreground italic">
+                      Sheets integration is disabled.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-lg border bg-card p-3">
+                          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                            Valid group tabs
+                          </div>
+                          <div className="text-2xl font-black tabular-nums">
+                            {groupsStatus.validGroupTabs.length}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border bg-card p-3">
+                          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                            Ignored tabs
+                          </div>
+                          <div className="text-2xl font-black tabular-nums">
+                            {groupsStatus.ignoredTabs.length}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border bg-card p-3">
+                          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                            DB groups missing tabs
+                          </div>
+                          <div className="text-2xl font-black tabular-nums">
+                            {groupsStatus.dbGroupsMissingTabs.length}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border bg-card p-3">
+                          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                            Tabs missing DB groups
+                          </div>
+                          <div className="text-2xl font-black tabular-nums">
+                            {groupsStatus.validTabsMissingDbGroups.length}
+                          </div>
                         </div>
                       </div>
-                    ) : health.connection.attempted && !health.connection.ok ? (
-                      <div className="text-sm flex gap-2 p-3 rounded-lg bg-red-50 text-red-900 border border-red-100 dark:bg-red-950/20 dark:text-red-200 dark:border-red-900">
-                        <AlertTriangle className="h-5 w-5 shrink-0" />
-                        {health.connection.error}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground italic">
-                        {health.connection.error}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-sm text-muted-foreground italic">No source configuration found.</div>
-                )}
-              </CardContent>
-            </Card>
+
+                      {groupsStatus.dbGroupsMissingTabs.length > 0 ? (
+                        <div>
+                          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
+                            Missing tabs (will be created on sync)
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {groupsStatus.dbGroupsMissingTabs.map((g) => (
+                              <Badge
+                                key={g.id}
+                                variant="destructive"
+                                className="text-[10px] py-0"
+                              >
+                                {g.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {groupsStatus.validTabsMissingDbGroups.length > 0 ? (
+                        <div>
+                          <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
+                            Tabs without DB groups (will be created on sync)
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {groupsStatus.validTabsMissingDbGroups.map((t) => (
+                              <Badge
+                                key={t}
+                                variant="outline"
+                                className="text-[10px] py-0"
+                              >
+                                {t}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
 
             <div className="space-y-6">
               <Card>
@@ -333,7 +509,9 @@ export function SheetsView({ lang, dict }: { lang: string; dict: any }) {
                     <CardTitle className="text-xl">
                       {dict?.sheets?.queueTitle ?? "Sync Performance"}
                     </CardTitle>
-                    <CardDescription>Real-time status of data synchronization.</CardDescription>
+                    <CardDescription>
+                      Real-time status of data synchronization.
+                    </CardDescription>
                   </div>
                   <Badge
                     className="font-mono text-[10px]"
@@ -356,7 +534,7 @@ export function SheetsView({ lang, dict }: { lang: string; dict: any }) {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="rounded-xl border bg-card p-4 shadow-sm">
                           <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
-                             Students in DB
+                            Students in DB
                           </div>
                           <div className="text-2xl font-black tabular-nums">
                             {status.syncedStudents}
@@ -370,12 +548,14 @@ export function SheetsView({ lang, dict }: { lang: string; dict: any }) {
                             {status.spreadsheetRows}
                           </div>
                         </div>
-                        <div className="rounded-xl border bg-card p-4 shadow-sm border-orange-200 bg-orange-50/20 dark:border-orange-950 dark:bg-orange-950/10">
+                        <div className="rounded-xl border p-4 shadow-sm border-orange-200 bg-orange-50/20 dark:border-orange-950 dark:bg-orange-950/10">
                           <div className="text-xs font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider mb-2">
                             Open Conflicts
                           </div>
                           <div className="text-2xl font-black tabular-nums text-orange-600 dark:text-orange-400">
-                            {status.openConflicts ?? conflicts?.items?.length ?? 0}
+                            {status.openConflicts ??
+                              conflicts?.items?.length ??
+                              0}
                           </div>
                         </div>
                         <div className="rounded-xl border bg-card p-4 shadow-sm">
@@ -390,22 +570,36 @@ export function SheetsView({ lang, dict }: { lang: string; dict: any }) {
 
                       <div className="grid gap-2 text-xs divide-y">
                         <div className="flex justify-between py-1.5 px-1">
-                          <span className="text-muted-foreground">Last Run ID</span>
-                          <span className="font-mono">{status.lastRunId ? status.lastRunId.slice(0, 12) : "-"}</span>
+                          <span className="text-muted-foreground">
+                            Last Run ID
+                          </span>
+                          <span className="font-mono">
+                            {status.lastRunId
+                              ? status.lastRunId.slice(0, 12)
+                              : "-"}
+                          </span>
                         </div>
                         <div className="flex justify-between py-1.5 px-1">
-                          <span className="text-muted-foreground">Last Synchronization</span>
-                          <span className="font-medium">{formatDateTime(status.lastSyncAt)}</span>
+                          <span className="text-muted-foreground">
+                            Last Synchronization
+                          </span>
+                          <span className="font-medium">
+                            {formatDateTime(status.lastSyncAt)}
+                          </span>
                         </div>
                         <div className="flex justify-between py-1.5 px-1">
-                          <span className="text-muted-foreground">Worker Pulsar (Heartbeat)</span>
+                          <span className="text-muted-foreground">
+                            Worker Pulsar (Heartbeat)
+                          </span>
                           <span className="font-medium text-emerald-600">
-                             {status.worker?.running ? (
-                                <span className="flex items-center gap-1.5">
-                                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                                   {formatDateTime(status.worker?.lastHeartbeatAt)}
-                                </span>
-                             ) : "Stopped"}
+                            {status.worker?.running ? (
+                              <span className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                {formatDateTime(status.worker?.lastHeartbeatAt)}
+                              </span>
+                            ) : (
+                              "Stopped"
+                            )}
                           </span>
                         </div>
                       </div>
@@ -417,7 +611,9 @@ export function SheetsView({ lang, dict }: { lang: string; dict: any }) {
                       ) : null}
                     </div>
                   ) : (
-                    <div className="text-sm text-muted-foreground italic">Sync status information is unavailable.</div>
+                    <div className="text-sm text-muted-foreground italic">
+                      Sync status information is unavailable.
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -426,15 +622,15 @@ export function SheetsView({ lang, dict }: { lang: string; dict: any }) {
         </TabsContent>
 
         <TabsContent value="conflicts" className="outline-none">
-          <ConflictManager 
-              conflicts={conflicts?.items ?? []}
-              conflictDetail={conflictDetail}
-              selectedConflictId={selectedConflictId}
-              setSelectedConflictId={setSelectedConflictId}
-              isResolving={resolveMutation.isPending}
-              onResolve={(data) => resolveMutation.mutate(data)}
-              dict={dict}
-            />
+          <ConflictManager
+            conflicts={conflicts?.items ?? []}
+            conflictDetail={conflictDetail}
+            selectedConflictId={selectedConflictId}
+            setSelectedConflictId={setSelectedConflictId}
+            isResolving={resolveMutation.isPending}
+            onResolve={(data) => resolveMutation.mutate(data)}
+            dict={dict}
+          />
         </TabsContent>
       </Tabs>
 
@@ -446,14 +642,16 @@ export function SheetsView({ lang, dict }: { lang: string; dict: any }) {
               <ListFilter className="h-5 w-5 text-primary" />
               Synchronization Logs
             </CardTitle>
-            <CardDescription>Historical activity of the Sheets sync engine</CardDescription>
+            <CardDescription>
+              Historical activity of the Sheets sync engine
+            </CardDescription>
           </div>
           <Badge variant="outline" className="font-mono text-[10px]">
             {status?.recentLogs?.length ?? 0} ENTRIES
           </Badge>
         </CardHeader>
         <CardContent className="pt-4">
-             <SyncLogs logs={status?.recentLogs ?? []} dict={dict} />
+          <SyncLogs logs={status?.recentLogs ?? []} dict={dict} />
         </CardContent>
       </Card>
     </div>

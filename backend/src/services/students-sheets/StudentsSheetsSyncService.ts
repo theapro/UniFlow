@@ -15,6 +15,24 @@ const UUID_REGEX =
 
 const REQUIRED_COLUMNS = STUDENTS_SHEET_COLUMNS.map((c) => c.trim());
 
+function compileRegex(value: string | undefined | null): RegExp | null {
+  if (!value) return null;
+  try {
+    return new RegExp(value);
+  } catch {
+    return null;
+  }
+}
+
+const GROUP_TABS_ALLOW_RE = compileRegex(env.studentsSheetsGroupTabsAllowRegex);
+const GROUP_TABS_DENY_RE = compileRegex(env.studentsSheetsGroupTabsDenyRegex);
+
+function isCandidateGroupTab(title: string): boolean {
+  if (GROUP_TABS_ALLOW_RE && !GROUP_TABS_ALLOW_RE.test(title)) return false;
+  if (GROUP_TABS_DENY_RE && GROUP_TABS_DENY_RE.test(title)) return false;
+  return true;
+}
+
 function normalizeHeader(value: string): string {
   return value.trim().toLowerCase();
 }
@@ -167,6 +185,45 @@ function formatDateForSheet(d: Date): string {
   return d.toISOString();
 }
 
+type UniqueConflictReason =
+  | {
+      kind: "DUPLICATE_STUDENT_UUID_ACROSS_TABS";
+      student_uuid: string;
+      occurrences: Array<{ sheetTitle: string; rowNumber: number }>;
+    }
+  | {
+      kind: "DUPLICATE_STUDENT_NUMBER_ACROSS_TABS";
+      student_uuid: string;
+      student_number: string;
+      occurrences: Array<{
+        sheetTitle: string;
+        rowNumber: number;
+        student_uuid: string;
+      }>;
+    }
+  | {
+      kind: "DUPLICATE_EMAIL_ACROSS_TABS";
+      student_uuid: string;
+      email: string;
+      occurrences: Array<{
+        sheetTitle: string;
+        rowNumber: number;
+        student_uuid: string;
+      }>;
+    };
+
+type RowRef = {
+  sheetTitle: string;
+  rowNumber: number;
+  student_uuid: string;
+  student_number: string | null;
+  email: string | null;
+};
+
+function distinct<T>(values: T[]): T[] {
+  return Array.from(new Set(values));
+}
+
 export type StudentsSheetsSyncResult = {
   runId: string;
   spreadsheetId: string;
@@ -198,8 +255,10 @@ export class StudentsSheetsSyncService {
     const meta = await client.getSpreadsheetMetadata();
 
     const spreadsheetId = meta.spreadsheetId;
-    const groups = meta.sheetTitles;
+    const allSheetTitles = meta.sheetTitles;
     const now = new Date();
+
+    const detectedGroupTabs: string[] = [];
 
     const logs: Prisma.StudentsSheetsSyncLogCreateManyInput[] = [];
     const log = (entry: {
@@ -271,8 +330,245 @@ export class StudentsSheetsSyncService {
       return loaded;
     };
 
+    // --- Pre-scan: detect duplicate unique keys across tabs ---
+    // Invariant: 1 student must belong to exactly 1 group tab.
+    // If the same unique identifier appears in multiple tabs, we create an OPEN conflict
+    // and skip automatic updates (prevents "last tab wins" overwrites).
+    const conflictStudentIds = new Set<string>();
+    const reasonsByStudentId = new Map<string, UniqueConflictReason[]>();
+
+    const addReason = (studentId: string, reason: UniqueConflictReason) => {
+      conflictStudentIds.add(studentId);
+      const arr = reasonsByStudentId.get(studentId) ?? [];
+      arr.push(reason);
+      reasonsByStudentId.set(studentId, arr);
+    };
+
+    const uuidRefs = new Map<string, RowRef[]>();
+    const studentNumberRefs = new Map<string, RowRef[]>();
+    const emailRefs = new Map<string, RowRef[]>();
+
+    const pushRef = (map: Map<string, RowRef[]>, key: string, ref: RowRef) => {
+      const arr = map.get(key) ?? [];
+      arr.push(ref);
+      map.set(key, arr);
+    };
+
+    for (const tabTitle of allSheetTitles) {
+      if (!isCandidateGroupTab(tabTitle)) continue;
+
+      let sheet;
+      try {
+        sheet = await loadSheet(tabTitle);
+      } catch {
+        continue;
+      }
+      if (sheet.values.length === 0) continue;
+      if (missingColumns(sheet.header).length > 0) continue;
+
+      const tabValues = sheet.values;
+      for (let i = 1; i < tabValues.length; i++) {
+        const row = tabValues[i] ?? [];
+        const rowNumber = i + 1;
+        if (isRowEmpty(row)) continue;
+
+        const studentUuid = getCell(row, sheet.header, "student_uuid");
+        if (!studentUuid || !UUID_REGEX.test(studentUuid)) continue;
+
+        const studentNumber =
+          getCell(row, sheet.header, "student_number") || null;
+        const email =
+          (getCell(row, sheet.header, "email") || "").trim().toLowerCase() ||
+          null;
+
+        const ref: RowRef = {
+          sheetTitle: tabTitle,
+          rowNumber,
+          student_uuid: studentUuid,
+          student_number: studentNumber?.trim() || null,
+          email,
+        };
+
+        pushRef(uuidRefs, studentUuid, ref);
+        if (ref.student_number)
+          pushRef(studentNumberRefs, ref.student_number, ref);
+        if (ref.email) pushRef(emailRefs, ref.email, ref);
+      }
+    }
+
+    const addDuplicateReasons = <T extends "uuid" | "student_number" | "email">(
+      kind: T,
+      key: string,
+      refs: RowRef[],
+    ) => {
+      const distinctTabs = distinct(refs.map((r) => r.sheetTitle));
+      if (distinctTabs.length <= 1) return;
+
+      if (kind === "uuid") {
+        const occurrences = refs.map((r) => ({
+          sheetTitle: r.sheetTitle,
+          rowNumber: r.rowNumber,
+        }));
+        const reasonBase: Omit<
+          Extract<
+            UniqueConflictReason,
+            { kind: "DUPLICATE_STUDENT_UUID_ACROSS_TABS" }
+          >,
+          "student_uuid"
+        > = {
+          kind: "DUPLICATE_STUDENT_UUID_ACROSS_TABS",
+          occurrences,
+        };
+
+        for (const r of refs)
+          addReason(r.student_uuid, {
+            ...reasonBase,
+            student_uuid: r.student_uuid,
+          });
+        return;
+      }
+
+      if (kind === "student_number") {
+        const occurrences = refs.map((r) => ({
+          sheetTitle: r.sheetTitle,
+          rowNumber: r.rowNumber,
+          student_uuid: r.student_uuid,
+        }));
+        for (const r of refs) {
+          addReason(r.student_uuid, {
+            kind: "DUPLICATE_STUDENT_NUMBER_ACROSS_TABS",
+            student_uuid: r.student_uuid,
+            student_number: key,
+            occurrences,
+          });
+        }
+        return;
+      }
+
+      const occurrences = refs.map((r) => ({
+        sheetTitle: r.sheetTitle,
+        rowNumber: r.rowNumber,
+        student_uuid: r.student_uuid,
+      }));
+      for (const r of refs) {
+        addReason(r.student_uuid, {
+          kind: "DUPLICATE_EMAIL_ACROSS_TABS",
+          student_uuid: r.student_uuid,
+          email: key,
+          occurrences,
+        });
+      }
+    };
+
+    for (const [uuid, refs] of uuidRefs) {
+      if (refs.length > 1) addDuplicateReasons("uuid", uuid, refs);
+    }
+    for (const [sn, refs] of studentNumberRefs) {
+      const distinctStudents = distinct(refs.map((r) => r.student_uuid));
+      if (distinctStudents.length > 1)
+        addDuplicateReasons("student_number", sn, refs);
+    }
+    for (const [em, refs] of emailRefs) {
+      const distinctStudents = distinct(refs.map((r) => r.student_uuid));
+      if (distinctStudents.length > 1) addDuplicateReasons("email", em, refs);
+    }
+
+    if (reasonsByStudentId.size > 0) {
+      for (const [studentId, reasons] of reasonsByStudentId) {
+        conflictsDetected++;
+        const first = reasons[0];
+        const sheetTitle =
+          first.kind === "DUPLICATE_STUDENT_UUID_ACROSS_TABS"
+            ? first.occurrences[0]?.sheetTitle
+            : (first as any).occurrences?.[0]?.sheetTitle;
+        const rowNumber =
+          first.kind === "DUPLICATE_STUDENT_UUID_ACROSS_TABS"
+            ? first.occurrences[0]?.rowNumber
+            : (first as any).occurrences?.[0]?.rowNumber;
+
+        await this.prisma.studentsSheetsConflict.upsert({
+          where: {
+            spreadsheetId_studentId: { spreadsheetId, studentId },
+          },
+          update: {
+            status: "OPEN",
+            resolution: null,
+            sheetTitle: sheetTitle ?? null,
+            rowNumber: typeof rowNumber === "number" ? rowNumber : null,
+            message:
+              "Conflict detected: duplicate unique identifier across multiple group tabs",
+            sheetPayload: {
+              type: "DUPLICATE_UNIQUE_ACROSS_TABS",
+              reasons,
+            } as any,
+            baseHash: null,
+            detectedAt: now,
+            resolvedAt: null,
+          },
+          create: {
+            spreadsheetId,
+            studentId,
+            status: "OPEN",
+            sheetTitle: sheetTitle ?? null,
+            rowNumber: typeof rowNumber === "number" ? rowNumber : null,
+            message:
+              "Conflict detected: duplicate unique identifier across multiple group tabs",
+            sheetPayload: {
+              type: "DUPLICATE_UNIQUE_ACROSS_TABS",
+              reasons,
+            } as any,
+            detectedAt: now,
+          },
+          select: { id: true },
+        });
+      }
+    }
+
     // --- Sheets -> DB ---
-    for (const groupTabName of groups) {
+    for (const groupTabName of allSheetTitles) {
+      if (!isCandidateGroupTab(groupTabName)) {
+        log({
+          level: "INFO",
+          direction: "SHEETS_TO_DB",
+          action: "TAB_IGNORED",
+          sheetTitle: groupTabName,
+          message: `Ignored tab '${groupTabName}' (filtered by allow/deny regex)`,
+        });
+        continue;
+      }
+
+      let sheet;
+      try {
+        sheet = await loadSheet(groupTabName);
+      } catch (e) {
+        log({
+          level: "ERROR",
+          direction: "SHEETS_TO_DB",
+          action: "SHEET_READ_FAILED",
+          sheetTitle: groupTabName,
+          message: `Failed to read sheet tab ${groupTabName}`,
+          meta: { error: (e as any)?.message ?? String(e) },
+        });
+        continue;
+      }
+
+      if (sheet.values.length === 0) continue;
+      const missing = missingColumns(sheet.header);
+      if (missing.length > 0) {
+        headerMismatches++;
+        log({
+          level: "WARN",
+          direction: "SHEETS_TO_DB",
+          action: "TAB_IGNORED",
+          sheetTitle: groupTabName,
+          message: `Ignored tab '${groupTabName}' (missing required columns: ${missing.join(", ")})`,
+          meta: { header: sheet.header.raw },
+        });
+        continue;
+      }
+
+      detectedGroupTabs.push(groupTabName);
+
       const { cohortYear } = parseGroupTab(groupTabName);
 
       const cohortId = cohortYear
@@ -297,36 +593,6 @@ export class StudentsSheetsSyncService {
         },
         select: { id: true },
       });
-
-      let sheet;
-      try {
-        sheet = await loadSheet(groupTabName);
-      } catch (e) {
-        log({
-          level: "ERROR",
-          direction: "SHEETS_TO_DB",
-          action: "SHEET_READ_FAILED",
-          sheetTitle: groupTabName,
-          message: `Failed to read sheet tab ${groupTabName}`,
-          meta: { error: (e as any)?.message ?? String(e) },
-        });
-        continue;
-      }
-
-      if (sheet.values.length === 0) continue;
-      const missing = missingColumns(sheet.header);
-      if (missing.length > 0) {
-        headerMismatches++;
-        log({
-          level: "ERROR",
-          direction: "SHEETS_TO_DB",
-          action: "HEADER_MISMATCH",
-          sheetTitle: groupTabName,
-          message: `Header mismatch on tab ${groupTabName}; missing: ${missing.join(", ")}`,
-          meta: { header: sheet.header.raw },
-        });
-        continue;
-      }
 
       const existingStates = await this.prisma.studentsSheetsRowState.findMany({
         where: { spreadsheetId, sheetTitle: groupTabName },
@@ -408,6 +674,20 @@ export class StudentsSheetsSyncService {
             sheetTitle: groupTabName,
             message: `Row ${rowNumber} skipped (invalid UUID)`,
             meta: { student_uuid: studentUuid },
+          });
+          continue;
+        }
+
+        if (conflictStudentIds.has(studentUuid)) {
+          skipped++;
+          log({
+            level: "WARN",
+            direction: "SHEETS_TO_DB",
+            action: "ROW_SKIPPED_CONFLICT",
+            sheetTitle: groupTabName,
+            studentId: studentUuid,
+            message:
+              "Row skipped due to OPEN conflict (duplicate unique identifier across tabs)",
           });
           continue;
         }
@@ -742,40 +1022,94 @@ export class StudentsSheetsSyncService {
           }
         }
 
-        await this.prisma.student.upsert({
-          where: { id: studentUuid },
-          update: {
-            studentNumber: studentNumberVal,
-            fullName,
-            email: emailVal,
-            phone,
-            status,
-            teacherIds,
-            parentIds,
-            cohort,
-            groupName: groupTabName,
-            note,
-            groupId: group.id,
-            updatedAt,
-          },
-          create: {
-            id: studentUuid,
-            studentNumber: studentNumberVal,
-            fullName,
-            email: emailVal,
-            phone,
-            status,
-            teacherIds,
-            parentIds,
-            cohort,
-            groupName: groupTabName,
-            note,
-            groupId: group.id,
-            createdAt,
-            updatedAt,
-          },
-          select: { id: true },
-        });
+        try {
+          await this.prisma.student.upsert({
+            where: { id: studentUuid },
+            update: {
+              studentNumber: studentNumberVal,
+              fullName,
+              email: emailVal,
+              phone,
+              status,
+              teacherIds,
+              parentIds,
+              cohort,
+              groupName: groupTabName,
+              note,
+              groupId: group.id,
+              updatedAt,
+            },
+            create: {
+              id: studentUuid,
+              studentNumber: studentNumberVal,
+              fullName,
+              email: emailVal,
+              phone,
+              status,
+              teacherIds,
+              parentIds,
+              cohort,
+              groupName: groupTabName,
+              note,
+              groupId: group.id,
+              createdAt,
+              updatedAt,
+            },
+            select: { id: true },
+          });
+        } catch (e) {
+          const code = (e as any)?.code;
+          // Prisma unique constraint violation (e.g., studentNumber already used by another student)
+          if (code === "P2002") {
+            conflictsDetected++;
+            await this.prisma.studentsSheetsConflict.upsert({
+              where: {
+                spreadsheetId_studentId: {
+                  spreadsheetId,
+                  studentId: studentUuid,
+                },
+              },
+              update: {
+                status: "OPEN",
+                resolution: null,
+                sheetTitle: groupTabName,
+                rowNumber,
+                message:
+                  "Conflict detected: DB unique constraint violation while applying Sheets row",
+                sheetPayload: rowPayloadRaw as any,
+                baseHash: prev?.rowHash ?? null,
+                detectedAt: now,
+                resolvedAt: null,
+              },
+              create: {
+                spreadsheetId,
+                studentId: studentUuid,
+                status: "OPEN",
+                sheetTitle: groupTabName,
+                rowNumber,
+                message:
+                  "Conflict detected: DB unique constraint violation while applying Sheets row",
+                sheetPayload: rowPayloadRaw as any,
+                detectedAt: now,
+              },
+              select: { id: true },
+            });
+
+            skipped++;
+            log({
+              level: "WARN",
+              direction: "SHEETS_TO_DB",
+              action: "CONFLICT_DETECTED",
+              sheetTitle: groupTabName,
+              studentId: studentUuid,
+              message:
+                "DB unique constraint violation; created conflict and skipped row",
+              meta: { error: (e as any)?.message ?? String(e) },
+            });
+            continue;
+          }
+          throw e;
+        }
 
         await this.prisma.studentsSheetsRowState.upsert({
           where: {
@@ -875,33 +1209,82 @@ export class StudentsSheetsSyncService {
         });
 
         try {
-          const rowState = await this.prisma.studentsSheetsRowState.findFirst({
-            where: { spreadsheetId, studentId: ev.studentId, deletedAt: null },
-            select: { sheetTitle: true, rowNumber: true },
-          });
+          const openConflict =
+            await this.prisma.studentsSheetsConflict.findUnique({
+              where: {
+                spreadsheetId_studentId: {
+                  spreadsheetId,
+                  studentId: ev.studentId,
+                },
+              },
+              select: { status: true },
+            });
+          if (openConflict?.status === "OPEN") {
+            const delayMs = 5 * 60_000;
+            await this.prisma.studentsSheetsOutboxEvent.update({
+              where: { id: ev.id },
+              data: {
+                status: "FAILED",
+                lastError: "OPEN_CONFLICT",
+                nextAttemptAt: new Date(Date.now() + delayMs),
+              },
+            });
+            log({
+              level: "WARN",
+              direction: "DB_TO_SHEETS",
+              action: "OUTBOX_SKIPPED_OPEN_CONFLICT",
+              sheetTitle: ev.targetSheetTitle ?? undefined,
+              studentId: ev.studentId,
+              message:
+                "Skipped outbox event because student has an OPEN conflict",
+            });
+            continue;
+          }
+
+          const activeRowStates =
+            await this.prisma.studentsSheetsRowState.findMany({
+              where: {
+                spreadsheetId,
+                studentId: ev.studentId,
+                deletedAt: null,
+              },
+              select: { sheetTitle: true, rowNumber: true },
+              orderBy: { lastSeenAt: "desc" },
+              take: 20,
+            });
 
           if (ev.type === "DELETE") {
-            const sheetTitle =
-              ev.targetSheetTitle ??
-              (typeof (ev.payload as any)?.group === "string"
-                ? String((ev.payload as any).group)
-                : null) ??
-              rowState?.sheetTitle ??
-              null;
+            const candidateTitles = distinct(
+              [
+                ev.targetSheetTitle ?? null,
+                typeof (ev.payload as any)?.group === "string"
+                  ? String((ev.payload as any).group)
+                  : null,
+                ...activeRowStates.map((s) => s.sheetTitle),
+              ].filter(Boolean) as string[],
+            );
 
-            if (!sheetTitle) {
+            if (candidateTitles.length === 0) {
               throw new Error("OUTBOX_DELETE_MISSING_SHEET_TITLE");
             }
 
-            const sheet = await loadSheet(sheetTitle);
-            const rowNumber =
-              sheet.uuidToRowNumber.get(ev.studentId) ??
-              rowState?.rowNumber ??
-              null;
+            for (const sheetTitle of candidateTitles) {
+              try {
+                const sheet = await loadSheet(sheetTitle);
+                const rowNumber =
+                  sheet.uuidToRowNumber.get(ev.studentId) ??
+                  activeRowStates.find((s) => s.sheetTitle === sheetTitle)
+                    ?.rowNumber ??
+                  null;
 
-            if (rowNumber) {
-              // Prefer non-destructive clears to avoid reindexing large sheets.
-              await client.clearRow({ sheetName: sheetTitle, rowNumber });
+                if (rowNumber) {
+                  // Prefer non-destructive clears to avoid reindexing large sheets.
+                  await client.clearRow({ sheetName: sheetTitle, rowNumber });
+                }
+              } catch {
+                // ignore; we'll still mark row states as deleted
+              }
+
               await this.prisma.studentsSheetsRowState.updateMany({
                 where: { spreadsheetId, sheetTitle, studentId: ev.studentId },
                 data: { deletedAt: now },
@@ -917,9 +1300,10 @@ export class StudentsSheetsSyncService {
             log({
               direction: "DB_TO_SHEETS",
               action: "SHEET_ROW_CLEARED",
-              sheetTitle,
+              sheetTitle: candidateTitles[0] ?? undefined,
               studentId: ev.studentId,
               message: "Cleared row in Sheets due to DB delete",
+              meta: { clearedTabs: candidateTitles },
             });
             continue;
           }
@@ -941,32 +1325,37 @@ export class StudentsSheetsSyncService {
             continue;
           }
 
-          const sheetTitle = ev.targetSheetTitle ?? student.group?.name ?? null;
+          const sheetTitle = student.group?.name ?? ev.targetSheetTitle ?? null;
           if (!sheetTitle) {
             throw new Error("OUTBOX_UPSERT_MISSING_SHEET_TITLE");
           }
-          if (!groups.includes(sheetTitle)) {
+          if (!allSheetTitles.includes(sheetTitle)) {
             throw new Error(`OUTBOX_UPSERT_UNKNOWN_TAB:${sheetTitle}`);
           }
 
-          // If student moved groups, clear old row (best-effort).
-          if (rowState?.sheetTitle && rowState.sheetTitle !== sheetTitle) {
+          // Enforce invariant: a student should exist in exactly ONE group tab.
+          // Clear any stale occurrences in other tabs (best-effort).
+          const staleStates = activeRowStates.filter(
+            (s) => s.sheetTitle !== sheetTitle,
+          );
+          for (const st of staleStates) {
             try {
               await client.clearRow({
-                sheetName: rowState.sheetTitle,
-                rowNumber: rowState.rowNumber,
-              });
-              await this.prisma.studentsSheetsRowState.updateMany({
-                where: {
-                  spreadsheetId,
-                  sheetTitle: rowState.sheetTitle,
-                  studentId: ev.studentId,
-                },
-                data: { deletedAt: now },
+                sheetName: st.sheetTitle,
+                rowNumber: st.rowNumber,
               });
             } catch {
               // ignore
             }
+
+            await this.prisma.studentsSheetsRowState.updateMany({
+              where: {
+                spreadsheetId,
+                sheetTitle: st.sheetTitle,
+                studentId: ev.studentId,
+              },
+              data: { deletedAt: now },
+            });
           }
 
           const sheet = await loadSheet(sheetTitle);
@@ -1139,7 +1528,7 @@ export class StudentsSheetsSyncService {
         lastSyncAt: now,
         ...(hadErrors ? {} : { lastSuccessAt: now }),
         lastError: hadErrors ? "SEE_LOGS" : null,
-        detectedGroups: groups,
+        detectedGroups: detectedGroupTabs,
         syncedStudents: dbStudents,
         spreadsheetRows: sheetsRows,
       },
@@ -1150,7 +1539,7 @@ export class StudentsSheetsSyncService {
         lastSyncAt: now,
         lastSuccessAt: hadErrors ? null : now,
         lastError: hadErrors ? "SEE_LOGS" : null,
-        detectedGroups: groups,
+        detectedGroups: detectedGroupTabs,
         syncedStudents: dbStudents,
         spreadsheetRows: sheetsRows,
       },
@@ -1169,7 +1558,7 @@ export class StudentsSheetsSyncService {
     return {
       runId,
       spreadsheetId,
-      groups,
+      groups: detectedGroupTabs,
       sheetsRows,
       dbStudents,
       conflictsDetected,

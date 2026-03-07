@@ -188,6 +188,10 @@ export const sheetsApi = {
   health: () => axios.get("/api/admin/students-sheets/health"),
   status: () => axios.get("/api/admin/students-sheets/status"),
   syncNow: () => axios.post("/api/admin/students-sheets/sync"),
+  groups: {
+    status: () => axios.get("/api/admin/students-sheets/groups/status"),
+    sync: () => axios.post("/api/admin/students-sheets/groups/sync"),
+  },
   conflicts: {
     list: (params?: {
       status?: "OPEN" | "RESOLVED";

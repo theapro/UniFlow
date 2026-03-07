@@ -83,4 +83,14 @@ export const env = {
     optionalBool("GOOGLE_SHEETS_STUDENTS_DETECT_DELETES") ?? false,
   studentsSheetsDbToSheetsEnabled:
     optionalBool("GOOGLE_SHEETS_STUDENTS_DB_TO_SHEETS_ENABLED") ?? true,
+
+  // Optional tab filtering (treat only matching tabs as "groups")
+  // Example allow regex: ^\\d{2,4}.*$  (tabs starting with year)
+  studentsSheetsGroupTabsAllowRegex: optional(
+    "GOOGLE_SHEETS_STUDENTS_GROUP_TABS_ALLOW_REGEX",
+  ),
+  // Example deny regex: ^(?:Sheet\\d+|Summary|Config)$
+  studentsSheetsGroupTabsDenyRegex: optional(
+    "GOOGLE_SHEETS_STUDENTS_GROUP_TABS_DENY_REGEX",
+  ),
 };
