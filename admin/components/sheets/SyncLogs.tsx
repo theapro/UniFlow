@@ -6,10 +6,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 type Log = {
   createdAt: string;
   level: "INFO" | "WARN" | "ERROR";
-  direction: "SHEETS_TO_DB" | "DB_TO_SHEETS" | "WORKER";
+  direction: string;
   action: string;
   sheetTitle: string | null;
-  studentId: string | null;
   message: string;
 };
 

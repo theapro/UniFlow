@@ -67,6 +67,22 @@ export const env = {
     "GOOGLE_SHEETS_STUDENTS_SPREADSHEET_ID",
   ),
 
+  // Teachers Spreadsheet (TeachersWithSubjects; tabs = subjects)
+  teachersSheetsEnabled:
+    optionalBool("GOOGLE_SHEETS_TEACHERS_ENABLED") ??
+    Boolean(optional("GOOGLE_SHEETS_TEACHERS_SPREADSHEET_ID")),
+  teachersSheetsSpreadsheetId: optional(
+    "GOOGLE_SHEETS_TEACHERS_SPREADSHEET_ID",
+  ),
+
+  // Teachers Worker
+  teachersSheetsWorkerEnabled:
+    optionalBool("GOOGLE_SHEETS_TEACHERS_WORKER_ENABLED") ?? false,
+  teachersSheetsWorkerIntervalMs:
+    optionalNumber("GOOGLE_SHEETS_TEACHERS_WORKER_INTERVAL_MS") ?? 60_000,
+  teachersSheetsDbToSheetsEnabled:
+    optionalBool("GOOGLE_SHEETS_TEACHERS_DB_TO_SHEETS_ENABLED") ?? true,
+
   // Optional background sync loop (recommended: run a separate worker in prod)
   studentsSheetsWorkerEnabled:
     optionalBool("GOOGLE_SHEETS_STUDENTS_WORKER_ENABLED") ?? false,
@@ -92,5 +108,13 @@ export const env = {
   // Example deny regex: ^(?:Sheet\\d+|Summary|Config)$
   studentsSheetsGroupTabsDenyRegex: optional(
     "GOOGLE_SHEETS_STUDENTS_GROUP_TABS_DENY_REGEX",
+  ),
+
+  // Optional tab filtering for TeachersWithSubjects (treat only matching tabs as subjects)
+  teachersSheetsSubjectTabsAllowRegex: optional(
+    "GOOGLE_SHEETS_TEACHERS_SUBJECT_TABS_ALLOW_REGEX",
+  ),
+  teachersSheetsSubjectTabsDenyRegex: optional(
+    "GOOGLE_SHEETS_TEACHERS_SUBJECT_TABS_DENY_REGEX",
   ),
 };

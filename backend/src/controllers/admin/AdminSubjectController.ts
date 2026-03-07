@@ -1,9 +1,28 @@
 import type { Request, Response } from "express";
 import { AdminSubjectService } from "../../services/admin/AdminSubjectService";
+import { TeachersSheetsSyncService } from "../../services/teachers-sheets/TeachersSheetsSyncService";
 import { created, fail, ok } from "../../utils/responses";
 
 export class AdminSubjectController {
+  private teachersSheetsSyncService: TeachersSheetsSyncService | null = null;
+
   constructor(private readonly subjectService: AdminSubjectService) {}
+
+  setSyncService(syncService: TeachersSheetsSyncService) {
+    this.teachersSheetsSyncService = syncService;
+  }
+
+  private async triggerSync() {
+    if (this.teachersSheetsSyncService) {
+      // Run in background
+      this.teachersSheetsSyncService.syncDbToSheets().catch((err) => {
+        console.error(
+          "Failed to trigger DB to Sheets sync after subject change:",
+          err,
+        );
+      });
+    }
+  }
 
   list = async (req: Request, res: Response) => {
     try {
@@ -44,8 +63,14 @@ export class AdminSubjectController {
         code: typeof code === "string" ? code : (code ?? null),
       });
 
+      // Trigger sync to ensure new tab is created in Sheets if needed
+      await this.triggerSync();
+
       return created(res, "Subject created", subject);
-    } catch {
+    } catch (err: any) {
+      if (err.code === "P2002") {
+        return fail(res, 400, "Subject with this name already exists");
+      }
       return fail(res, 500, "Failed to create subject");
     }
   };
@@ -54,13 +79,38 @@ export class AdminSubjectController {
     try {
       const { name, code } = req.body ?? {};
 
+      const before = await this.subjectService.getById(req.params.id);
+
       const subject = await this.subjectService.update(req.params.id, {
         ...(name !== undefined ? { name } : {}),
         ...(code !== undefined ? { code } : {}),
       });
 
+      // If subject name changed, keep Sheets tab name in sync
+      if (
+        this.teachersSheetsSyncService &&
+        before?.name &&
+        subject?.name &&
+        before.name !== subject.name
+      ) {
+        this.teachersSheetsSyncService
+          .renameSubjectTab({ fromTitle: before.name, toTitle: subject.name })
+          .catch((err) => {
+            console.error(
+              "Failed to rename Sheets tab after subject rename:",
+              err,
+            );
+          });
+      }
+
+      // Trigger sync to update tab names if subject name changed
+      await this.triggerSync();
+
       return ok(res, "Subject updated", subject);
-    } catch {
+    } catch (err: any) {
+      if (err.code === "P2002") {
+        return fail(res, 400, "Subject with this name already exists");
+      }
       return fail(res, 500, "Failed to update subject");
     }
   };
@@ -68,9 +118,12 @@ export class AdminSubjectController {
   remove = async (req: Request, res: Response) => {
     try {
       await this.subjectService.remove(req.params.id);
+
+      // No need to trigger deep sync here usually, as we don't delete tabs from sheets automatically for safety
+
       return ok(res, "Subject deleted");
-    } catch {
-      return fail(res, 500, "Failed to delete subject");
+    } catch (err: any) {
+      return fail(res, 500, "Failed to delete subject: " + err.message);
     }
   };
 }

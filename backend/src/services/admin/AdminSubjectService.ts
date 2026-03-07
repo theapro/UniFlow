@@ -27,11 +27,29 @@ export class AdminSubjectService {
       orderBy: { name: "asc" },
       take: params?.take ?? 100,
       skip: params?.skip ?? 0,
+      include: {
+        _count: {
+          select: {
+            teachers: true,
+            lessons: true,
+          },
+        },
+      },
     });
   }
 
   async getById(id: string) {
-    return prisma.subject.findUnique({ where: { id } });
+    return prisma.subject.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            teachers: true,
+            lessons: true,
+          },
+        },
+      },
+    });
   }
 
   async create(input: CreateSubjectInput) {
@@ -54,7 +72,42 @@ export class AdminSubjectService {
   }
 
   async remove(id: string) {
-    await prisma.subject.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      // Remove attendance records for lessons of this subject
+      await tx.attendance.deleteMany({
+        where: {
+          lesson: {
+            subjectId: id,
+          },
+        },
+      });
+
+      // Remove lessons tied to this subject
+      await tx.lesson.deleteMany({
+        where: {
+          subjectId: id,
+        },
+      });
+
+      // Remove schedule entries tied to this subject
+      await tx.scheduleEntry.deleteMany({
+        where: {
+          subjectId: id,
+        },
+      });
+
+      // Unlink from teachers (many-to-many)
+      await tx.subject.update({
+        where: { id },
+        data: {
+          teachers: { set: [] },
+        },
+        select: { id: true },
+      });
+
+      await tx.subject.delete({ where: { id } });
+    });
+
     return true;
   }
 }

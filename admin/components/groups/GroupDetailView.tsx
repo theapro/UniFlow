@@ -2,11 +2,20 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Users } from "lucide-react";
+import { 
+  ArrowLeft, 
+  Users, 
+  Edit2, 
+  Trash2, 
+  CheckCircle2, 
+  AlertCircle, 
+  Loader2, 
+  MoreHorizontal 
+} from "lucide-react";
 
 import { groupsApi, sheetsApi, studentsApi } from "@/lib/api";
-import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { StudentTable } from "@/components/students/StudentTable";
@@ -18,21 +27,24 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 
 type Group = {
   id: string;
   name: string;
-  _count?: { students?: number };
 };
 
 type SheetsGroupsStatus = {
   enabled: boolean;
-  allTabs: string[];
   dbGroupsMissingTabs: Array<{ id: string; name: string }>;
 };
 
@@ -46,10 +58,13 @@ export function GroupDetailView({
   id: string;
 }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  
   const [renameOpen, setRenameOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [nameDraft, setNameDraft] = React.useState("");
 
+  // Queries
   const { data: group, isLoading: groupLoading } = useQuery({
     queryKey: ["groups", id],
     queryFn: () => groupsApi.getById(id).then((r) => r.data.data as Group),
@@ -57,14 +72,12 @@ export function GroupDetailView({
 
   const { data: students, isLoading: studentsLoading } = useQuery({
     queryKey: ["students", { groupId: id }],
-    queryFn: () =>
-      studentsApi.list({ groupId: id, take: 1000 }).then((r) => r.data.data),
+    queryFn: () => studentsApi.list({ groupId: id, take: 1000 }).then((r) => r.data.data),
   });
 
   const { data: sheetsGroups } = useQuery({
     queryKey: ["sheets", "groups", "status"],
-    queryFn: () =>
-      sheetsApi.groups.status().then((r) => r.data.data as SheetsGroupsStatus),
+    queryFn: () => sheetsApi.groups.status().then((r) => r.data.data as SheetsGroupsStatus),
     staleTime: 30_000,
   });
 
@@ -73,151 +86,149 @@ export function GroupDetailView({
     return (sheetsGroups.dbGroupsMissingTabs ?? []).some((g) => g.id === id);
   }, [sheetsGroups, id]);
 
+  // Mutations
   const renameMutation = useMutation({
     mutationFn: (name: string) => groupsApi.update(id, { name }),
     onSuccess: async () => {
       setRenameOpen(false);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["groups"] }),
-        queryClient.invalidateQueries({ queryKey: ["groups", id] }),
-        queryClient.invalidateQueries({
-          queryKey: ["sheets", "groups", "status"],
-        }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: ["groups", id] });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => groupsApi.remove(id),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["groups"] }),
-        queryClient.invalidateQueries({
-          queryKey: ["sheets", "groups", "status"],
-        }),
-      ]);
-      // Navigate back
-      window.location.href = `/${lang}/dashboard/groups`;
+      await queryClient.invalidateQueries({ queryKey: ["groups"] });
+      router.push(`/${lang}/dashboard/groups`);
     },
   });
 
+  const isLoading = groupLoading || studentsLoading;
+
   return (
-    <div className="container space-y-4">
-      <PageHeader
-        title={group?.name ?? dict?.groups?.detailTitle ?? "Group"}
-        actions={
-          <div className="flex gap-2">
+    <div className="container space-y-6">
+      {/* Top Navigation */}
+      <Link 
+        href={`/${lang}/dashboard/groups`}
+        className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors group"
+      >
+        <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
+        {dict?.common?.back ?? "Groups"}
+      </Link>
+
+      <div className="flex items-start justify-between">
+        <div className="space-y-1.5">
+          <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50">
+            {group?.name ?? "..."}
+          </h1>
+          
+          {/* Status Indicators */}
+          <div className="flex items-center gap-2">
             {sheetsGroups?.enabled ? (
-              missingTab ? (
-                <Badge variant="destructive" className="self-center">
-                  {dict?.groups?.missingTab ?? "Missing Sheets tab"}
-                </Badge>
-              ) : (
-                <Badge variant="secondary" className="self-center">
-                  {dict?.groups?.tabOk ?? "Sheets tab OK"}
-                </Badge>
-              )
-            ) : null}
-
-            <Dialog
-              open={renameOpen}
-              onOpenChange={(o) => {
-                setRenameOpen(o);
-                if (o && group?.name) setNameDraft(group.name);
-              }}
-            >
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  {dict?.common?.edit ?? "Rename"}
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>
-                    {dict?.groups?.rename ?? "Rename group"}
-                  </DialogTitle>
-                  <DialogDescription>
-                    {dict?.groups?.renameHint ??
-                      "Renames the group in DB and best-effort renames the matching Google Sheets tab."}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-2">
-                  <Label htmlFor="groupRename">
-                    {dict?.common?.name ?? "Name"}
-                  </Label>
-                  <Input
-                    id="groupRename"
-                    value={nameDraft}
-                    onChange={(e) => setNameDraft(e.target.value)}
-                  />
-                </div>
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={() => setRenameOpen(false)}
-                    disabled={renameMutation.isPending}
-                  >
-                    {dict?.common?.cancel ?? "Cancel"}
-                  </Button>
-                  <Button
-                    onClick={() => renameMutation.mutate(nameDraft.trim())}
-                    disabled={
-                      renameMutation.isPending || nameDraft.trim().length === 0
-                    }
-                  >
-                    {renameMutation.isPending
-                      ? (dict?.common?.loading ?? "Saving...")
-                      : (dict?.common?.save ?? "Save")}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-
-            <Button
-              variant="destructive"
-              onClick={() => setDeleteOpen(true)}
-              disabled={deleteMutation.isPending}
-            >
-              {dict?.common?.delete ?? "Delete"}
-            </Button>
-
-            <Link href={`/${lang}/dashboard/groups`}>
-              <Button variant="outline">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                {dict?.common?.back ?? "Back"}
-              </Button>
-            </Link>
+              <div className={`flex items-center text-xs font-medium ${missingTab ? "text-destructive" : "text-emerald-600"}`}>
+                {missingTab ? <AlertCircle className="w-3.5 h-3.5 mr-1" /> : <CheckCircle2 className="w-3.5 h-3.5 mr-1" />}
+                {missingTab ? (dict?.groups?.missingTab ?? "Sync Error") : (dict?.groups?.tabOk ?? "Synced with Sheets")}
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground italic">Local group</span>
+            )}
           </div>
-        }
-      />
+        </div>
 
+        {/* Action Menu (3 dots) */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon" className="h-10 w-10">
+              <MoreHorizontal className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem 
+              onClick={() => {
+                setNameDraft(group?.name ?? "");
+                setRenameOpen(true);
+              }}
+              className="cursor-pointer"
+            >
+              <Edit2 className="mr-2 h-4 w-4" />
+              {dict?.common?.edit ?? "Rename"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              onClick={() => setDeleteOpen(true)}
+              className="text-destructive focus:text-destructive cursor-pointer"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {dict?.common?.delete ?? "Delete"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="pt-4">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-24 space-y-3">
+            <Loader2 className="h-10 w-10 animate-spin text-primary/60" />
+            <p className="text-sm text-muted-foreground animate-pulse">{dict?.common?.loading ?? "Fetching students..."}</p>
+          </div>
+        ) : students && students.length > 0 ? (
+          <div className=" rounded-xl">
+            <StudentTable students={students} lang={lang} dict={dict} />
+          </div>
+        ) : (
+          <EmptyState
+            icon={Users}
+            title={dict?.common?.noData ?? "Empty Group"}
+            description={dict?.groups?.noStudentsDescription ?? "Start by adding students to this group."}
+          />
+        )}
+      </div>
+
+      {/* Rename Dialog */}
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{dict?.groups?.rename ?? "Update Name"}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="name" className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">
+              {dict?.common?.name ?? "Group Name"}
+            </Label>
+            <Input
+              id="name"
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              className="h-11"
+              autoFocus
+            />
+          </div>
+          <DialogFooter className="sm:justify-end gap-2">
+            <Button variant="ghost" onClick={() => setRenameOpen(false)}>
+              {dict?.common?.cancel ?? "Cancel"}
+            </Button>
+            <Button 
+              onClick={() => renameMutation.mutate(nameDraft.trim())}
+              disabled={renameMutation.isPending || !nameDraft.trim()}
+              className="px-8"
+            >
+              {renameMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {dict?.common?.save ?? "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        title={dict?.groups?.deleteTitle ?? "Delete group?"}
-        description={
-          dict?.groups?.deleteDescription ??
-          "This deletes the group from the database. The Google Sheets tab is not removed by default."
-        }
-        confirmLabel={dict?.common?.delete ?? "Delete"}
+        title={dict?.groups?.deleteTitle ?? "Delete Group"}
+        description={dict?.groups?.deleteDescription ?? "This action is permanent and will remove all student references in this group."}
+        confirmLabel={dict?.common?.delete ?? "Yes, Delete"}
         cancelLabel={dict?.common?.cancel ?? "Cancel"}
         onConfirm={() => deleteMutation.mutate()}
       />
-
-      {groupLoading || studentsLoading ? (
-        <div>{dict?.common?.loading ?? "Loading..."}</div>
-      ) : students && students.length ? (
-        <StudentTable students={students} lang={lang} dict={dict} />
-      ) : (
-        <EmptyState
-          icon={Users}
-          title={dict?.common?.noData ?? "No data"}
-          description={
-            dict?.groups?.noStudentsDescription ??
-            "No students found in this group"
-          }
-        />
-      )}
     </div>
   );
 }

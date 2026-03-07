@@ -10,6 +10,10 @@ export type CreateTeacherInput = {
   email?: string;
   staffNo?: string | null;
   departmentId?: string | null;
+  phone?: string | null;
+  telegram?: string | null;
+  note?: string | null;
+  subjectIds: string[];
 };
 
 export type UpdateTeacherInput = {
@@ -17,6 +21,10 @@ export type UpdateTeacherInput = {
   email?: string;
   staffNo?: string | null;
   departmentId?: string | null;
+  phone?: string | null;
+  telegram?: string | null;
+  note?: string | null;
+  subjectIds?: string[];
 };
 
 export class AdminTeacherService {
@@ -34,6 +42,7 @@ export class AdminTeacherService {
       where,
       include: {
         department: true,
+        subjects: { select: { id: true, name: true } },
         user: {
           select: { email: true, lastLoginAt: true, credentialsSentAt: true },
         },
@@ -49,6 +58,7 @@ export class AdminTeacherService {
       where: { id },
       include: {
         department: true,
+        subjects: { select: { id: true, name: true } },
         user: {
           select: { email: true, lastLoginAt: true, credentialsSentAt: true },
         },
@@ -59,14 +69,28 @@ export class AdminTeacherService {
   async create(input: CreateTeacherInput) {
     const hasEmail = typeof input.email === "string" && input.email.length > 0;
 
+    if (!Array.isArray(input.subjectIds) || input.subjectIds.length === 0) {
+      throw new Error("SUBJECT_REQUIRED");
+    }
+
     const teacher = await prisma.$transaction(async (tx) => {
       const createdTeacher = await tx.teacher.create({
         data: {
           fullName: input.fullName,
           staffNo: input.staffNo ?? null,
           departmentId: input.departmentId ?? null,
+          email: input.email ?? null,
+          phone: input.phone ?? null,
+          telegram: input.telegram ?? null,
+          note: input.note ?? null,
+          subjects: {
+            connect: input.subjectIds.map((id) => ({ id })),
+          },
         },
-        include: { department: true },
+        include: {
+          department: true,
+          subjects: { select: { id: true, name: true } },
+        },
       });
 
       if (!hasEmail) {
@@ -135,6 +159,7 @@ export class AdminTeacherService {
       where: { id: teacher.id },
       include: {
         department: true,
+        subjects: { select: { id: true, name: true } },
         user: {
           select: { email: true, lastLoginAt: true, credentialsSentAt: true },
         },
@@ -152,9 +177,21 @@ export class AdminTeacherService {
           ...(input.departmentId !== undefined
             ? { departmentId: input.departmentId }
             : {}),
+          ...(input.email !== undefined ? { email: input.email } : {}),
+          ...(input.phone !== undefined ? { phone: input.phone } : {}),
+          ...(input.telegram !== undefined ? { telegram: input.telegram } : {}),
+          ...(input.note !== undefined ? { note: input.note } : {}),
+          ...(input.subjectIds !== undefined
+            ? {
+                subjects: {
+                  set: input.subjectIds.map((id) => ({ id })),
+                },
+              }
+            : {}),
         },
         include: {
           department: true,
+          subjects: { select: { id: true, name: true } },
           user: { select: { id: true, email: true } },
         },
       });
@@ -240,6 +277,7 @@ export class AdminTeacherService {
       where: { id },
       include: {
         department: true,
+        subjects: { select: { id: true, name: true } },
         user: {
           select: { email: true, lastLoginAt: true, credentialsSentAt: true },
         },

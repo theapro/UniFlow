@@ -48,6 +48,8 @@ interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   columnToggleLabel?: string;
   initialColumnVisibility?: VisibilityState;
+  isLoading?: boolean;
+  emptyLabel?: string;
 }
 
 export function DataTable<TData, TValue>({
@@ -55,6 +57,8 @@ export function DataTable<TData, TValue>({
   columns,
   columnToggleLabel = "Customize Columns",
   initialColumnVisibility,
+  isLoading,
+  emptyLabel = "No results.",
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] =
@@ -143,13 +147,22 @@ export function DataTable<TData, TValue>({
                   ))}
                 </TableRow>
               ))
+            ) : isLoading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={table.getAllLeafColumns().length}
+                  className="h-24 text-center text-muted-foreground"
+                >
+                  Loading...
+                </TableCell>
+              </TableRow>
             ) : (
               <TableRow>
                 <TableCell
                   colSpan={table.getAllLeafColumns().length}
                   className="h-24 text-center"
                 >
-                  No results.
+                  {emptyLabel}
                 </TableCell>
               </TableRow>
             )}

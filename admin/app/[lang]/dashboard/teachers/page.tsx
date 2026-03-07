@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { teachersApi } from "@/lib/api";
+import { subjectsApi, teachersApi } from "@/lib/api";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,11 @@ export default function TeachersPage({
   const { data, isLoading } = useQuery({
     queryKey: ["teachers", search],
     queryFn: () => teachersApi.list({ q: search }).then((res) => res.data.data),
+  });
+
+  const { data: subjects } = useQuery({
+    queryKey: ["subjects"],
+    queryFn: () => subjectsApi.list({ take: 1000 }).then((r) => r.data.data),
   });
 
   const bulkImportMutation = useMutation({
@@ -50,6 +55,13 @@ export default function TeachersPage({
   });
 
   const handleImport = (data: any[]) => {
+    const subjectsByName = new Map(
+      ((subjects ?? []) as Array<{ id: string; name: string }>).map((s) => [
+        s.name.toLowerCase(),
+        s.id,
+      ]),
+    );
+
     // Transform the data to match API format
     const transformedData = data.map((row) => ({
       fullName: row["Full Name"] || row.fullName || row.name,
@@ -57,6 +69,12 @@ export default function TeachersPage({
       department: row.department || row.Department,
       email: row.email || row.Email,
       phone: row.phone || row.Phone,
+      subjectIds: String(row["Subjects"] || row["Subject"] || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((name) => subjectsByName.get(name.toLowerCase()))
+        .filter((id): id is string => typeof id === "string"),
     }));
 
     bulkImportMutation.mutate(transformedData);
@@ -70,12 +88,19 @@ export default function TeachersPage({
       cancel: "Cancel",
       actions: "Actions",
       import: "Import",
+      createdAt: "Created",
+      updatedAt: "Updated",
     },
     teachers: {
       title: "Teachers",
       fullName: "Full Name",
       staffNo: "Staff Number",
       department: "Department",
+      email: "Email",
+      phone: "Phone",
+      telegram: "Telegram",
+      note: "Note",
+      subjects: "Subjects",
       deleteConfirm: "Are you sure you want to delete this teacher?",
       importTitle: "Import Teachers",
       importDescription: "Upload a CSV or XLSX file with teacher data",
@@ -146,6 +171,7 @@ export default function TeachersPage({
           "Department",
           "Email",
           "Phone",
+          "Subjects",
         ]}
       />
     </div>

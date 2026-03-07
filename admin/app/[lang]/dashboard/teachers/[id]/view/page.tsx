@@ -53,6 +53,10 @@ export default function TeacherViewPage({
       fullName: "Full Name",
       staffNo: "Staff Number",
       department: "Department",
+      subjects: "Subjects",
+      phone: "Phone",
+      telegram: "Telegram",
+      note: "Note",
       createdAt: "Created At",
       updatedAt: "Updated At",
     },
@@ -111,7 +115,38 @@ export default function TeacherViewPage({
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Email</p>
-              <p className="text-base">{teacher.user?.email || "-"}</p>
+              <p className="text-base">
+                {teacher.email || teacher.user?.email || "-"}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">
+                {dict.teachers.subjects}
+              </p>
+              <p className="text-base">
+                {(teacher.subjects ?? []).map((s: any) => s.name).join(", ") ||
+                  "-"}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">
+                {dict.teachers.phone}
+              </p>
+              <p className="text-base">{teacher.phone || "-"}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">
+                {dict.teachers.telegram}
+              </p>
+              <p className="text-base">{teacher.telegram || "-"}</p>
+            </div>
+            <div className="col-span-2">
+              <p className="text-sm font-medium text-muted-foreground">
+                {dict.teachers.note}
+              </p>
+              <p className="text-base whitespace-pre-wrap">
+                {teacher.note || "-"}
+              </p>
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">

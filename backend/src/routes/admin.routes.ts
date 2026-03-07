@@ -19,6 +19,7 @@ import { AdminLessonService } from "../services/admin/AdminLessonService";
 import { AdminAiModelController } from "../controllers/admin/AdminAiModelController";
 import { AiModelService } from "../services/ai/AiModelService";
 import { AdminStudentsSheetsController } from "../controllers/admin/AdminStudentsSheetsController";
+import { AdminTeachersSheetsController } from "../controllers/admin/AdminTeachersSheetsController";
 
 const router = Router();
 
@@ -57,6 +58,12 @@ const adminLessonController = new AdminLessonController(
 );
 const adminAiModelController = new AdminAiModelController(new AiModelService());
 const adminStudentsSheetsController = new AdminStudentsSheetsController();
+const adminTeachersSheetsController = new AdminTeachersSheetsController();
+
+// Inter-service wiring for Subjects <-> TeachersSheets
+adminSubjectController.setSyncService(
+  adminTeachersSheetsController.getSyncService(),
+);
 
 // Students
 router.get("/students", adminStudentController.list);
@@ -143,6 +150,15 @@ router.get(
 router.post(
   "/students-sheets/conflicts/:id/resolve",
   adminStudentsSheetsController.resolveConflict,
+);
+
+// Teachers Spreadsheet (Google Sheets) Sync
+router.get("/teachers-sheets/health", adminTeachersSheetsController.getHealth);
+router.get("/teachers-sheets/status", adminTeachersSheetsController.getStatus);
+router.post("/teachers-sheets/sync", adminTeachersSheetsController.syncNow);
+router.post(
+  "/teachers-sheets/sync-to-sheets",
+  adminTeachersSheetsController.syncDbToSheetsNow,
 );
 
 export default router;

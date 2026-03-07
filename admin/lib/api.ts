@@ -204,3 +204,9 @@ export const sheetsApi = {
       axios.post(`/api/admin/students-sheets/conflicts/${id}/resolve`, data),
   },
 };
+
+export const teachersSheetsApi = {
+  health: () => axios.get("/api/admin/teachers-sheets/health"),
+  status: () => axios.get("/api/admin/teachers-sheets/status"),
+  syncNow: () => axios.post("/api/admin/teachers-sheets/sync"),
+};

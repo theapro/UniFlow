@@ -43,16 +43,15 @@ model TimeSlot {
 model Group {
   id              String          @id @default(uuid()) @db.Uuid
   name            String          @unique
-  cohortId        String?         @db.Uuid
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
+  cohortId        String?         @db.Uuid
+  cohort          Cohort?         @relation(fields: [cohortId], references: [id])
   lessons         Lesson[]
   scheduleEntries ScheduleEntry[]
   students        Student[]
-  cohort          Cohort?         @relation(fields: [cohortId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([cohortId])
-
   @@map("Group")
 }
 
@@ -66,72 +65,48 @@ model Cohort {
   @@map("Cohort")
 }
 
-enum StudentStatus {
-  ACTIVE
-  INACTIVE
-  GRADUATED
-  DROPPED
-}
-
 model Student {
-  // Primary synchronization key from Google Sheets: student_uuid
   id            String        @id @default(uuid()) @db.Uuid
-  studentNumber String?       @unique
   fullName      String
-  email         String?
-  phone         String?
-  status        StudentStatus @default(ACTIVE)
-  teacherIds    String[]      @default([])
-  parentIds     String[]      @default([])
-  // Spreadsheet column: cohort (free-form; e.g. 2023)
-  cohort        String?
-  // Spreadsheet column: group (tab name). Kept in sync with groupId relation.
-  groupName     String?       @map("group")
-  note          String?
-
   groupId       String?       @db.Uuid
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @default(now())
-
+  email         String?
+  note          String?
+  parentIds     String[]      @default([])
+  phone         String?
+  status        StudentStatus @default(ACTIVE)
+  studentNumber String?       @unique
+  teacherIds    String[]      @default([])
+  cohort        String?
+  groupName     String?       @map("group")
   attendance    Attendance[]
-  group         Group?        @relation(fields: [groupId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  group         Group?        @relation(fields: [groupId], references: [id])
   user          User?
 
   @@map("Student")
 }
 
-enum StudentsSheetsConflictStatus {
-  OPEN
-  RESOLVED
-}
-
-enum StudentsSheetsConflictResolution {
-  KEEP_SHEET
-  KEEP_DB
-  MERGE
-}
-
 model StudentsSheetsConflict {
-  id            String                         @id @default(uuid()) @db.Uuid
+  id            String                            @id @default(uuid()) @db.Uuid
   spreadsheetId String
   sheetTitle    String?
   rowNumber     Int?
-  studentId     String?                        @db.Uuid
-  status        StudentsSheetsConflictStatus   @default(OPEN)
+  studentId     String?                           @db.Uuid
+  status        StudentsSheetsConflictStatus      @default(OPEN)
   resolution    StudentsSheetsConflictResolution?
   message       String?
   sheetPayload  Json?
   dbPayload     Json?
   baseHash      String?
-  detectedAt    DateTime                       @default(now())
+  detectedAt    DateTime                          @default(now())
   resolvedAt    DateTime?
-  createdAt     DateTime                       @default(now())
-  updatedAt     DateTime                       @updatedAt
+  createdAt     DateTime                          @default(now())
+  updatedAt     DateTime                          @updatedAt
 
   @@unique([spreadsheetId, studentId])
   @@index([spreadsheetId, status, detectedAt])
   @@index([studentId])
-
   @@map("StudentsSheetsConflict")
 }
 
@@ -142,24 +117,79 @@ model Teacher {
   departmentId    String?         @db.Uuid
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
+  email           String?
+  note            String?
+  phone           String?
+  sheetCreatedAt  DateTime?
+  sheetUpdatedAt  DateTime?
+  telegram        String?
   lessons         Lesson[]
   scheduleEntries ScheduleEntry[]
-  department      Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  department      Department?     @relation(fields: [departmentId], references: [id])
   user            User?
+  subjects        Subject[]       @relation("SubjectToTeacher")
 
   @@map("Teacher")
 }
 
 model Subject {
   id              String          @id @default(uuid()) @db.Uuid
-  name            String
+  name            String          @unique
   code            String?         @unique
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   lessons         Lesson[]
   scheduleEntries ScheduleEntry[]
+  teachers        Teacher[]       @relation("SubjectToTeacher")
 
   @@map("Subject")
+}
+
+model TeachersSheetsSyncState {
+  id               String                    @id @default(uuid()) @db.Uuid
+  spreadsheetId    String                    @unique
+  lastRunId        String?
+  lastStatus       TeachersSheetsSyncStatus?
+  lastSyncAt       DateTime?
+  lastSuccessAt    DateTime?
+  lastError        String?
+  detectedSubjects String[]                  @default([])
+  syncedTeachers   Int                       @default(0)
+  spreadsheetRows  Int                       @default(0)
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  @@map("TeachersSheetsSyncState")
+}
+
+model TeachersSheetsSyncLog {
+  id            String                     @id @default(uuid()) @db.Uuid
+  spreadsheetId String
+  runId         String
+  level         TeachersSheetsLogLevel     @default(INFO)
+  direction     TeachersSheetsLogDirection
+  action        String
+  sheetTitle    String?
+  teacherId     String?                    @db.Uuid
+  message       String
+  meta          Json?
+  createdAt     DateTime                   @default(now())
+
+  @@index([spreadsheetId, createdAt])
+  @@index([runId, createdAt])
+  @@map("TeachersSheetsSyncLog")
+}
+
+model TeachersSheetsWorkerState {
+  key             String    @id
+  lastHeartbeatAt DateTime?
+  lastStartedAt   DateTime?
+  lastFinishedAt  DateTime?
+  lastError       String?
+  isRunning       Boolean   @default(false)
+  updatedAt       DateTime  @updatedAt
+
+  @@map("TeachersSheetsWorkerState")
 }
 
 model Lesson {
@@ -193,7 +223,7 @@ model ScheduleEntry {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   group         Group     @relation(fields: [groupId], references: [id])
-  room          Room?     @relation(fields: [roomId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  room          Room?     @relation(fields: [roomId], references: [id])
   subject       Subject   @relation(fields: [subjectId], references: [id])
   teacher       Teacher   @relation(fields: [teacherId], references: [id])
   timeSlot      TimeSlot  @relation(fields: [timeSlotId], references: [id])
@@ -227,12 +257,12 @@ model User {
   teacherId         String?          @unique @db.Uuid
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
-  loginCodes        LoginCode[]
-  student           Student?         @relation(fields: [studentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  teacher           Teacher?         @relation(fields: [teacherId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  invitations       UserInvitation[]
-  chatSessions      ChatSession[]
   chats             Chat[]
+  chatSessions      ChatSession[]
+  loginCodes        LoginCode[]
+  student           Student?         @relation(fields: [studentId], references: [id])
+  teacher           Teacher?         @relation(fields: [teacherId], references: [id])
+  invitations       UserInvitation[]
   profile           UserProfile?
 
   @@map("User")
@@ -244,50 +274,204 @@ model ChatSession {
   title     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   chats     Chat[]
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, updatedAt])
   @@map("ChatSession")
 }
 
 model Chat {
-  id        String     @id @default(uuid()) @db.Uuid
-  userId    String     @db.Uuid
-  sessionId String     @db.Uuid
+  id        String      @id @default(uuid()) @db.Uuid
+  userId    String      @db.Uuid
+  sessionId String      @db.Uuid
   message   String
   sender    ChatSender
-  timestamp DateTime   @default(now())
-
-  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  timestamp DateTime    @default(now())
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, timestamp])
   @@index([sessionId, timestamp])
   @@map("Chat")
 }
 
-
-enum StudentsSheetsSyncStatus {
-  SUCCESS
-  FAILED
-}
-
 model StudentsSheetsSyncState {
-  id              String                   @id @default(uuid()) @db.Uuid
-  spreadsheetId   String                   @unique
-  lastRunId       String?
+  id              String                    @id @default(uuid()) @db.Uuid
+  spreadsheetId   String                    @unique
   lastStatus      StudentsSheetsSyncStatus?
   lastSyncAt      DateTime?
   lastSuccessAt   DateTime?
   lastError       String?
-  detectedGroups  String[]                 @default([])
-  syncedStudents  Int                      @default(0)
-  spreadsheetRows Int                      @default(0)
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
+  detectedGroups  String[]                  @default([])
+  syncedStudents  Int                       @default(0)
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+  lastRunId       String?
+  spreadsheetRows Int                       @default(0)
 
   @@map("StudentsSheetsSyncState")
+}
+
+model StudentsSheetsRowState {
+  id            String    @id @default(uuid()) @db.Uuid
+  spreadsheetId String
+  sheetTitle    String
+  studentId     String    @db.Uuid
+  rowNumber     Int
+  rowHash       String
+  lastSeenAt    DateTime  @default(now())
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([spreadsheetId, sheetTitle, studentId])
+  @@index([spreadsheetId, sheetTitle])
+  @@index([studentId])
+  @@map("StudentsSheetsRowState")
+}
+
+model StudentsSheetsOutboxEvent {
+  id               String                     @id @default(uuid()) @db.Uuid
+  spreadsheetId    String
+  studentId        String                     @db.Uuid
+  type             StudentsSheetsOutboxType
+  targetSheetTitle String?
+  payload          Json?
+  status           StudentsSheetsOutboxStatus @default(PENDING)
+  attempts         Int                        @default(0)
+  nextAttemptAt    DateTime                   @default(now())
+  lastError        String?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+
+  @@unique([spreadsheetId, studentId])
+  @@index([status, nextAttemptAt])
+  @@map("StudentsSheetsOutboxEvent")
+}
+
+model StudentsSheetsSyncLog {
+  id            String                     @id @default(uuid()) @db.Uuid
+  spreadsheetId String
+  runId         String
+  level         StudentsSheetsLogLevel     @default(INFO)
+  direction     StudentsSheetsLogDirection
+  action        String
+  sheetTitle    String?
+  studentId     String?                    @db.Uuid
+  message       String
+  meta          Json?
+  createdAt     DateTime                   @default(now())
+
+  @@index([spreadsheetId, createdAt])
+  @@index([runId, createdAt])
+  @@map("StudentsSheetsSyncLog")
+}
+
+model StudentsSheetsWorkerState {
+  key             String    @id
+  lastHeartbeatAt DateTime?
+  lastStartedAt   DateTime?
+  lastFinishedAt  DateTime?
+  lastError       String?
+  isRunning       Boolean   @default(false)
+  updatedAt       DateTime  @updatedAt
+
+  @@map("StudentsSheetsWorkerState")
+}
+
+model UserProfile {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @unique @db.Uuid
+  interests   Json?
+  preferences Json?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("UserProfile")
+}
+
+model UserInvitation {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("UserInvitation")
+}
+
+model AiModel {
+  id               String     @id @default(uuid()) @db.Uuid
+  provider         String
+  model            String
+  displayName      String
+  modality         AiModality @default(CHAT)
+  isEnabled        Boolean    @default(true)
+  enabledForUsers  Boolean    @default(false)
+  enabledForAdmins Boolean    @default(true)
+  sortOrder        Int        @default(0)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@unique([provider, model])
+  @@index([provider, modality, isEnabled, enabledForUsers, sortOrder])
+  @@map("AiModel")
+}
+
+model LoginCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("LoginCode")
+}
+
+enum StudentStatus {
+  ACTIVE
+  INACTIVE
+  GRADUATED
+  DROPPED
+}
+
+enum StudentsSheetsConflictStatus {
+  OPEN
+  RESOLVED
+}
+
+enum StudentsSheetsConflictResolution {
+  KEEP_SHEET
+  KEEP_DB
+  MERGE
+}
+
+enum TeachersSheetsSyncStatus {
+  SUCCESS
+  FAILED
+}
+
+enum TeachersSheetsLogLevel {
+  INFO
+  WARN
+  ERROR
+}
+
+enum TeachersSheetsLogDirection {
+  SHEETS_TO_DB
+}
+
+enum StudentsSheetsSyncStatus {
+  SUCCESS
+  FAILED
 }
 
 enum StudentsSheetsOutboxType {
@@ -312,133 +496,6 @@ enum StudentsSheetsLogDirection {
   SHEETS_TO_DB
   DB_TO_SHEETS
   WORKER
-}
-
-model StudentsSheetsRowState {
-  id            String   @id @default(uuid()) @db.Uuid
-  spreadsheetId String
-  sheetTitle    String
-  studentId     String   @db.Uuid
-  rowNumber     Int
-  rowHash       String
-  lastSeenAt    DateTime @default(now())
-  deletedAt     DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@unique([spreadsheetId, sheetTitle, studentId])
-  @@index([spreadsheetId, sheetTitle])
-  @@index([studentId])
-
-  @@map("StudentsSheetsRowState")
-}
-
-model StudentsSheetsOutboxEvent {
-  id              String                   @id @default(uuid()) @db.Uuid
-  spreadsheetId   String
-  studentId       String                   @db.Uuid
-  type            StudentsSheetsOutboxType
-  targetSheetTitle String?
-  payload         Json?
-  status          StudentsSheetsOutboxStatus @default(PENDING)
-  attempts        Int                      @default(0)
-  nextAttemptAt   DateTime                 @default(now())
-  lastError       String?
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
-
-  @@unique([spreadsheetId, studentId])
-  @@index([status, nextAttemptAt])
-
-  @@map("StudentsSheetsOutboxEvent")
-}
-
-model StudentsSheetsSyncLog {
-  id            String                   @id @default(uuid()) @db.Uuid
-  spreadsheetId String
-  runId         String
-  level         StudentsSheetsLogLevel   @default(INFO)
-  direction     StudentsSheetsLogDirection
-  action        String
-  sheetTitle    String?
-  studentId     String?                  @db.Uuid
-  message       String
-  meta          Json?
-  createdAt     DateTime                 @default(now())
-
-  @@index([spreadsheetId, createdAt])
-  @@index([runId, createdAt])
-
-  @@map("StudentsSheetsSyncLog")
-}
-
-model StudentsSheetsWorkerState {
-  key             String   @id
-  lastHeartbeatAt DateTime?
-  lastStartedAt   DateTime?
-  lastFinishedAt  DateTime?
-  lastError       String?
-  isRunning       Boolean  @default(false)
-  updatedAt       DateTime @updatedAt
-
-  @@map("StudentsSheetsWorkerState")
-}
-
-model UserProfile {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @unique @db.Uuid
-  interests   Json?
-  preferences Json?
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("UserProfile")
-}
-
-model UserInvitation {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @db.Uuid
-  tokenHash String    @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("UserInvitation")
-}
-
-model AiModel {
-  id              String     @id @default(uuid()) @db.Uuid
-  provider        String
-  model           String
-  displayName     String
-  modality        AiModality @default(CHAT)
-  isEnabled       Boolean    @default(true)
-  enabledForUsers Boolean    @default(false)
-  enabledForAdmins Boolean   @default(true)
-  sortOrder       Int        @default(0)
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-
-  @@unique([provider, model])
-  @@index([provider, modality, isEnabled, enabledForUsers, sortOrder])
-  @@map("AiModel")
-}
-
-model LoginCode {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @db.Uuid
-  codeHash  String
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-  @@map("LoginCode")
 }
 
 enum AttendanceStatus {

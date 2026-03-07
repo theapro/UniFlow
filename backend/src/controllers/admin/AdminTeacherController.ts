@@ -34,9 +34,29 @@ export class AdminTeacherController {
 
   create = async (req: Request, res: Response) => {
     try {
-      const { fullName, email, staffNo, departmentId } = req.body ?? {};
+      const {
+        fullName,
+        email,
+        staffNo,
+        departmentId,
+        phone,
+        telegram,
+        note,
+        subjectIds,
+      } = req.body ?? {};
       if (!fullName || typeof fullName !== "string") {
         return fail(res, 400, "fullName is required");
+      }
+
+      if (!Array.isArray(subjectIds) || subjectIds.length === 0) {
+        return fail(res, 400, "subjectIds is required");
+      }
+
+      const safeSubjectIds = subjectIds.filter(
+        (x: any) => typeof x === "string",
+      );
+      if (safeSubjectIds.length === 0) {
+        return fail(res, 400, "subjectIds is required");
       }
 
       const safeEmail = typeof email === "string" ? email : undefined;
@@ -49,12 +69,19 @@ export class AdminTeacherController {
           typeof departmentId === "string"
             ? departmentId
             : (departmentId ?? null),
+        phone: typeof phone === "string" ? phone : (phone ?? null),
+        telegram: typeof telegram === "string" ? telegram : (telegram ?? null),
+        note: typeof note === "string" ? note : (note ?? null),
+        subjectIds: safeSubjectIds,
       });
 
       return created(res, "Teacher created", teacher);
     } catch (error: any) {
       if (error?.message === "EMAIL_ALREADY_EXISTS") {
         return fail(res, 400, "User with this email already exists");
+      }
+      if (error?.message === "SUBJECT_REQUIRED") {
+        return fail(res, 400, "Subject selection is required");
       }
       if (
         typeof error?.message === "string" &&
@@ -72,13 +99,26 @@ export class AdminTeacherController {
 
   update = async (req: Request, res: Response) => {
     try {
-      const { fullName, email, staffNo, departmentId } = req.body ?? {};
+      const {
+        fullName,
+        email,
+        staffNo,
+        departmentId,
+        phone,
+        telegram,
+        note,
+        subjectIds,
+      } = req.body ?? {};
 
       const teacher = await this.teacherService.update(req.params.id, {
         ...(fullName !== undefined ? { fullName } : {}),
         ...(email !== undefined ? { email } : {}),
         ...(staffNo !== undefined ? { staffNo } : {}),
         ...(departmentId !== undefined ? { departmentId } : {}),
+        ...(phone !== undefined ? { phone } : {}),
+        ...(telegram !== undefined ? { telegram } : {}),
+        ...(note !== undefined ? { note } : {}),
+        ...(subjectIds !== undefined ? { subjectIds } : {}),
       });
 
       return ok(res, "Teacher updated", teacher);

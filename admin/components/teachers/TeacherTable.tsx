@@ -33,8 +33,14 @@ export function TeacherTable({ teachers, lang, dict }: TeacherTableProps) {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => teachersApi.remove(id),
     onSuccess: () => {
+      toast.success(dict?.common?.success ?? "Done");
       queryClient.invalidateQueries({ queryKey: ["teachers"] });
       setDeleteId(null);
+    },
+    onError: (err: any) => {
+      const msg =
+        err?.response?.data?.message || err?.message || "Failed to delete";
+      toast.error(msg);
     },
   });
 
@@ -95,10 +101,56 @@ export function TeacherTable({ teachers, lang, dict }: TeacherTableProps) {
       cell: ({ row }) => (row.getValue("staffNo") as string) || "-",
     },
     {
+      accessorKey: "email",
+      header: dict.teachers.email || "Email",
+      accessorFn: (t) => t.email || t.user?.email || "-",
+      cell: ({ row }) => (row.getValue("email") as string) || "-",
+    },
+    {
+      accessorKey: "phone",
+      header: dict.teachers.phone || "Phone",
+      cell: ({ row }) => (row.getValue("phone") as string) || "-",
+    },
+    {
+      accessorKey: "telegram",
+      header: dict.teachers.telegram || "Telegram",
+      cell: ({ row }) => (row.getValue("telegram") as string) || "-",
+    },
+    {
+      id: "subjects",
+      header: dict.teachers.subjects || "Subjects",
+      accessorFn: (t) =>
+        (t.subjects ?? []).map((s) => s.name).join(", ") || "-",
+      cell: ({ row }) => row.getValue("subjects") as string,
+    },
+    {
       id: "department",
       header: dict.teachers.department,
       accessorFn: (teacher) => teacher.department?.name || "-",
       cell: ({ row }) => row.getValue("department") as string,
+    },
+    {
+      accessorKey: "note",
+      header: dict.teachers.note || "Note",
+      cell: ({ row }) => (row.getValue("note") as string) || "-",
+    },
+    {
+      accessorKey: "createdAt",
+      header: dict.common.createdAt || "Created",
+      cell: ({ row }) => {
+        const v = row.getValue("createdAt") as string;
+        const d = new Date(v);
+        return Number.isNaN(d.getTime()) ? v || "-" : d.toLocaleString();
+      },
+    },
+    {
+      accessorKey: "updatedAt",
+      header: dict.common.updatedAt || "Updated",
+      cell: ({ row }) => {
+        const v = row.getValue("updatedAt") as string;
+        const d = new Date(v);
+        return Number.isNaN(d.getTime()) ? v || "-" : d.toLocaleString();
+      },
     },
     {
       id: "actions",
@@ -153,7 +205,17 @@ export function TeacherTable({ teachers, lang, dict }: TeacherTableProps) {
 
   return (
     <>
-      <DataTable data={teachers} columns={columns} />
+      <DataTable
+        data={teachers}
+        columns={columns}
+        initialColumnVisibility={{
+          phone: false,
+          telegram: false,
+          note: false,
+          createdAt: false,
+          updatedAt: false,
+        }}
+      />
       <ConfirmDialog
         open={!!deleteId}
         onOpenChange={(open) => !open && setDeleteId(null)}
