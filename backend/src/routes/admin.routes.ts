@@ -18,6 +18,12 @@ import { AdminLessonController } from "../controllers/admin/AdminLessonControlle
 import { AdminLessonService } from "../services/admin/AdminLessonService";
 import { AdminAiModelController } from "../controllers/admin/AdminAiModelController";
 import { AiModelService } from "../services/ai/AiModelService";
+import { AdminAiSettingsController } from "../controllers/admin/AdminAiSettingsController";
+import { AiSettingsService } from "../services/ai/AiSettingsService";
+import { AdminAiToolsController } from "../controllers/admin/AdminAiToolsController";
+import { AiToolConfigService } from "../services/ai/AiToolConfigService";
+import { AdminAiLogsController } from "../controllers/admin/AdminAiLogsController";
+import { AiUsageLogService } from "../services/ai/AiUsageLogService";
 import { AdminStudentsSheetsController } from "../controllers/admin/AdminStudentsSheetsController";
 import { AdminTeachersSheetsController } from "../controllers/admin/AdminTeachersSheetsController";
 import { AdminAttendanceSheetsController } from "../controllers/admin/AdminAttendanceSheetsController";
@@ -59,6 +65,15 @@ const adminLessonController = new AdminLessonController(
   new AdminLessonService(),
 );
 const adminAiModelController = new AdminAiModelController(new AiModelService());
+const adminAiSettingsController = new AdminAiSettingsController(
+  new AiSettingsService(),
+);
+const adminAiToolsController = new AdminAiToolsController(
+  new AiToolConfigService(),
+);
+const adminAiLogsController = new AdminAiLogsController(
+  new AiUsageLogService(),
+);
 const adminStudentsSheetsController = new AdminStudentsSheetsController();
 const adminTeachersSheetsController = new AdminTeachersSheetsController();
 const adminAttendanceSheetsController = new AdminAttendanceSheetsController();
@@ -135,6 +150,15 @@ router.delete("/lessons/:id", adminLessonController.remove);
 // AI Models
 router.get("/ai/models", adminAiModelController.list);
 router.patch("/ai/models/:id", adminAiModelController.update);
+
+// AI Settings / Tools / Logs
+router.get("/ai/settings", adminAiSettingsController.get);
+router.patch("/ai/settings", adminAiSettingsController.patch);
+
+router.get("/ai/tools", adminAiToolsController.list);
+router.patch("/ai/tools/:name", adminAiToolsController.patch);
+
+router.get("/ai/logs", adminAiLogsController.list);
 
 // Students Spreadsheet (Google Sheets) Sync
 router.get("/students-sheets/health", adminStudentsSheetsController.getHealth);

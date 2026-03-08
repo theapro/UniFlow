@@ -14,6 +14,7 @@ import { UserProfileService } from "../../services/user/UserProfileService";
 import { prisma } from "../../config/prisma";
 import { env } from "../../config/env";
 import { fail, ok } from "../../utils/responses";
+import { AiAssistantService } from "../../services/ai/AiAssistantService";
 
 function detectIntent(message: string): AiIntent {
   const normalized = message.trim().toLowerCase();
@@ -111,6 +112,7 @@ export class AiController {
   private readonly aiModelService: AiModelService;
   private readonly chatService: ChatService;
   private readonly userProfileService: UserProfileService;
+  private readonly aiAssistantService: AiAssistantService;
 
   constructor(
     private readonly studentService: StudentService,
@@ -121,6 +123,38 @@ export class AiController {
     this.aiModelService = new AiModelService();
     this.chatService = new ChatService();
     this.userProfileService = new UserProfileService();
+    this.aiAssistantService = new AiAssistantService();
+  }
+
+  private shouldUseToolAssistant(message: string): boolean {
+    const s = String(message ?? "")
+      .trim()
+      .toLowerCase();
+    // English
+    if (
+      /(teacher|my teacher|who.*teacher|attendance|absent|present|grades?|score|mark|schedule|timetable|lesson|classes|group|subject)/.test(
+        s,
+      )
+    ) {
+      return true;
+    }
+    // Uzbek (common terms)
+    if (
+      /(o['’]qituvch|ustoz|davomat|kelmagan|keldi|bahol|baho|ball|reyting|dars|dars jadval|jadval|dars kun|guruh|fan)/.test(
+        s,
+      )
+    ) {
+      return true;
+    }
+    // Russian (basic)
+    if (
+      /(учител|преподавател|оценк|успеваем|расписан|посещаем|групп|предмет)/.test(
+        s,
+      )
+    ) {
+      return true;
+    }
+    return false;
   }
 
   listAllowedModels = async (req: Request, res: Response) => {
@@ -422,6 +456,76 @@ export class AiController {
       typeof req.body?.temperature === "number" ? req.body.temperature : 0.7;
 
     try {
+      // For relational/university-data questions, prefer the RBAC+tool-based assistant.
+      // This avoids hallucinations and grounds answers in DB state.
+      if (this.shouldUseToolAssistant(message)) {
+        // Resolve or create session (keep existing chat storage behavior)
+        let session = sessionId
+          ? await this.chatService.getSession(user.id, sessionId)
+          : null;
+
+        if (!session) {
+          session = await this.chatService.createSession(user.id, "New Chat");
+        }
+
+        await this.chatService.addMessage({
+          userId: user.id,
+          sessionId: session.id,
+          sender: ChatSender.USER,
+          message: message.trim(),
+        });
+
+        // Auto-title
+        if (session.title === "New Chat") {
+          const title = message.trim().slice(0, 60);
+          await prisma.chatSession.update({
+            where: { id: session.id },
+            data: { title },
+            select: { id: true },
+          });
+        }
+
+        res.status(200);
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+
+        const requestId = ((req as any).requestId ?? null) as string | null;
+        const result = await this.aiAssistantService.chat({
+          user,
+          requestId,
+          message: message.trim().slice(0, 4_000),
+          requestedModel,
+        });
+
+        const reply = result.reply ?? "";
+
+        // Stream as small chunks to keep UI behavior consistent.
+        const chunkSize = 120;
+        for (let i = 0; i < reply.length; i += chunkSize) {
+          const delta = reply.slice(i, i + chunkSize);
+          res.write(
+            `data: ${JSON.stringify({ content: delta, sessionId: session.id })}\n\n`,
+          );
+        }
+
+        res.write("data: [DONE]\n\n");
+        res.end();
+
+        if (reply.trim().length > 0) {
+          await this.chatService.addMessage({
+            userId: user.id,
+            sessionId: session.id,
+            sender: ChatSender.ASSISTANT,
+            message: reply,
+          });
+        }
+
+        // Minimal profile inference from the latest user message
+        await this.userProfileService.inferFromMessage(user.id, message);
+        return;
+      }
+
       const resolvedModel = await this.aiModelService.resolveChatModel({
         role: user.role,
         requestedModel,

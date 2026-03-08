@@ -191,6 +191,22 @@ export const aiModelsApi = {
     axios.patch(`/api/admin/ai/models/${id}`, patch),
 };
 
+export const aiAdminApi = {
+  settings: {
+    get: () => axios.get("/api/admin/ai/settings"),
+    patch: (patch: any) => axios.patch("/api/admin/ai/settings", patch),
+  },
+  tools: {
+    list: () => axios.get("/api/admin/ai/tools"),
+    patch: (name: string, patch: any) =>
+      axios.patch(`/api/admin/ai/tools/${encodeURIComponent(name)}`, patch),
+  },
+  logs: {
+    list: (params?: { take?: number; cursor?: string | null }) =>
+      axios.get("/api/admin/ai/logs", { params }),
+  },
+};
+
 export const sheetsApi = {
   health: () => axios.get("/api/admin/students-sheets/health"),
   status: () => axios.get("/api/admin/students-sheets/status"),

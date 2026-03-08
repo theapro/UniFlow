@@ -44,6 +44,10 @@ export const env = {
   aiContextLimit: Number(process.env.AI_CONTEXT_LIMIT ?? 15),
   aiMaxTokens: Number(process.env.AI_MAX_TOKENS ?? 2048),
 
+  // LLM / OpenAI (OpenAI-compatible; optional)
+  openaiApiKey: optional("OPENAI_API_KEY"),
+  openaiApiUrl: optional("OPENAI_API_URL"),
+
   // Google Sign-In (ID token verification)
   googleClientId: optional("GOOGLE_CLIENT_ID"),
 

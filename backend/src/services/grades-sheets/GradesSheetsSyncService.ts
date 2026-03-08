@@ -3,6 +3,7 @@ import { env } from "../../config/env";
 import { StudentsSheetsClient } from "../students-sheets/StudentsSheetsClient";
 import { GradesSheetsClient } from "./GradesSheetsClient";
 import { randomUUID } from "crypto";
+import { syncGroupSubjectDerivedLinks } from "../sync/derivedRelations";
 
 function compileOptionalRegex(source?: string): RegExp | null {
   if (!source) return null;
@@ -74,8 +75,142 @@ function getCell(row: string[], header: HeaderIndex, colName: string): string {
   return String(row[idx] ?? "").trim();
 }
 
+function parseScore(raw: string): { rawValue: string; score: number | null } {
+  const rawValue = String(raw ?? "").trim();
+  if (!rawValue) return { rawValue: "", score: null };
+
+  // Accept both "85" and "85.5" and commas as decimal separator.
+  const normalized = rawValue.replace(",", ".");
+  const n = Number(normalized);
+  if (!Number.isFinite(n)) return { rawValue, score: null };
+  return { rawValue, score: n };
+}
+
 export class GradesSheetsSyncService {
   constructor(private readonly prisma?: PrismaClient) {}
+
+  private async upsertGradesToDb(opts: {
+    sheetTitle: string;
+    groupName: string;
+    subjectName: string;
+    values: string[][];
+  }): Promise<void> {
+    if (!this.prisma) return;
+
+    const headerRow = opts.values?.[0] ?? [];
+    const assignmentCount = this.detectAssignmentCountFromHeader(headerRow);
+    if (assignmentCount <= 0) return;
+
+    const group = await this.prisma.group.findFirst({
+      where: { name: { equals: opts.groupName, mode: "insensitive" } },
+      select: { id: true, name: true },
+    });
+    if (!group) {
+      throw new Error(`GROUP_NOT_FOUND:${opts.groupName}`);
+    }
+
+    const subject = await this.prisma.subject.findFirst({
+      where: { name: { equals: opts.subjectName, mode: "insensitive" } },
+      select: { id: true, name: true },
+    });
+    if (!subject) {
+      throw new Error(`SUBJECT_NOT_FOUND:${opts.subjectName}`);
+    }
+
+    const gradeBook = await this.prisma.gradeBook.upsert({
+      where: {
+        groupId_subjectId: { groupId: group.id, subjectId: subject.id },
+      },
+      create: {
+        groupId: group.id,
+        subjectId: subject.id,
+        assignmentCount,
+        source: "GRADES_SHEETS",
+      },
+      update: {
+        assignmentCount,
+        source: "GRADES_SHEETS",
+      },
+      select: { id: true },
+    });
+
+    // Keep derived relations in sync (teachers<->subject, students.teacherIds)
+    try {
+      await syncGroupSubjectDerivedLinks(this.prisma, {
+        groupId: group.id,
+        subjectId: subject.id,
+      });
+    } catch {
+      // Non-fatal
+    }
+
+    // Map roster rows -> student IDs that belong to this group.
+    const rosterStudentIds = Array.from(
+      new Set(
+        (opts.values ?? [])
+          .slice(1)
+          .map((r) => String(r?.[0] ?? "").trim())
+          .filter(Boolean),
+      ),
+    );
+
+    if (rosterStudentIds.length === 0) return;
+
+    const allowedStudents = await this.prisma.student.findMany({
+      where: {
+        id: { in: rosterStudentIds },
+        groupId: group.id,
+      },
+      select: { id: true },
+    });
+
+    const allowedSet = new Set(allowedStudents.map((s) => s.id));
+
+    // Replace all records for this gradeBook in one go to keep sync deterministic.
+    await this.prisma.gradeRecord.deleteMany({
+      where: { gradeBookId: gradeBook.id },
+    });
+
+    const rowsToCreate: Array<{
+      gradeBookId: string;
+      studentId: string;
+      assignmentIndex: number;
+      rawValue: string | null;
+      score: number | null;
+    }> = [];
+
+    for (let r = 1; r < (opts.values ?? []).length; r++) {
+      const row = opts.values[r] ?? [];
+      const studentId = String(row[0] ?? "").trim();
+      if (!studentId) continue;
+      if (!allowedSet.has(studentId)) continue;
+
+      for (let i = 0; i < assignmentCount; i++) {
+        const cell = String(row[3 + i] ?? "");
+        const parsed = parseScore(cell);
+        if (!parsed.rawValue) continue; // skip empty cells
+
+        rowsToCreate.push({
+          gradeBookId: gradeBook.id,
+          studentId,
+          assignmentIndex: i + 1,
+          rawValue: parsed.rawValue,
+          score: parsed.score,
+        });
+      }
+    }
+
+    if (rowsToCreate.length === 0) return;
+
+    // Chunk to avoid query size limits.
+    const CHUNK = 2_000;
+    for (let i = 0; i < rowsToCreate.length; i += CHUNK) {
+      const slice = rowsToCreate.slice(i, i + CHUNK);
+      await this.prisma.gradeRecord.createMany({
+        data: slice,
+      });
+    }
+  }
 
   private isAllowedTab(title: string): boolean {
     const t = normalizeTitle(title);
@@ -402,11 +537,24 @@ export class GradesSheetsSyncService {
       if (!parsed) continue;
 
       try {
+        // Read full tab once for grade persistence.
+        const values = await client.getSheetValuesRange(sheetTitle, "A1:ZZ");
+
         const res = await this.syncTabRoster({
           client,
           sheetTitle,
           groupTabTitle: parsed.groupName,
         });
+
+        // Optional: persist grades to DB when Prisma is provided.
+        // This keeps AI tools purely Prisma-backed (no direct Sheets reads).
+        await this.upsertGradesToDb({
+          sheetTitle,
+          groupName: parsed.groupName,
+          subjectName: parsed.subjectName,
+          values,
+        });
+
         processedTabs++;
         spreadsheetRows += res.spreadsheetRows;
         rosterAdded += res.rosterAdded;

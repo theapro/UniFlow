@@ -2,6 +2,7 @@ import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
 import { AiController } from "../controllers/ai/AiController";
+import { AiAssistantController } from "../controllers/ai/AiAssistantController";
 import { StudentService } from "../services/user/StudentService";
 import { TeacherService } from "../services/user/TeacherService";
 import { UserRole } from "@prisma/client";
@@ -12,6 +13,8 @@ const aiController = new AiController(
   new StudentService(),
   new TeacherService(),
 );
+
+const aiAssistantController = new AiAssistantController();
 
 // All AI endpoints require auth (avoid leaking university/student data)
 router.use(authMiddleware);
@@ -46,5 +49,8 @@ router.get("/chat/sessions/:sessionId/messages", aiController.listChatMessages);
 
 // LLM chat (streams SSE, stores messages in DB, injects context)
 router.post("/llm/chat", aiController.llmChat);
+
+// Tool-based assistant (RBAC + tool toggles + usage logs)
+router.post("/assistant/chat", aiAssistantController.chat);
 
 export default router;

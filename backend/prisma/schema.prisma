@@ -50,6 +50,7 @@ model Group {
   lessons         Lesson[]
   scheduleEntries ScheduleEntry[]
   students        Student[]
+  gradeBooks      GradeBook[]
 
   @@index([cohortId])
   @@map("Group")
@@ -83,6 +84,7 @@ model Student {
   attendance    Attendance[]
   group         Group?        @relation(fields: [groupId], references: [id])
   user          User?
+  gradeRecords   GradeRecord[]
 
   @@map("Student")
 }
@@ -141,6 +143,7 @@ model Subject {
   lessons         Lesson[]
   scheduleEntries ScheduleEntry[]
   teachers        Teacher[]       @relation("SubjectToTeacher")
+  gradeBooks      GradeBook[]
 
   @@map("Subject")
 }
@@ -318,6 +321,7 @@ model User {
   teacher           Teacher?         @relation(fields: [teacherId], references: [id])
   invitations       UserInvitation[]
   profile           UserProfile?
+  aiUsageLogs       AiUsageLog[]
 
   @@map("User")
 }
@@ -472,9 +476,104 @@ model AiModel {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
+  defaultUserChatSettings  AiSettings[] @relation("DefaultUserChatModel")
+  defaultAdminChatSettings AiSettings[] @relation("DefaultAdminChatModel")
+
   @@unique([provider, model])
   @@index([provider, modality, isEnabled, enabledForUsers, sortOrder])
   @@map("AiModel")
+}
+
+// Persisted AI admin settings (singleton row).
+model AiSettings {
+  key                   String   @id
+  isEnabled             Boolean  @default(true)
+  systemPrompt          String   @default("")
+  toolPlannerPrompt     String   @default("")
+  defaultUserChatModelId  String? @db.Uuid
+  defaultAdminChatModelId String? @db.Uuid
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  defaultUserChatModel  AiModel? @relation("DefaultUserChatModel", fields: [defaultUserChatModelId], references: [id])
+  defaultAdminChatModel AiModel? @relation("DefaultAdminChatModel", fields: [defaultAdminChatModelId], references: [id])
+
+  @@map("AiSettings")
+}
+
+// Enable/disable tools globally and per-role.
+model AiToolConfig {
+  name              String   @id
+  isEnabled         Boolean  @default(true)
+  enabledForStudents Boolean @default(true)
+  enabledForTeachers Boolean @default(true)
+  enabledForAdmins   Boolean @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("AiToolConfig")
+}
+
+// Audit log for AI requests (admin-visible).
+model AiUsageLog {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String?  @db.Uuid
+  role             UserRole?
+  requestId        String?
+  provider         String?
+  model            String?
+  toolName         String?
+  toolArgs         Json?
+  userMessage      String
+  assistantMessage String?
+  status           String
+  error            String?
+  ms               Int?
+  meta             Json?
+  createdAt        DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@map("AiUsageLog")
+}
+
+// Grades persisted from the Grades spreadsheet (GROUP_SUBJECT tabs).
+model GradeBook {
+  id              String     @id @default(uuid()) @db.Uuid
+  groupId         String     @db.Uuid
+  subjectId       String     @db.Uuid
+  assignmentCount Int        @default(0)
+  source          String     @default("GRADES_SHEETS")
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  group    Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  subject  Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  records  GradeRecord[]
+
+  @@unique([groupId, subjectId])
+  @@index([groupId, updatedAt])
+  @@map("GradeBook")
+}
+
+model GradeRecord {
+  id            String   @id @default(uuid()) @db.Uuid
+  gradeBookId   String   @db.Uuid
+  studentId     String   @db.Uuid
+  assignmentIndex Int
+  rawValue      String?
+  score         Float?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  gradeBook GradeBook @relation(fields: [gradeBookId], references: [id], onDelete: Cascade)
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([gradeBookId, studentId, assignmentIndex])
+  @@index([studentId, updatedAt])
+  @@map("GradeRecord")
 }
 
 model LoginCode {

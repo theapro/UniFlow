@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { env } from "../../config/env";
 import { AttendanceSheetsClient } from "./AttendanceSheetsClient";
 import { GradesSheetsSyncService } from "../grades-sheets/GradesSheetsSyncService";
+import { syncGroupSubjectDerivedLinks } from "../sync/derivedRelations";
 import {
   formatAttendanceCell,
   parseAttendanceCell,
@@ -578,6 +579,7 @@ export class AttendanceSheetsSyncService {
     const dateFormat = env.attendanceSheetsDateFormat;
 
     const touchedLessonIds = new Set<string>();
+    const touchedGroupSubjects = new Set<string>();
 
     for (const sheetTitle of detectedTabs) {
       const parsed = parseTabTitle(sheetTitle);
@@ -621,6 +623,8 @@ export class AttendanceSheetsSyncService {
         });
         continue;
       }
+
+      touchedGroupSubjects.add(`${group.id}:${subject.id}`);
 
       // Read enough columns for a month+; extend as needed.
       const values = await client.getSheetValuesRange(sheetTitle, "A1:ZZ");
@@ -779,6 +783,17 @@ export class AttendanceSheetsSyncService {
     }
 
     syncedLessons = touchedLessonIds.size;
+
+    // Derived relationship sync: subject<->teacher (from schedule/lessons) and student.teacherIds
+    for (const key of touchedGroupSubjects) {
+      const [groupId, subjectId] = key.split(":");
+      if (!groupId || !subjectId) continue;
+      try {
+        await syncGroupSubjectDerivedLinks(this.prisma, { groupId, subjectId });
+      } catch {
+        // Non-fatal: do not fail attendance sync if derived links can't be updated
+      }
+    }
 
     const finishedAt = new Date();
 
