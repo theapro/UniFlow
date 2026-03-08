@@ -20,6 +20,7 @@ import { AdminAiModelController } from "../controllers/admin/AdminAiModelControl
 import { AiModelService } from "../services/ai/AiModelService";
 import { AdminStudentsSheetsController } from "../controllers/admin/AdminStudentsSheetsController";
 import { AdminTeachersSheetsController } from "../controllers/admin/AdminTeachersSheetsController";
+import { AdminAttendanceSheetsController } from "../controllers/admin/AdminAttendanceSheetsController";
 
 const router = Router();
 
@@ -59,6 +60,7 @@ const adminLessonController = new AdminLessonController(
 const adminAiModelController = new AdminAiModelController(new AiModelService());
 const adminStudentsSheetsController = new AdminStudentsSheetsController();
 const adminTeachersSheetsController = new AdminTeachersSheetsController();
+const adminAttendanceSheetsController = new AdminAttendanceSheetsController();
 
 // Inter-service wiring for Subjects <-> TeachersSheets
 adminSubjectController.setSyncService(
@@ -96,9 +98,14 @@ router.delete("/schedule/:id", adminScheduleController.remove);
 
 // Attendance
 router.get("/attendance", adminAttendanceController.list);
+router.get("/attendance/by-date", adminAttendanceController.getByDate);
 router.get("/attendance/:id", adminAttendanceController.getById);
 router.post("/attendance", adminAttendanceController.create);
 router.post("/attendance/bulk", adminAttendanceController.bulkMark);
+router.post(
+  "/attendance/by-date/bulk",
+  adminAttendanceController.bulkMarkByDate,
+);
 router.put("/attendance/:id", adminAttendanceController.update);
 router.delete("/attendance/:id", adminAttendanceController.remove);
 
@@ -159,6 +166,26 @@ router.post("/teachers-sheets/sync", adminTeachersSheetsController.syncNow);
 router.post(
   "/teachers-sheets/sync-to-sheets",
   adminTeachersSheetsController.syncDbToSheetsNow,
+);
+
+// Attendance Spreadsheet (Google Sheets) Sync
+router.get(
+  "/attendance-sheets/health",
+  adminAttendanceSheetsController.getHealth,
+);
+router.get(
+  "/attendance-sheets/status",
+  adminAttendanceSheetsController.getStatus,
+);
+router.post("/attendance-sheets/sync", adminAttendanceSheetsController.syncNow);
+router.get("/attendance-sheets/tabs", adminAttendanceSheetsController.listTabs);
+router.post(
+  "/attendance-sheets/tabs",
+  adminAttendanceSheetsController.createTab,
+);
+router.get(
+  "/attendance-sheets/preview",
+  adminAttendanceSheetsController.previewTab,
 );
 
 export default router;

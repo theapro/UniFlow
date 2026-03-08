@@ -9,6 +9,10 @@ export class AdminLessonController {
     try {
       const groupId =
         typeof req.query.groupId === "string" ? req.query.groupId : undefined;
+      const subjectId =
+        typeof req.query.subjectId === "string"
+          ? req.query.subjectId
+          : undefined;
       const teacherId =
         typeof req.query.teacherId === "string"
           ? req.query.teacherId
@@ -26,6 +30,7 @@ export class AdminLessonController {
 
       const lessons = await this.lessonService.list({
         groupId,
+        subjectId,
         teacherId,
         from,
         to,

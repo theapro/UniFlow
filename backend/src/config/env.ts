@@ -75,6 +75,14 @@ export const env = {
     "GOOGLE_SHEETS_TEACHERS_SPREADSHEET_ID",
   ),
 
+  // Attendance Spreadsheet (tabs = GROUP_SUBJECT)
+  attendanceSheetsEnabled:
+    optionalBool("GOOGLE_SHEETS_ATTENDANCE_ENABLED") ??
+    Boolean(optional("GOOGLE_SHEETS_ATTENDANCE_SPREADSHEET_ID")),
+  attendanceSheetsSpreadsheetId: optional(
+    "GOOGLE_SHEETS_ATTENDANCE_SPREADSHEET_ID",
+  ),
+
   // Teachers Worker
   teachersSheetsWorkerEnabled:
     optionalBool("GOOGLE_SHEETS_TEACHERS_WORKER_ENABLED") ?? false,
@@ -82,6 +90,14 @@ export const env = {
     optionalNumber("GOOGLE_SHEETS_TEACHERS_WORKER_INTERVAL_MS") ?? 60_000,
   teachersSheetsDbToSheetsEnabled:
     optionalBool("GOOGLE_SHEETS_TEACHERS_DB_TO_SHEETS_ENABLED") ?? true,
+
+  // Attendance Worker
+  attendanceSheetsWorkerEnabled:
+    optionalBool("GOOGLE_SHEETS_ATTENDANCE_WORKER_ENABLED") ?? false,
+  attendanceSheetsWorkerIntervalMs:
+    optionalNumber("GOOGLE_SHEETS_ATTENDANCE_WORKER_INTERVAL_MS") ?? 60_000,
+  attendanceSheetsDbToSheetsEnabled:
+    optionalBool("GOOGLE_SHEETS_ATTENDANCE_DB_TO_SHEETS_ENABLED") ?? true,
 
   // Optional background sync loop (recommended: run a separate worker in prod)
   studentsSheetsWorkerEnabled:
@@ -92,6 +108,11 @@ export const env = {
   // Optional webhook trigger (Apps Script onEdit -> POST to backend)
   studentsSheetsWebhookSecret: optional(
     "GOOGLE_SHEETS_STUDENTS_WEBHOOK_SECRET",
+  ),
+
+  // Optional webhook trigger (Apps Script onEdit -> POST to backend)
+  attendanceSheetsWebhookSecret: optional(
+    "GOOGLE_SHEETS_ATTENDANCE_WEBHOOK_SECRET",
   ),
 
   // Optional behaviors
@@ -117,4 +138,16 @@ export const env = {
   teachersSheetsSubjectTabsDenyRegex: optional(
     "GOOGLE_SHEETS_TEACHERS_SUBJECT_TABS_DENY_REGEX",
   ),
+
+  // Optional tab filtering for Attendance spreadsheet (treat only matching tabs as attendance tabs)
+  attendanceSheetsTabsAllowRegex: optional(
+    "GOOGLE_SHEETS_ATTENDANCE_TABS_ALLOW_REGEX",
+  ),
+  attendanceSheetsTabsDenyRegex: optional(
+    "GOOGLE_SHEETS_ATTENDANCE_TABS_DENY_REGEX",
+  ),
+
+  // Date parsing for attendance headers (default: MM/DD)
+  attendanceSheetsDateFormat:
+    optional("GOOGLE_SHEETS_ATTENDANCE_DATE_FORMAT") ?? "MM/DD",
 };

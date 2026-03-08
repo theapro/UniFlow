@@ -192,6 +192,60 @@ model TeachersSheetsWorkerState {
   @@map("TeachersSheetsWorkerState")
 }
 
+model AttendanceSheetsSyncState {
+  id              String                      @id @default(uuid()) @db.Uuid
+  spreadsheetId   String                      @unique
+  lastRunId       String?
+  lastStatus      AttendanceSheetsSyncStatus?
+  lastSyncAt      DateTime?
+  lastSuccessAt   DateTime?
+  lastError       String?
+  detectedTabs    String[]                    @default([])
+  processedTabs   Int                         @default(0)
+  syncedLessons   Int                         @default(0)
+  syncedRecords   Int                         @default(0)
+  rosterAdded     Int                         @default(0)
+  rosterUpdated   Int                         @default(0)
+  spreadsheetRows Int                         @default(0)
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+
+  @@map("AttendanceSheetsSyncState")
+}
+
+model AttendanceSheetsSyncLog {
+  id            String                      @id @default(uuid()) @db.Uuid
+  spreadsheetId String
+  runId         String
+  level         AttendanceSheetsLogLevel    @default(INFO)
+  direction     AttendanceSheetsLogDirection
+  action        String
+  sheetTitle    String?
+  groupId       String?                     @db.Uuid
+  subjectId     String?                     @db.Uuid
+  lessonId      String?                     @db.Uuid
+  studentId     String?                     @db.Uuid
+  message       String
+  meta          Json?
+  createdAt     DateTime                    @default(now())
+
+  @@index([spreadsheetId, createdAt])
+  @@index([runId, createdAt])
+  @@map("AttendanceSheetsSyncLog")
+}
+
+model AttendanceSheetsWorkerState {
+  key             String    @id
+  lastHeartbeatAt DateTime?
+  lastStartedAt   DateTime?
+  lastFinishedAt  DateTime?
+  lastError       String?
+  isRunning       Boolean   @default(false)
+  updatedAt       DateTime  @updatedAt
+
+  @@map("AttendanceSheetsWorkerState")
+}
+
 model Lesson {
   id         String       @id @default(uuid()) @db.Uuid
   startsAt   DateTime
@@ -493,6 +547,23 @@ enum StudentsSheetsLogLevel {
 }
 
 enum StudentsSheetsLogDirection {
+  SHEETS_TO_DB
+  DB_TO_SHEETS
+  WORKER
+}
+
+enum AttendanceSheetsSyncStatus {
+  SUCCESS
+  FAILED
+}
+
+enum AttendanceSheetsLogLevel {
+  INFO
+  WARN
+  ERROR
+}
+
+enum AttendanceSheetsLogDirection {
   SHEETS_TO_DB
   DB_TO_SHEETS
   WORKER

@@ -34,7 +34,12 @@ export class AdminSubjectController {
 
       const subjects = await this.subjectService.list({ q, take, skip });
       return ok(res, "Subjects fetched", subjects);
-    } catch {
+    } catch (err) {
+      console.error("[AdminSubjectController.list] Failed to fetch subjects", {
+        query: req.query,
+        user: (req as any).user,
+        error: err,
+      });
       return fail(res, 500, "Failed to fetch subjects");
     }
   };
@@ -46,7 +51,15 @@ export class AdminSubjectController {
         return fail(res, 404, "Subject not found");
       }
       return ok(res, "Subject fetched", subject);
-    } catch {
+    } catch (err) {
+      console.error(
+        "[AdminSubjectController.getById] Failed to fetch subject",
+        {
+          params: req.params,
+          user: (req as any).user,
+          error: err,
+        },
+      );
       return fail(res, 500, "Failed to fetch subject");
     }
   };
@@ -68,6 +81,14 @@ export class AdminSubjectController {
 
       return created(res, "Subject created", subject);
     } catch (err: any) {
+      console.error(
+        "[AdminSubjectController.create] Failed to create subject",
+        {
+          body: req.body,
+          user: (req as any).user,
+          error: err,
+        },
+      );
       if (err.code === "P2002") {
         return fail(res, 400, "Subject with this name already exists");
       }
@@ -108,6 +129,15 @@ export class AdminSubjectController {
 
       return ok(res, "Subject updated", subject);
     } catch (err: any) {
+      console.error(
+        "[AdminSubjectController.update] Failed to update subject",
+        {
+          params: req.params,
+          body: req.body,
+          user: (req as any).user,
+          error: err,
+        },
+      );
       if (err.code === "P2002") {
         return fail(res, 400, "Subject with this name already exists");
       }
@@ -123,6 +153,14 @@ export class AdminSubjectController {
 
       return ok(res, "Subject deleted");
     } catch (err: any) {
+      console.error(
+        "[AdminSubjectController.remove] Failed to delete subject",
+        {
+          params: req.params,
+          user: (req as any).user,
+          error: err,
+        },
+      );
       return fail(res, 500, "Failed to delete subject: " + err.message);
     }
   };

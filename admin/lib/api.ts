@@ -21,7 +21,7 @@ export const authApi = {
       localStorage.removeItem("user");
 
       // Also clear cookie used by Next.js middleware
-      document.cookie = "token=; Max-Age=0; Path=/; SameSite=Lax; Secure";
+      document.cookie = "token=; Max-Age=0; Path=/; SameSite=Lax";
     }
   },
 
@@ -141,6 +141,7 @@ export const scheduleApi = {
 export const lessonsApi = {
   list: (params?: {
     groupId?: string;
+    subjectId?: string;
     teacherId?: string;
     from?: string;
     to?: string;
@@ -166,11 +167,17 @@ export const attendanceApi = {
     skip?: number;
   }) => axios.get("/api/admin/attendance", { params }),
 
+  getByDate: (params: { groupId: string; subjectId: string; date: string }) =>
+    axios.get("/api/admin/attendance/by-date", { params }),
+
   getById: (id: string) => axios.get(`/api/admin/attendance/${id}`),
 
   create: (data: any) => axios.post("/api/admin/attendance", data),
 
   bulkMark: (data: any) => axios.post("/api/admin/attendance/bulk", data),
+
+  bulkMarkByDate: (data: any) =>
+    axios.post("/api/admin/attendance/by-date/bulk", data),
 
   update: (id: string, data: any) =>
     axios.put(`/api/admin/attendance/${id}`, data),
@@ -209,4 +216,15 @@ export const teachersSheetsApi = {
   health: () => axios.get("/api/admin/teachers-sheets/health"),
   status: () => axios.get("/api/admin/teachers-sheets/status"),
   syncNow: () => axios.post("/api/admin/teachers-sheets/sync"),
+};
+
+export const attendanceSheetsApi = {
+  health: () => axios.get("/api/admin/attendance-sheets/health"),
+  status: () => axios.get("/api/admin/attendance-sheets/status"),
+  syncNow: () => axios.post("/api/admin/attendance-sheets/sync"),
+  tabs: () => axios.get("/api/admin/attendance-sheets/tabs"),
+  createTab: (data: { groupId: string; subjectId: string; dates: string[] }) =>
+    axios.post("/api/admin/attendance-sheets/tabs", data),
+  preview: (params: { sheetTitle: string; takeRows?: number }) =>
+    axios.get("/api/admin/attendance-sheets/preview", { params }),
 };

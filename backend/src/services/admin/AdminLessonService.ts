@@ -22,6 +22,7 @@ export type UpdateLessonInput = {
 export class AdminLessonService {
   async list(params?: {
     groupId?: string;
+    subjectId?: string;
     teacherId?: string;
     from?: Date;
     to?: Date;
@@ -30,6 +31,7 @@ export class AdminLessonService {
   }) {
     const where: Prisma.LessonWhereInput = {
       ...(params?.groupId ? { groupId: params.groupId } : {}),
+      ...(params?.subjectId ? { subjectId: params.subjectId } : {}),
       ...(params?.teacherId ? { teacherId: params.teacherId } : {}),
       ...(params?.from || params?.to
         ? {

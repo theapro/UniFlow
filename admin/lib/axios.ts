@@ -1,17 +1,29 @@
 import axios from "axios";
 
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const cookies = document.cookie ? document.cookie.split(";") : [];
+  for (const raw of cookies) {
+    const [k, ...rest] = raw.trim().split("=");
+    if (k === name) return decodeURIComponent(rest.join("="));
+  }
+  return null;
+}
+
 const axiosInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001",
   headers: {
     "Content-Type": "application/json",
   },
+  // Allows sending cookies cross-port on localhost if needed.
+  withCredentials: true,
 });
 
 axiosInstance.interceptors.request.use(
   (config) => {
     // Only access localStorage on client side
     if (typeof window !== "undefined") {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("token") || getCookie("token");
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }

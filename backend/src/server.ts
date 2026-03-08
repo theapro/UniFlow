@@ -3,10 +3,22 @@ import { env } from "./config/env";
 import { prisma } from "./config/prisma";
 import { StudentsSheetsWorker } from "./services/students-sheets/StudentsSheetsWorker";
 import { TeachersSheetsWorker } from "./services/teachers-sheets/TeachersSheetsWorker";
+import { AttendanceSheetsWorker } from "./services/attendance-sheets/AttendanceSheetsWorker";
+import { logError, logInfo } from "./utils/logger";
+
+process.on("unhandledRejection", (reason) => {
+  logError("Process", "unhandledRejection", { reason });
+});
+
+process.on("uncaughtException", (err) => {
+  logError("Process", "uncaughtException", err);
+});
 
 app.listen(env.port, () => {
-  // eslint-disable-next-line no-console
-  console.log(`Server listening on port ${env.port}`);
+  logInfo("Server", "listening", {
+    port: env.port,
+    nodeEnv: env.nodeEnv,
+  });
 });
 
 if (env.studentsSheetsWorkerEnabled) {
@@ -15,7 +27,7 @@ if (env.studentsSheetsWorkerEnabled) {
   });
 
   worker.start().catch((e) => {
-    console.error("[StudentsSheetsWorker] failed to start", e);
+    logError("StudentsSheetsWorker", "failed to start", e);
   });
 }
 
@@ -25,6 +37,16 @@ if (env.teachersSheetsWorkerEnabled) {
   });
 
   worker.start().catch((e) => {
-    console.error("[TeachersSheetsWorker] failed to start", e);
+    logError("TeachersSheetsWorker", "failed to start", e);
+  });
+}
+
+if (env.attendanceSheetsWorkerEnabled) {
+  const worker = new AttendanceSheetsWorker(prisma, {
+    intervalMs: env.attendanceSheetsWorkerIntervalMs,
+  });
+
+  worker.start().catch((e) => {
+    logError("AttendanceSheetsWorker", "failed to start", e);
   });
 }
