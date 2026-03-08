@@ -223,8 +223,28 @@ export const attendanceSheetsApi = {
   status: () => axios.get("/api/admin/attendance-sheets/status"),
   syncNow: () => axios.post("/api/admin/attendance-sheets/sync"),
   tabs: () => axios.get("/api/admin/attendance-sheets/tabs"),
-  createTab: (data: { groupId: string; subjectId: string; dates: string[] }) =>
-    axios.post("/api/admin/attendance-sheets/tabs", data),
+  createTab: (data: {
+    groupId: string;
+    subjectId: string;
+    dates: string[];
+    assignmentCount?: number;
+  }) => axios.post("/api/admin/attendance-sheets/tabs", data),
   preview: (params: { sheetTitle: string; takeRows?: number }) =>
     axios.get("/api/admin/attendance-sheets/preview", { params }),
+};
+
+export const gradesSheetsApi = {
+  health: () => axios.get("/api/admin/grades-sheets/health"),
+  status: () => axios.get("/api/admin/grades-sheets/status"),
+  syncNow: () => axios.post("/api/admin/grades-sheets/sync"),
+  forceSyncNow: () => axios.post("/api/admin/grades-sheets/force-sync"),
+  tabs: () => axios.get("/api/admin/grades-sheets/tabs"),
+  preview: (params: { sheetTitle: string; takeRows?: number }) =>
+    axios.get("/api/admin/grades-sheets/preview", { params }),
+  updateTab: (data: {
+    sheetTitle: string;
+    assignmentCount?: number;
+    gradeValues?: string[][];
+    gradeStartRowNumber?: number;
+  }) => axios.post("/api/admin/grades-sheets/update", data),
 };

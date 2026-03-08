@@ -2,6 +2,7 @@ import type { AttendanceStatus, PrismaClient, Weekday } from ".prisma/client";
 import { randomUUID } from "crypto";
 import { env } from "../../config/env";
 import { AttendanceSheetsClient } from "./AttendanceSheetsClient";
+import { GradesSheetsSyncService } from "../grades-sheets/GradesSheetsSyncService";
 import {
   formatAttendanceCell,
   parseAttendanceCell,
@@ -194,6 +195,7 @@ export class AttendanceSheetsSyncService {
     groupId: string;
     subjectId: string;
     dates: string[];
+    assignmentCount?: number;
   }): Promise<{
     sheetTitle: string;
     createdTab: boolean;
@@ -318,6 +320,17 @@ export class AttendanceSheetsSyncService {
       message: "Attendance Sheet tab ensured",
       meta: { createdTab, addedDates },
     });
+
+    // --- Grades spreadsheet (Baholash) ---
+    // Requirement: on Attendance creation, also create the Grades tab with HW columns.
+    if (opts.assignmentCount !== undefined && opts.assignmentCount !== null) {
+      const gradesSvc = new GradesSheetsSyncService(this.prisma);
+      await gradesSvc.ensureTabAndHwColumns({
+        sheetTitle,
+        groupTabTitle: group.name,
+        assignmentCount: Number(opts.assignmentCount),
+      });
+    }
 
     return { sheetTitle, createdTab, addedDates };
   }

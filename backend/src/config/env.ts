@@ -83,6 +83,12 @@ export const env = {
     "GOOGLE_SHEETS_ATTENDANCE_SPREADSHEET_ID",
   ),
 
+  // Grades Spreadsheet (Baholash; tabs = GROUP_SUBJECT)
+  gradesSheetsEnabled:
+    optionalBool("GOOGLE_SHEETS_GRADES_ENABLED") ??
+    Boolean(optional("GOOGLE_SHEETS_GRADES_SPREADSHEET_ID")),
+  gradesSheetsSpreadsheetId: optional("GOOGLE_SHEETS_GRADES_SPREADSHEET_ID"),
+
   // Teachers Worker
   teachersSheetsWorkerEnabled:
     optionalBool("GOOGLE_SHEETS_TEACHERS_WORKER_ENABLED") ?? false,
@@ -146,6 +152,10 @@ export const env = {
   attendanceSheetsTabsDenyRegex: optional(
     "GOOGLE_SHEETS_ATTENDANCE_TABS_DENY_REGEX",
   ),
+
+  // Optional tab filtering for Grades spreadsheet (treat only matching tabs as grades tabs)
+  gradesSheetsTabsAllowRegex: optional("GOOGLE_SHEETS_GRADES_TABS_ALLOW_REGEX"),
+  gradesSheetsTabsDenyRegex: optional("GOOGLE_SHEETS_GRADES_TABS_DENY_REGEX"),
 
   // Date parsing for attendance headers (default: MM/DD)
   attendanceSheetsDateFormat:

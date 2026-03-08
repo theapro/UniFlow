@@ -20,9 +20,11 @@
     "subjects": "Fanlar",
     "schedule": "Dars jadvali",
     "attendance": "Davomat",
+    "grades": "Baholash",
     "aiMonitor": "AI Monitoring",
     "aiModels": "AI Modellar",
-    "sheets": "Sheets"
+    "sheets": "Sheets",
+    "gradesSheets": "Baholash Sheets"
   },
   "dashboard": {
     "title": "Boshqaruv paneli",
@@ -89,6 +91,8 @@
     "tabInfo": "Tab ma'lumotlari",
     "lessonDays": "Dars kunlari",
     "lessonDaysHint": "Bir nechta kunlarni tanlash uchun sanalarga bosing. Ular Sheetda ustun sifatida qo'shiladi.",
+    "assignmentCount": "Vazifalar soni (HW)",
+    "assignmentCountHint": "Baholash Sheetida HW1..HWN ustunlarini yaratadi.",
     "createSuccess": "Davomat tab saqlandi",
     "updateSuccess": "Davomat tab yangilandi",
     "noChanges": "O'zgarish yo'q",
@@ -110,6 +114,22 @@
     "absent": "Kelmadi",
     "late": "Kechikdi",
     "excused": "Sababli"
+  },
+  "grades": {
+    "title": "Baholash",
+    "tabsDescription": "Admin Baholash tablarini ko'rishi mumkin; o'qituvchilar baholarni to'g'ridan-to'g'ri Google Sheetsda kiritadi.",
+    "tab": "Tab",
+    "noTabsTitle": "Baholash tablari yo'q",
+    "noTabsDescription": "Davomat tabini (vazifalar soni bilan) yarating — Baholash tabi avtomatik yaratiladi.",
+    "viewTab": "Baholash tabini ko'rish",
+    "viewHint": "Bu Google Sheetning jonli ko'rinishi. O'qituvchilar baholarni Google Sheetsda (C ustundan keyin) kiritadi.",
+    "emptyPreview": "Bu tabda hali ma'lumot yo'q.",
+    "editTab": "Baholash tabini tahrirlash",
+    "editHint": "Bu yerda o'zgarishlar to'g'ridan-to'g'ri Baholash Sheetga yoziladi.",
+    "editFooterHint": "Maslahat: roster (A–C) eski bo'lsa, Sheets → Baholash → Force Sync qiling."
+  },
+  "sheetsGrades": {
+    "description": "Baholash (Grades) spreadsheetini boshqarish, Sync va preview qilish."
   },
   "groups": {
     "title": "Guruhlar",

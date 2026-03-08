@@ -21,6 +21,7 @@ import { AiModelService } from "../services/ai/AiModelService";
 import { AdminStudentsSheetsController } from "../controllers/admin/AdminStudentsSheetsController";
 import { AdminTeachersSheetsController } from "../controllers/admin/AdminTeachersSheetsController";
 import { AdminAttendanceSheetsController } from "../controllers/admin/AdminAttendanceSheetsController";
+import { AdminGradesSheetsController } from "../controllers/admin/AdminGradesSheetsController";
 
 const router = Router();
 
@@ -61,6 +62,7 @@ const adminAiModelController = new AdminAiModelController(new AiModelService());
 const adminStudentsSheetsController = new AdminStudentsSheetsController();
 const adminTeachersSheetsController = new AdminTeachersSheetsController();
 const adminAttendanceSheetsController = new AdminAttendanceSheetsController();
+const adminGradesSheetsController = new AdminGradesSheetsController();
 
 // Inter-service wiring for Subjects <-> TeachersSheets
 adminSubjectController.setSyncService(
@@ -187,5 +189,17 @@ router.get(
   "/attendance-sheets/preview",
   adminAttendanceSheetsController.previewTab,
 );
+
+// Grades Spreadsheet (Google Sheets)
+router.get("/grades-sheets/health", adminGradesSheetsController.getHealth);
+router.get("/grades-sheets/status", adminGradesSheetsController.getStatus);
+router.post("/grades-sheets/sync", adminGradesSheetsController.syncNow);
+router.post(
+  "/grades-sheets/force-sync",
+  adminGradesSheetsController.forceSyncNow,
+);
+router.get("/grades-sheets/tabs", adminGradesSheetsController.listTabs);
+router.get("/grades-sheets/preview", adminGradesSheetsController.previewTab);
+router.post("/grades-sheets/update", adminGradesSheetsController.updateTab);
 
 export default router;

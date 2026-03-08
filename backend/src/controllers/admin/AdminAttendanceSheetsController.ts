@@ -166,10 +166,19 @@ export class AdminAttendanceSheetsController {
   };
 
   createTab = async (req: Request, res: Response) => {
-    const { groupId, subjectId, dates } = req.body ?? {};
+    const { groupId, subjectId, dates, assignmentCount } = req.body ?? {};
 
     if (!groupId || !subjectId || !Array.isArray(dates)) {
       return fail(res, 400, "groupId, subjectId, dates[] are required");
+    }
+
+    const assignmentCountProvided =
+      assignmentCount !== undefined &&
+      assignmentCount !== null &&
+      assignmentCount !== "";
+    const n = assignmentCountProvided ? Number(assignmentCount) : undefined;
+    if (assignmentCountProvided && (!Number.isFinite(n) || (n ?? 0) <= 0)) {
+      return fail(res, 400, "assignmentCount must be a positive number");
     }
 
     const cleanedDates = (dates as any[])
@@ -185,6 +194,7 @@ export class AdminAttendanceSheetsController {
       groupId: String(groupId),
       subjectId: String(subjectId),
       dates: cleanedDates,
+      assignmentCount: n,
     });
 
     return created(res, "Attendance Sheets tab ensured", result);

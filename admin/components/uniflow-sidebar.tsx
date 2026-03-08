@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -11,6 +10,7 @@ import {
   BrainIcon,
   CalendarIcon,
   ClipboardCheckIcon,
+  ClipboardListIcon,
   FileSpreadsheet,
   LayoutDashboardIcon,
   UsersIcon,
@@ -93,6 +93,11 @@ export function UniFlowSidebar({
       icon: ClipboardCheckIcon,
     },
     {
+      name: dict?.nav?.grades ?? "Grades",
+      url: `${dashboardBase}/grades`,
+      icon: ClipboardListIcon,
+    },
+    {
       name: dict?.nav?.aiMonitor ?? "AI Monitor",
       url: `${dashboardBase}/ai-monitor`,
       icon: BrainIcon,
@@ -119,6 +124,11 @@ export function UniFlowSidebar({
       title: "Attendance",
       url: `${dashboardBase}/sheets/attendance`,
       icon: ClipboardCheckIcon,
+    },
+    {
+      title: dict?.nav?.grades ?? "Grades",
+      url: `${dashboardBase}/sheets/grades`,
+      icon: ClipboardListIcon,
     },
   ];
 
@@ -154,7 +164,9 @@ export function UniFlowSidebar({
         />
 
         <SidebarGroup>
-          <SidebarGroupLabel>{dict?.nav?.management ?? "Management"}</SidebarGroupLabel>
+          <SidebarGroupLabel>
+            {dict?.nav?.management ?? "Management"}
+          </SidebarGroupLabel>
           <SidebarMenu>
             {managementItems.map((item) => (
               <SidebarMenuItem key={item.name}>
@@ -179,7 +191,7 @@ export function UniFlowSidebar({
             >
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
-                  <SidebarMenuButton 
+                  <SidebarMenuButton
                     tooltip={dict?.nav?.sheets ?? "Sheets"}
                     isActive={isSheetsActive}
                   >
@@ -192,7 +204,10 @@ export function UniFlowSidebar({
                   <SidebarMenuSub>
                     {sheetsSubItems.map((subItem) => (
                       <SidebarMenuSubItem key={subItem.title}>
-                        <SidebarMenuSubButton asChild isActive={pathname === subItem.url}>
+                        <SidebarMenuSubButton
+                          asChild
+                          isActive={pathname === subItem.url}
+                        >
                           <Link href={subItem.url}>
                             <span>{subItem.title}</span>
                           </Link>
@@ -220,4 +235,3 @@ export function UniFlowSidebar({
     </Sidebar>
   );
 }
-

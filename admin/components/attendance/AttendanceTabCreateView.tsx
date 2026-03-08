@@ -9,6 +9,7 @@ import { attendanceSheetsApi, groupsApi, subjectsApi } from "@/lib/api";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -39,6 +40,7 @@ export function AttendanceTabCreateView({
   const [groupId, setGroupId] = React.useState<string>("");
   const [subjectId, setSubjectId] = React.useState<string>("");
   const [dates, setDates] = React.useState<string[]>([]);
+  const [assignmentCount, setAssignmentCount] = React.useState<string>("5");
 
   const groupsQuery = useQuery({
     queryKey: ["groups"],
@@ -61,10 +63,16 @@ export function AttendanceTabCreateView({
       if (!groupId || !subjectId) throw new Error("MISSING_GROUP_SUBJECT");
       if (!dates.length) throw new Error("MISSING_DATES");
 
+      const n = Number(assignmentCount);
+      if (!Number.isFinite(n) || n <= 0) {
+        throw new Error("MISSING_ASSIGNMENT_COUNT");
+      }
+
       const res = await attendanceSheetsApi.createTab({
         groupId,
         subjectId,
         dates,
+        assignmentCount: n,
       });
       return res.data.data as CreateTabResponse;
     },
@@ -162,6 +170,23 @@ export function AttendanceTabCreateView({
             </div>
           </div>
 
+          <div className="space-y-2">
+            <div className="text-sm font-medium">
+              {dict?.attendance?.assignmentCount ?? "Assignments (HW count)"}
+            </div>
+            <Input
+              type="number"
+              min={1}
+              step={1}
+              value={assignmentCount}
+              onChange={(e) => setAssignmentCount(e.target.value)}
+            />
+            <div className="text-xs text-muted-foreground">
+              {dict?.attendance?.assignmentCountHint ??
+                "This controls HW1..HWN columns in the Grades spreadsheet."}
+            </div>
+          </div>
+
           <div className="flex justify-end gap-2">
             <Button
               onClick={() => createMutation.mutate()}
@@ -169,7 +194,8 @@ export function AttendanceTabCreateView({
                 createMutation.isPending ||
                 !groupId ||
                 !subjectId ||
-                dates.length === 0
+                dates.length === 0 ||
+                !(Number(assignmentCount) > 0)
               }
             >
               {createMutation.isPending

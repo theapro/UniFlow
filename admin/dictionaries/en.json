@@ -20,9 +20,11 @@
     "subjects": "Subjects",
     "schedule": "Schedule",
     "attendance": "Attendance",
+    "grades": "Grades",
     "aiMonitor": "AI Monitor",
     "aiModels": "AI Models",
-    "sheets": "Sheets"
+    "sheets": "Sheets",
+    "gradesSheets": "Grades Sheets"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -89,6 +91,8 @@
     "tabInfo": "Tab details",
     "lessonDays": "Lesson days",
     "lessonDaysHint": "Click dates to select multiple days. These will become date columns in the Sheet.",
+    "assignmentCount": "Assignments (HW count)",
+    "assignmentCountHint": "This controls HW1..HWN columns in the Grades spreadsheet.",
     "createSuccess": "Attendance tab saved",
     "updateSuccess": "Attendance tab updated",
     "noChanges": "No changes",
@@ -110,6 +114,22 @@
     "absent": "Absent",
     "late": "Late",
     "excused": "Excused"
+  },
+  "grades": {
+    "title": "Grades",
+    "tabsDescription": "Admin can preview Grades (Baholash) tabs; teachers fill grades directly in Google Sheets.",
+    "tab": "Tab",
+    "noTabsTitle": "No grades tabs",
+    "noTabsDescription": "Create an Attendance tab (with assignment count) to auto-generate a matching Grades tab.",
+    "viewTab": "View grades tab",
+    "viewHint": "This is a live preview of the Google Sheet. Teachers enter grades directly in Google Sheets (columns after C).",
+    "emptyPreview": "No data in this tab yet.",
+    "editTab": "Edit grades tab",
+    "editHint": "Edits here update the Grades sheet directly.",
+    "editFooterHint": "Tip: Use Sheets → Grades → Force Sync if roster (A–C) looks outdated."
+  },
+  "sheetsGrades": {
+    "description": "Manage synchronization and preview the Grades (Baholash) spreadsheet."
   },
   "groups": {
     "title": "Groups",

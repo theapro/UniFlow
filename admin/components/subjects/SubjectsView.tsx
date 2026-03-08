@@ -131,9 +131,6 @@ export function SubjectsView({ lang, dict }: { lang: string; dict: any }) {
           <Badge variant="secondary" className="h-5">
             {row.original._count?.teachers ?? 0} Teachers
           </Badge>
-          <Badge variant="secondary" className="h-5">
-            {row.original._count?.lessons ?? 0} Lessons
-          </Badge>
         </div>
       ),
     },
@@ -243,7 +240,6 @@ export function SubjectsView({ lang, dict }: { lang: string; dict: any }) {
                 className="pl-9"
               />
             </div>
-           
           </div>
           <DataTable
             data={(subjects ?? []).filter((s: Subject) => {
