@@ -22,7 +22,9 @@
     "attendance": "Attendance",
     "grades": "Grades",
     "aiMonitor": "AI Monitor",
+    "testAi": "Test AI",
     "aiModels": "AI Models",
+    "dangerZone": "Danger Zone",
     "sheets": "Sheets",
     "gradesSheets": "Grades Sheets"
   },

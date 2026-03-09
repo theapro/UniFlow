@@ -94,6 +94,45 @@ export class GradesSheetsClient {
     };
   }
 
+  async getSheetIdByTitle(sheetTitle: string): Promise<number> {
+    const t = String(sheetTitle ?? "").trim();
+    if (!t) throw new Error("TAB_REQUIRED");
+
+    if (this.sheetIdByTitleCache?.has(t)) {
+      return this.sheetIdByTitleCache.get(t)!;
+    }
+
+    const meta = await this.getSpreadsheetMetadata();
+    const id = meta.sheetIdByTitle[t];
+    if (typeof id !== "number") {
+      throw new Error(`SHEET_ID_NOT_FOUND:${t}`);
+    }
+    return id;
+  }
+
+  async deleteSheetTab(opts: { title: string }): Promise<void> {
+    const title = String(opts.title ?? "").trim();
+    if (!title) throw new Error("TAB_REQUIRED");
+
+    const sheetId = await this.getSheetIdByTitle(title);
+
+    await this.sheets.spreadsheets.batchUpdate({
+      auth: this.auth,
+      spreadsheetId: this.spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            deleteSheet: {
+              sheetId,
+            },
+          },
+        ],
+      },
+    });
+
+    this.sheetIdByTitleCache = null;
+  }
+
   async createSheetTab(opts: {
     title: string;
   }): Promise<{ sheetId: number | null }> {

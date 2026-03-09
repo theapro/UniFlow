@@ -17,6 +17,7 @@ import {
   GraduationCapIcon,
   LayersIcon,
   SettingsIcon,
+  AlertTriangle,
   ChevronRight,
 } from "lucide-react";
 
@@ -103,9 +104,19 @@ export function UniFlowSidebar({
       icon: BrainIcon,
     },
     {
+      name: dict?.nav?.testAi ?? "Test AI",
+      url: `${dashboardBase}/testai`,
+      icon: BrainIcon,
+    },
+    {
       name: dict?.nav?.aiModels ?? "AI Models",
       url: `${dashboardBase}/ai-models`,
       icon: SettingsIcon,
+    },
+    {
+      name: dict?.nav?.dangerZone ?? "Danger Zone",
+      url: `${dashboardBase}/danger-zone`,
+      icon: AlertTriangle,
     },
   ];
 

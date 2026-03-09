@@ -165,6 +165,29 @@ export class TeachersSheetsClient {
     this.sheetIdByTitleCache = null;
   }
 
+  async deleteSheetTab(opts: { title: string }): Promise<void> {
+    const title = String(opts.title ?? "").trim();
+    if (!title) throw new Error("TAB_REQUIRED");
+
+    const sheetId = await this.getSheetIdByTitle(title);
+
+    await this.sheets.spreadsheets.batchUpdate({
+      auth: this.auth,
+      spreadsheetId: this.spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            deleteSheet: {
+              sheetId,
+            },
+          },
+        ],
+      },
+    });
+
+    this.sheetIdByTitleCache = null;
+  }
+
   async setRowValues(opts: {
     sheetName: string;
     rowNumber: number;

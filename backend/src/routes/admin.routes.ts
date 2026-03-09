@@ -24,10 +24,12 @@ import { AdminAiToolsController } from "../controllers/admin/AdminAiToolsControl
 import { AiToolConfigService } from "../services/ai/AiToolConfigService";
 import { AdminAiLogsController } from "../controllers/admin/AdminAiLogsController";
 import { AiUsageLogService } from "../services/ai/AiUsageLogService";
+import { AdminAiTestController } from "../controllers/admin/AdminAiTestController";
 import { AdminStudentsSheetsController } from "../controllers/admin/AdminStudentsSheetsController";
 import { AdminTeachersSheetsController } from "../controllers/admin/AdminTeachersSheetsController";
 import { AdminAttendanceSheetsController } from "../controllers/admin/AdminAttendanceSheetsController";
 import { AdminGradesSheetsController } from "../controllers/admin/AdminGradesSheetsController";
+import { AdminPurgeController } from "../controllers/admin/AdminPurgeController";
 
 const router = Router();
 
@@ -74,10 +76,12 @@ const adminAiToolsController = new AdminAiToolsController(
 const adminAiLogsController = new AdminAiLogsController(
   new AiUsageLogService(),
 );
+const adminAiTestController = new AdminAiTestController();
 const adminStudentsSheetsController = new AdminStudentsSheetsController();
 const adminTeachersSheetsController = new AdminTeachersSheetsController();
 const adminAttendanceSheetsController = new AdminAttendanceSheetsController();
 const adminGradesSheetsController = new AdminGradesSheetsController();
+const adminPurgeController = new AdminPurgeController();
 
 // Inter-service wiring for Subjects <-> TeachersSheets
 adminSubjectController.setSyncService(
@@ -160,6 +164,9 @@ router.patch("/ai/tools/:name", adminAiToolsController.patch);
 
 router.get("/ai/logs", adminAiLogsController.list);
 
+// Admin-only AI testing endpoint (impersonates student/teacher roles)
+router.post("/ai/test-chat", adminAiTestController.chat);
+
 // Students Spreadsheet (Google Sheets) Sync
 router.get("/students-sheets/health", adminStudentsSheetsController.getHealth);
 router.get("/students-sheets/status", adminStudentsSheetsController.getStatus);
@@ -225,5 +232,8 @@ router.post(
 router.get("/grades-sheets/tabs", adminGradesSheetsController.listTabs);
 router.get("/grades-sheets/preview", adminGradesSheetsController.previewTab);
 router.post("/grades-sheets/update", adminGradesSheetsController.updateTab);
+
+// Danger zone: bulk purge (keeps ADMIN users)
+router.post("/purge", adminPurgeController.purgeAll);
 
 export default router;

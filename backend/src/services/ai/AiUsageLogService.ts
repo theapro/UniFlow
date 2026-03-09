@@ -1,11 +1,10 @@
-import { UserRole } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import type { AiToolName } from "../ai-tools/toolNames";
 
 export class AiUsageLogService {
   async logStart(params: {
     userId: string | null;
-    role: UserRole | null;
+    role: any;
     requestId: string | null;
     provider: string | null;
     model: string | null;
@@ -15,7 +14,7 @@ export class AiUsageLogService {
     const row = await prisma.aiUsageLog.create({
       data: {
         userId: params.userId,
-        role: params.role,
+        role: params.role as any,
         requestId: params.requestId,
         provider: params.provider,
         model: params.model,
@@ -80,5 +79,32 @@ export class AiUsageLogService {
       items: rows,
       nextCursor: rows.length > 0 ? rows[rows.length - 1].id : null,
     };
+  }
+
+  async findLatestByRequestId(params: { requestId: string }) {
+    const requestId = String(params.requestId ?? "").trim();
+    if (!requestId) return null;
+
+    return prisma.aiUsageLog.findFirst({
+      where: { requestId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        userId: true,
+        role: true,
+        requestId: true,
+        provider: true,
+        model: true,
+        toolName: true,
+        toolArgs: true,
+        userMessage: true,
+        assistantMessage: true,
+        status: true,
+        error: true,
+        ms: true,
+        meta: true,
+        createdAt: true,
+      },
+    });
   }
 }

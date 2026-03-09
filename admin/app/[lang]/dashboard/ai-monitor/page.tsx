@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { aiAdminApi } from "@/lib/api";
+import Link from "next/link";
 
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 type AiSettings = {
   id: string;
@@ -116,6 +118,20 @@ export default function AIMonitorPage() {
           AI sozlamalari, tool ruxsatlari va usage loglar.
         </p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Test AI</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-between gap-3">
+          <div className="text-sm text-muted-foreground">
+            Student/Teacher rolida AI assistant’ni sinab ko‘ring.
+          </div>
+          <Button asChild>
+            <Link href="../testai">Open /testai</Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

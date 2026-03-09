@@ -137,6 +137,29 @@ export class AttendanceSheetsClient {
     return { sheetId };
   }
 
+  async deleteSheetTab(opts: { title: string }): Promise<void> {
+    const title = String(opts.title ?? "").trim();
+    if (!title) throw new Error("TAB_REQUIRED");
+
+    const sheetId = await this.getSheetIdByTitle(title);
+
+    await this.sheets.spreadsheets.batchUpdate({
+      auth: this.auth,
+      spreadsheetId: this.spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            deleteSheet: {
+              sheetId,
+            },
+          },
+        ],
+      },
+    });
+
+    this.sheetIdByTitleCache = null;
+  }
+
   async getSheetValuesRange(sheetName: string, a1Range: string) {
     const range = `${sheetName}!${a1Range}`;
     const res = await this.sheets.spreadsheets.values.get({

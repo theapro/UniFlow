@@ -205,6 +205,17 @@ export const aiAdminApi = {
     list: (params?: { take?: number; cursor?: string | null }) =>
       axios.get("/api/admin/ai/logs", { params }),
   },
+  testChat: (data: {
+    message: string;
+    asRole: "STUDENT" | "TEACHER";
+    userId?: string | null;
+    requestedModel?: string;
+  }) => axios.post("/api/admin/ai/test-chat", data),
+};
+
+export const maintenanceApi = {
+  purgeAllNonAdmin: (data: { confirm: string; syncSheets?: boolean }) =>
+    axios.post("/api/admin/purge", data),
 };
 
 export const sheetsApi = {

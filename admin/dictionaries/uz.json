@@ -22,7 +22,9 @@
     "attendance": "Davomat",
     "grades": "Baholash",
     "aiMonitor": "AI Monitoring",
+    "testAi": "Test AI",
     "aiModels": "AI Modellar",
+    "dangerZone": "Xavfli zona",
     "sheets": "Sheets",
     "gradesSheets": "Baholash Sheets"
   },
