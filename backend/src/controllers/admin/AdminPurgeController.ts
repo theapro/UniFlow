@@ -163,8 +163,12 @@ export class AdminPurgeController {
       try {
         const client = new TeachersSheetsClient();
         const meta = await client.getSpreadsheetMetadata();
-        const allowRe = compileOptionalRegex(env.teachersSheetsSubjectTabsAllowRegex);
-        const denyRe = compileOptionalRegex(env.teachersSheetsSubjectTabsDenyRegex);
+        const allowRe = compileOptionalRegex(
+          env.teachersSheetsSubjectTabsAllowRegex,
+        );
+        const denyRe = compileOptionalRegex(
+          env.teachersSheetsSubjectTabsDenyRegex,
+        );
 
         for (const tab of meta.sheetTitles) {
           if (!isAllowedByRegex({ title: tab, allowRe, denyRe })) continue;
@@ -190,11 +194,14 @@ export class AdminPurgeController {
       try {
         const client = new AttendanceSheetsClient();
         const meta = await client.getSpreadsheetMetadata();
-        const allowRe = compileOptionalRegex(env.attendanceSheetsTabsAllowRegex);
+        const allowRe = compileOptionalRegex(
+          env.attendanceSheetsTabsAllowRegex,
+        );
         const denyRe = compileOptionalRegex(env.attendanceSheetsTabsDenyRegex);
 
         for (const tab of meta.sheetTitles) {
-          if (!isAllowedUnderscoreTab({ title: tab, allowRe, denyRe })) continue;
+          if (!isAllowedUnderscoreTab({ title: tab, allowRe, denyRe }))
+            continue;
           try {
             await client.deleteSheetTab({ title: tab });
             deletedTabs.push(tab);
@@ -221,7 +228,8 @@ export class AdminPurgeController {
         const denyRe = compileOptionalRegex(env.gradesSheetsTabsDenyRegex);
 
         for (const tab of meta.sheetTitles) {
-          if (!isAllowedUnderscoreTab({ title: tab, allowRe, denyRe })) continue;
+          if (!isAllowedUnderscoreTab({ title: tab, allowRe, denyRe }))
+            continue;
           try {
             await client.deleteSheetTab({ title: tab });
             deletedTabs.push(tab);

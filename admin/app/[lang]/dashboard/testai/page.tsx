@@ -33,22 +33,17 @@ type DebugLog = {
 };
 
 export default function TestAiPage() {
-  const [asRole, setAsRole] = React.useState<"STUDENT" | "TEACHER">(
-    "STUDENT",
-  );
+  const [asRole, setAsRole] = React.useState<"STUDENT" | "TEACHER">("STUDENT");
   const [message, setMessage] = React.useState<string>("");
   const [userId, setUserId] = React.useState<string>("");
   const [requestedModel, setRequestedModel] = React.useState<string>("");
 
-  const [last, setLast] = React.useState<
-    | {
-        reply: string;
-        toolUsed: string | null;
-        requestId: string;
-        debugLog: DebugLog | null;
-      }
-    | null
-  >(null);
+  const [last, setLast] = React.useState<{
+    reply: string;
+    toolUsed: string | null;
+    requestId: string;
+    debugLog: DebugLog | null;
+  } | null>(null);
 
   const send = useMutation({
     mutationFn: async () => {
@@ -56,7 +51,9 @@ export default function TestAiPage() {
         message,
         asRole,
         userId: userId.trim() ? userId.trim() : null,
-        requestedModel: requestedModel.trim() ? requestedModel.trim() : undefined,
+        requestedModel: requestedModel.trim()
+          ? requestedModel.trim()
+          : undefined,
       });
 
       const data = res.data?.data;
@@ -127,7 +124,9 @@ export default function TestAiPage() {
             </div>
 
             <div className="space-y-2">
-              <div className="text-sm font-medium">Requested model (optional)</div>
+              <div className="text-sm font-medium">
+                Requested model (optional)
+              </div>
               <Input
                 value={requestedModel}
                 onChange={(e) => setRequestedModel(e.target.value)}
@@ -180,11 +179,15 @@ export default function TestAiPage() {
             <>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="secondary">requestId: {last.requestId}</Badge>
-                <Badge variant="outline">tool: {last.toolUsed ?? "(none)"}</Badge>
+                <Badge variant="outline">
+                  tool: {last.toolUsed ?? "(none)"}
+                </Badge>
                 {last.debugLog?.status ? (
                   <Badge
                     variant={
-                      last.debugLog.status === "ERROR" ? "destructive" : "default"
+                      last.debugLog.status === "ERROR"
+                        ? "destructive"
+                        : "default"
                     }
                   >
                     {last.debugLog.status}

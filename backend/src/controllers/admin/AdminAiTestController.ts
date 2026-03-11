@@ -70,17 +70,14 @@ export class AdminAiTestController {
   private async pickUser(params: {
     asRole: TestAsRole;
     userId: string | null;
-  }): Promise<
-    | {
-        id: string;
-        email: string;
-        role: "STUDENT" | "TEACHER" | "ADMIN";
-        fullName: string | null;
-        studentId: string | null;
-        teacherId: string | null;
-      }
-    | null
-  > {
+  }): Promise<{
+    id: string;
+    email: string;
+    role: "STUDENT" | "TEACHER" | "ADMIN";
+    fullName: string | null;
+    studentId: string | null;
+    teacherId: string | null;
+  } | null> {
     if (params.userId) {
       const u = await prisma.user.findUnique({
         where: { id: params.userId },
@@ -109,8 +106,8 @@ export class AdminAiTestController {
         role: u.role,
         fullName:
           params.asRole === "STUDENT"
-            ? u.student?.fullName ?? null
-            : u.teacher?.fullName ?? null,
+            ? (u.student?.fullName ?? null)
+            : (u.teacher?.fullName ?? null),
         studentId: u.studentId ?? null,
         teacherId: u.teacherId ?? null,
       };
@@ -118,9 +115,7 @@ export class AdminAiTestController {
 
     const u = await prisma.user.findFirst({
       where:
-        params.asRole === "STUDENT"
-          ? { role: "STUDENT" }
-          : { role: "TEACHER" },
+        params.asRole === "STUDENT" ? { role: "STUDENT" } : { role: "TEACHER" },
       orderBy: { createdAt: "asc" },
       select: {
         id: true,
@@ -141,8 +136,8 @@ export class AdminAiTestController {
       role: u.role,
       fullName:
         params.asRole === "STUDENT"
-          ? u.student?.fullName ?? null
-          : u.teacher?.fullName ?? null,
+          ? (u.student?.fullName ?? null)
+          : (u.teacher?.fullName ?? null),
       studentId: u.studentId ?? null,
       teacherId: u.teacherId ?? null,
     };

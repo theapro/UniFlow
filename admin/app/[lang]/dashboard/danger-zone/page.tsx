@@ -50,8 +50,8 @@ export default function DangerZonePage() {
         <PageHeader title="Danger Zone" />
         <p className="text-sm text-muted-foreground">
           Bu sahifa ADMIN’dan boshqa hamma ma’lumotlarni o‘chiradi (students,
-          teachers, groups, subjects, schedule, attendance, grades) va xohlasangiz
-          Sheets’dan ham mos tablarni o‘chiradi.
+          teachers, groups, subjects, schedule, attendance, grades) va
+          xohlasangiz Sheets’dan ham mos tablarni o‘chiradi.
         </p>
       </div>
 
@@ -81,9 +81,12 @@ export default function DangerZonePage() {
 
           <div className="flex items-center justify-between rounded-md border p-3">
             <div>
-              <div className="text-sm font-medium">Sync / purge Sheets tabs</div>
+              <div className="text-sm font-medium">
+                Sync / purge Sheets tabs
+              </div>
               <div className="text-xs text-muted-foreground">
-                Students/Teachers/Attendance/Grades spreadsheet tablari tozalanadi.
+                Students/Teachers/Attendance/Grades spreadsheet tablari
+                tozalanadi.
               </div>
             </div>
             <Switch
