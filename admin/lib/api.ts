@@ -120,6 +120,21 @@ export const groupsApi = {
   remove: (id: string) => axios.delete(`/api/admin/groups/${id}`),
 };
 
+export const parentGroupsApi = {
+  list: (params?: { q?: string; take?: number; skip?: number }) =>
+    axios.get("/api/admin/parent-groups", { params }),
+
+  getById: (id: string) => axios.get(`/api/admin/parent-groups/${id}`),
+
+  create: (data: { name: string }) =>
+    axios.post("/api/admin/parent-groups", data),
+
+  update: (id: string, data: { name: string }) =>
+    axios.put(`/api/admin/parent-groups/${id}`, data),
+
+  remove: (id: string) => axios.delete(`/api/admin/parent-groups/${id}`),
+};
+
 export const scheduleApi = {
   list: (params?: {
     groupId?: string;
@@ -136,6 +151,56 @@ export const scheduleApi = {
     axios.put(`/api/admin/schedule/${id}`, data),
 
   remove: (id: string) => axios.delete(`/api/admin/schedule/${id}`),
+};
+
+export const monthlyScheduleApi = {
+  list: (params: {
+    month: number;
+    year: number;
+    groupId?: string;
+    teacherId?: string;
+  }) => axios.get("/api/admin/monthly-schedule", { params }),
+
+  create: (data: {
+    date: string;
+    timeSlotId: string;
+    groupId: string;
+    teacherId: string;
+    subjectId: string;
+    roomId?: string | null;
+    note?: string | null;
+  }) => axios.post("/api/admin/monthly-schedule", data),
+
+  update: (
+    id: string,
+    patch: {
+      teacherId?: string;
+      subjectId?: string;
+      roomId?: string | null;
+      note?: string | null;
+    },
+  ) => axios.put(`/api/admin/monthly-schedule/${id}`, patch),
+
+  remove: (id: string) => axios.delete(`/api/admin/monthly-schedule/${id}`),
+};
+
+export const roomsApi = {
+  list: (params?: { q?: string; take?: number; skip?: number }) =>
+    axios.get("/api/admin/rooms", { params }),
+
+  getById: (id: string) => axios.get(`/api/admin/rooms/${id}`),
+
+  create: (data: { name: string; capacity?: number | null }) =>
+    axios.post("/api/admin/rooms", data),
+
+  update: (id: string, patch: { name?: string; capacity?: number | null }) =>
+    axios.put(`/api/admin/rooms/${id}`, patch),
+
+  remove: (id: string) => axios.delete(`/api/admin/rooms/${id}`),
+};
+
+export const timeSlotsApi = {
+  list: () => axios.get("/api/admin/time-slots"),
 };
 
 export const lessonsApi = {

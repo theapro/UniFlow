@@ -7,6 +7,7 @@ import type {
 } from "@prisma/client";
 import { createHash, randomUUID } from "crypto";
 import { env } from "../../config/env";
+import { jsonStringArray } from "../../utils/json";
 import { StudentsSheetsClient } from "./StudentsSheetsClient";
 import { STUDENTS_SHEET_COLUMNS } from "./studentsSheetColumns";
 
@@ -780,8 +781,12 @@ export class StudentsSheetsSyncService {
                 email: dbStudent.email ?? "",
                 phone: dbStudent.phone ?? "",
                 status: dbStudent.status,
-                teacher_ids: [...(dbStudent.teacherIds ?? [])].sort().join(","),
-                parent_ids: [...(dbStudent.parentIds ?? [])].sort().join(","),
+                teacher_ids: jsonStringArray(dbStudent.teacherIds)
+                  .sort()
+                  .join(","),
+                parent_ids: jsonStringArray(dbStudent.parentIds)
+                  .sort()
+                  .join(","),
                 cohort: dbStudent.cohort ?? "",
                 created_at: safeIso(dbStudent.createdAt),
                 updated_at: safeIso(dbStudent.updatedAt),
@@ -916,8 +921,12 @@ export class StudentsSheetsSyncService {
                 email: dbStudent.email ?? "",
                 phone: dbStudent.phone ?? "",
                 status: dbStudent.status,
-                teacher_ids: [...(dbStudent.teacherIds ?? [])].sort().join(","),
-                parent_ids: [...(dbStudent.parentIds ?? [])].sort().join(","),
+                teacher_ids: jsonStringArray(dbStudent.teacherIds)
+                  .sort()
+                  .join(","),
+                parent_ids: jsonStringArray(dbStudent.parentIds)
+                  .sort()
+                  .join(","),
                 cohort: dbStudent.cohort ?? "",
                 created_at: safeIso(dbStudent.createdAt),
                 updated_at: safeIso(dbStudent.updatedAt),
@@ -1373,8 +1382,8 @@ export class StudentsSheetsSyncService {
             email: student.email ?? "",
             phone: student.phone ?? "",
             status: student.status,
-            teacher_ids: [...(student.teacherIds ?? [])].sort().join(","),
-            parent_ids: [...(student.parentIds ?? [])].sort().join(","),
+            teacher_ids: jsonStringArray(student.teacherIds).sort().join(","),
+            parent_ids: jsonStringArray(student.parentIds).sort().join(","),
             cohort: student.cohort ?? "",
             created_at: formatDateForSheet(student.createdAt),
             updated_at: formatDateForSheet(student.updatedAt),

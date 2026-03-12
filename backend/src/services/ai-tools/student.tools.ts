@@ -1,5 +1,6 @@
 import { prisma } from "../../config/prisma";
 import { StudentFullContextService } from "../ai/StudentFullContextService";
+import { formatDbTime } from "../../utils/time";
 
 const fullContextService = new StudentFullContextService();
 
@@ -128,11 +129,11 @@ export async function getStudentSchedule(studentId: string) {
       subject: { select: { id: true, name: true } },
       teacher: { select: { id: true, fullName: true } },
       timeSlot: {
-        select: { id: true, order: true, startTime: true, endTime: true },
+        select: { id: true, slotNumber: true, startTime: true, endTime: true },
       },
       room: { select: { id: true, name: true } },
     },
-    orderBy: [{ weekday: "asc" }, { timeSlot: { order: "asc" } }],
+    orderBy: [{ weekday: "asc" }, { timeSlot: { slotNumber: "asc" } }],
   });
 
   const week = entries.map((e) => ({
@@ -140,7 +141,14 @@ export async function getStudentSchedule(studentId: string) {
     subject: e.subject,
     teacher: e.teacher,
     room: e.room,
-    timeSlot: e.timeSlot,
+    timeSlot: e.timeSlot
+      ? {
+          id: e.timeSlot.id,
+          slotNumber: e.timeSlot.slotNumber,
+          startTime: formatDbTime(e.timeSlot.startTime),
+          endTime: formatDbTime(e.timeSlot.endTime),
+        }
+      : null,
     effectiveFrom: e.effectiveFrom,
     effectiveTo: e.effectiveTo,
   }));

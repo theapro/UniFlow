@@ -17,7 +17,6 @@ import {
   GraduationCapIcon,
   LayersIcon,
   SettingsIcon,
-  AlertTriangle,
   ChevronRight,
 } from "lucide-react";
 
@@ -74,6 +73,11 @@ export function UniFlowSidebar({
       icon: LayersIcon,
     },
     {
+      name: dict?.nav?.parentGroups ?? "Parent Groups",
+      url: `${dashboardBase}/parent-groups`,
+      icon: LayersIcon,
+    },
+    {
       name: dict?.nav?.teachers ?? "Teachers",
       url: `${dashboardBase}/teachers`,
       icon: GraduationCapIcon,
@@ -81,6 +85,11 @@ export function UniFlowSidebar({
     {
       name: dict?.nav?.subjects ?? "Subjects",
       url: `${dashboardBase}/subjects`,
+      icon: BookOpenIcon,
+    },
+    {
+      name: dict?.nav?.classrooms ?? "Classrooms",
+      url: `${dashboardBase}/classrooms`,
       icon: BookOpenIcon,
     },
     {
@@ -99,24 +108,27 @@ export function UniFlowSidebar({
       icon: ClipboardListIcon,
     },
     {
-      name: dict?.nav?.aiMonitor ?? "AI Monitor",
+      name: dict?.nav?.settings ?? "Settings",
+      url: `${dashboardBase}/settings`,
+      icon: SettingsIcon,
+    },
+  ];
+
+  const aiSubItems = [
+    {
+      title: dict?.nav?.aiMonitor ?? "AI Monitor",
       url: `${dashboardBase}/ai-monitor`,
       icon: BrainIcon,
     },
     {
-      name: dict?.nav?.testAi ?? "Test AI",
+      title: dict?.nav?.testAi ?? "Test AI",
       url: `${dashboardBase}/testai`,
       icon: BrainIcon,
     },
     {
-      name: dict?.nav?.aiModels ?? "AI Models",
+      title: dict?.nav?.aiModels ?? "AI Models",
       url: `${dashboardBase}/ai-models`,
       icon: SettingsIcon,
-    },
-    {
-      name: dict?.nav?.dangerZone ?? "Danger Zone",
-      url: `${dashboardBase}/danger-zone`,
-      icon: AlertTriangle,
     },
   ];
 
@@ -144,6 +156,10 @@ export function UniFlowSidebar({
   ];
 
   const isSheetsActive = pathname.startsWith(`${dashboardBase}/sheets`);
+  const isAiActive =
+    pathname.startsWith(`${dashboardBase}/ai-monitor`) ||
+    pathname.startsWith(`${dashboardBase}/testai`) ||
+    pathname.startsWith(`${dashboardBase}/ai-models`);
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -194,6 +210,45 @@ export function UniFlowSidebar({
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
+
+            <Collapsible
+              asChild
+              defaultOpen={isAiActive}
+              className="group/collapsible"
+            >
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton
+                    tooltip={dict?.nav?.aiMonitor ?? "AI Monitor"}
+                    isActive={isAiActive}
+                  >
+                    <BrainIcon />
+                    <span>{dict?.nav?.aiMonitor ?? "AI Monitor"}</span>
+                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {aiSubItems.map((subItem) => (
+                      <SidebarMenuSubItem key={subItem.title}>
+                        <SidebarMenuSubButton
+                          asChild
+                          isActive={
+                            pathname === subItem.url ||
+                            pathname.startsWith(subItem.url + "/")
+                          }
+                        >
+                          <Link href={subItem.url}>
+                            <subItem.icon className="h-4 w-4" />
+                            <span>{subItem.title}</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    ))}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
 
             <Collapsible
               asChild

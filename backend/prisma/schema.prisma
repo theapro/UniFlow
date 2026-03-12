@@ -3,12 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
 model Department {
-  id        String    @id @default(uuid()) @db.Uuid
+  id        String    @id @default(uuid()) @db.Char(36)
   name      String    @unique
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -18,46 +18,67 @@ model Department {
 }
 
 model Room {
-  id              String          @id @default(uuid()) @db.Uuid
+  id              String          @id @default(uuid()) @db.Char(36)
   name            String          @unique
   capacity        Int?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   scheduleEntries ScheduleEntry[]
 
+  schedules Schedule[]
+
   @@map("Room")
 }
 
 model TimeSlot {
-  id              String          @id @default(uuid()) @db.Uuid
-  order           Int             @unique
-  startTime       String
-  endTime         String
+  id              String          @id @default(uuid()) @db.Char(36)
+  slotNumber      Int             @unique
+  startTime       DateTime        @db.Time(0)
+  endTime         DateTime        @db.Time(0)
+  isBreak         Boolean         @default(false)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   scheduleEntries ScheduleEntry[]
+
+  schedules Schedule[]
 
   @@map("TimeSlot")
 }
 
 model Group {
-  id              String          @id @default(uuid()) @db.Uuid
+  id              String          @id @default(uuid()) @db.Char(36)
   name            String          @unique
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
-  cohortId        String?         @db.Uuid
+  cohortId        String?         @db.Char(36)
   cohort          Cohort?         @relation(fields: [cohortId], references: [id])
+  parentGroupId   String?         @db.Char(36)
+  parentGroup     ParentGroup?    @relation(fields: [parentGroupId], references: [id], onDelete: SetNull)
   lessons         Lesson[]
   scheduleEntries ScheduleEntry[]
   students        Student[]
   gradeBooks      GradeBook[]
 
+  schedules Schedule[]
+
   @@index([cohortId])
+  @@index([parentGroupId])
   @@map("Group")
 }
 
+model ParentGroup {
+  id        String   @id @default(uuid()) @db.Char(36)
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  groups Group[]
+
+  @@map("ParentGroup")
+}
+
 model Cohort {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String   @id @default(uuid()) @db.Char(36)
   year      Int      @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -67,18 +88,18 @@ model Cohort {
 }
 
 model Student {
-  id            String        @id @default(uuid()) @db.Uuid
+  id            String        @id @default(uuid()) @db.Char(36)
   fullName      String
-  groupId       String?       @db.Uuid
+  groupId       String?       @db.Char(36)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @default(now())
   email         String?
   note          String?
-  parentIds     String[]      @default([])
+  parentIds     Json?
   phone         String?
   status        StudentStatus @default(ACTIVE)
   studentNumber String?       @unique
-  teacherIds    String[]      @default([])
+  teacherIds    Json?
   cohort        String?
   groupName     String?       @map("group")
   attendance    Attendance[]
@@ -90,11 +111,11 @@ model Student {
 }
 
 model StudentsSheetsConflict {
-  id            String                            @id @default(uuid()) @db.Uuid
+  id            String                            @id @default(uuid()) @db.Char(36)
   spreadsheetId String
   sheetTitle    String?
   rowNumber     Int?
-  studentId     String?                           @db.Uuid
+  studentId     String?                           @db.Char(36)
   status        StudentsSheetsConflictStatus      @default(OPEN)
   resolution    StudentsSheetsConflictResolution?
   message       String?
@@ -113,10 +134,10 @@ model StudentsSheetsConflict {
 }
 
 model Teacher {
-  id              String          @id @default(uuid()) @db.Uuid
+  id              String          @id @default(uuid()) @db.Char(36)
   fullName        String
   staffNo         String?         @unique
-  departmentId    String?         @db.Uuid
+  departmentId    String?         @db.Char(36)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   email           String?
@@ -127,6 +148,7 @@ model Teacher {
   telegram        String?
   lessons         Lesson[]
   scheduleEntries ScheduleEntry[]
+  schedules       Schedule[]
   department      Department?     @relation(fields: [departmentId], references: [id])
   user            User?
   subjects        Subject[]       @relation("SubjectToTeacher")
@@ -135,7 +157,7 @@ model Teacher {
 }
 
 model Subject {
-  id              String          @id @default(uuid()) @db.Uuid
+  id              String          @id @default(uuid()) @db.Char(36)
   name            String          @unique
   code            String?         @unique
   createdAt       DateTime        @default(now())
@@ -145,18 +167,20 @@ model Subject {
   teachers        Teacher[]       @relation("SubjectToTeacher")
   gradeBooks      GradeBook[]
 
+  schedules Schedule[]
+
   @@map("Subject")
 }
 
 model TeachersSheetsSyncState {
-  id               String                    @id @default(uuid()) @db.Uuid
+  id               String                    @id @default(uuid()) @db.Char(36)
   spreadsheetId    String                    @unique
   lastRunId        String?
   lastStatus       TeachersSheetsSyncStatus?
   lastSyncAt       DateTime?
   lastSuccessAt    DateTime?
   lastError        String?
-  detectedSubjects String[]                  @default([])
+  detectedSubjects Json?
   syncedTeachers   Int                       @default(0)
   spreadsheetRows  Int                       @default(0)
   createdAt        DateTime                  @default(now())
@@ -166,14 +190,14 @@ model TeachersSheetsSyncState {
 }
 
 model TeachersSheetsSyncLog {
-  id            String                     @id @default(uuid()) @db.Uuid
+  id            String                     @id @default(uuid()) @db.Char(36)
   spreadsheetId String
   runId         String
   level         TeachersSheetsLogLevel     @default(INFO)
   direction     TeachersSheetsLogDirection
   action        String
   sheetTitle    String?
-  teacherId     String?                    @db.Uuid
+  teacherId     String?                    @db.Char(36)
   message       String
   meta          Json?
   createdAt     DateTime                   @default(now())
@@ -196,14 +220,14 @@ model TeachersSheetsWorkerState {
 }
 
 model AttendanceSheetsSyncState {
-  id              String                      @id @default(uuid()) @db.Uuid
+  id              String                      @id @default(uuid()) @db.Char(36)
   spreadsheetId   String                      @unique
   lastRunId       String?
   lastStatus      AttendanceSheetsSyncStatus?
   lastSyncAt      DateTime?
   lastSuccessAt   DateTime?
   lastError       String?
-  detectedTabs    String[]                    @default([])
+  detectedTabs    Json?
   processedTabs   Int                         @default(0)
   syncedLessons   Int                         @default(0)
   syncedRecords   Int                         @default(0)
@@ -217,17 +241,17 @@ model AttendanceSheetsSyncState {
 }
 
 model AttendanceSheetsSyncLog {
-  id            String                      @id @default(uuid()) @db.Uuid
+  id            String                      @id @default(uuid()) @db.Char(36)
   spreadsheetId String
   runId         String
   level         AttendanceSheetsLogLevel    @default(INFO)
   direction     AttendanceSheetsLogDirection
   action        String
   sheetTitle    String?
-  groupId       String?                     @db.Uuid
-  subjectId     String?                     @db.Uuid
-  lessonId      String?                     @db.Uuid
-  studentId     String?                     @db.Uuid
+  groupId       String?                     @db.Char(36)
+  subjectId     String?                     @db.Char(36)
+  lessonId      String?                     @db.Char(36)
+  studentId     String?                     @db.Char(36)
   message       String
   meta          Json?
   createdAt     DateTime                    @default(now())
@@ -250,13 +274,13 @@ model AttendanceSheetsWorkerState {
 }
 
 model Lesson {
-  id         String       @id @default(uuid()) @db.Uuid
+  id         String       @id @default(uuid()) @db.Char(36)
   startsAt   DateTime
   endsAt     DateTime
   room       String?
-  groupId    String       @db.Uuid
-  teacherId  String       @db.Uuid
-  subjectId  String       @db.Uuid
+  groupId    String       @db.Char(36)
+  teacherId  String       @db.Char(36)
+  subjectId  String       @db.Char(36)
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
   attendance Attendance[]
@@ -267,14 +291,52 @@ model Lesson {
   @@map("Lesson")
 }
 
+model CalendarDay {
+  id        String   @id @default(uuid()) @db.Char(36)
+  date      DateTime @db.Date
+  weekday   Weekday
+  month     Int
+  year      Int
+  createdAt DateTime @default(now())
+
+  schedules Schedule[]
+
+  @@unique([date])
+  @@map("CalendarDay")
+}
+
+model Schedule {
+  id            String   @id @default(uuid()) @db.Char(36)
+  calendarDayId String   @db.Char(36)
+  timeSlotId    String   @db.Char(36)
+  groupId       String   @db.Char(36)
+  teacherId     String   @db.Char(36)
+  subjectId     String   @db.Char(36)
+  roomId        String?  @db.Char(36)
+  note          String?
+  createdAt     DateTime @default(now())
+
+  calendarDay CalendarDay @relation(fields: [calendarDayId], references: [id], onDelete: Cascade)
+  timeSlot    TimeSlot    @relation(fields: [timeSlotId], references: [id])
+  group       Group       @relation(fields: [groupId], references: [id])
+  teacher     Teacher     @relation(fields: [teacherId], references: [id])
+  subject     Subject     @relation(fields: [subjectId], references: [id])
+  room        Room?       @relation(fields: [roomId], references: [id])
+
+  @@unique([teacherId, calendarDayId, timeSlotId], map: "teacher_schedule_conflict")
+  @@unique([groupId, calendarDayId, timeSlotId], map: "group_schedule_conflict")
+  @@unique([roomId, calendarDayId, timeSlotId], map: "room_schedule_conflict")
+  @@map("Schedule")
+}
+
 model ScheduleEntry {
-  id            String    @id @default(uuid()) @db.Uuid
+  id            String    @id @default(uuid()) @db.Char(36)
   weekday       Weekday
-  groupId       String    @db.Uuid
-  teacherId     String    @db.Uuid
-  subjectId     String    @db.Uuid
-  timeSlotId    String    @db.Uuid
-  roomId        String?   @db.Uuid
+  groupId       String    @db.Char(36)
+  teacherId     String    @db.Char(36)
+  subjectId     String    @db.Char(36)
+  timeSlotId    String    @db.Char(36)
+  roomId        String?   @db.Char(36)
   effectiveFrom DateTime?
   effectiveTo   DateTime?
   createdAt     DateTime  @default(now())
@@ -291,10 +353,10 @@ model ScheduleEntry {
 }
 
 model Attendance {
-  id        String           @id @default(uuid()) @db.Uuid
+  id        String           @id @default(uuid()) @db.Char(36)
   status    AttendanceStatus
-  lessonId  String           @db.Uuid
-  studentId String           @db.Uuid
+  lessonId  String           @db.Char(36)
+  studentId String           @db.Char(36)
   notedAt   DateTime         @default(now())
   lesson    Lesson           @relation(fields: [lessonId], references: [id])
   student   Student          @relation(fields: [studentId], references: [id])
@@ -304,14 +366,14 @@ model Attendance {
 }
 
 model User {
-  id                String           @id @default(uuid()) @db.Uuid
+  id                String           @id @default(uuid()) @db.Char(36)
   email             String           @unique
   passwordHash      String?
   role              UserRole
   lastLoginAt       DateTime?
   credentialsSentAt DateTime?
-  studentId         String?          @unique @db.Uuid
-  teacherId         String?          @unique @db.Uuid
+  studentId         String?          @unique @db.Char(36)
+  teacherId         String?          @unique @db.Char(36)
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
   chats             Chat[]
@@ -327,8 +389,8 @@ model User {
 }
 
 model ChatSession {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
+  id        String   @id @default(uuid()) @db.Char(36)
+  userId    String   @db.Char(36)
   title     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -340,9 +402,9 @@ model ChatSession {
 }
 
 model Chat {
-  id        String      @id @default(uuid()) @db.Uuid
-  userId    String      @db.Uuid
-  sessionId String      @db.Uuid
+  id        String      @id @default(uuid()) @db.Char(36)
+  userId    String      @db.Char(36)
+  sessionId String      @db.Char(36)
   message   String
   sender    ChatSender
   timestamp DateTime    @default(now())
@@ -355,13 +417,13 @@ model Chat {
 }
 
 model StudentsSheetsSyncState {
-  id              String                    @id @default(uuid()) @db.Uuid
+  id              String                    @id @default(uuid()) @db.Char(36)
   spreadsheetId   String                    @unique
   lastStatus      StudentsSheetsSyncStatus?
   lastSyncAt      DateTime?
   lastSuccessAt   DateTime?
   lastError       String?
-  detectedGroups  String[]                  @default([])
+  detectedGroups  Json?
   syncedStudents  Int                       @default(0)
   createdAt       DateTime                  @default(now())
   updatedAt       DateTime                  @updatedAt
@@ -372,10 +434,10 @@ model StudentsSheetsSyncState {
 }
 
 model StudentsSheetsRowState {
-  id            String    @id @default(uuid()) @db.Uuid
+  id            String    @id @default(uuid()) @db.Char(36)
   spreadsheetId String
   sheetTitle    String
-  studentId     String    @db.Uuid
+  studentId     String    @db.Char(36)
   rowNumber     Int
   rowHash       String
   lastSeenAt    DateTime  @default(now())
@@ -390,9 +452,9 @@ model StudentsSheetsRowState {
 }
 
 model StudentsSheetsOutboxEvent {
-  id               String                     @id @default(uuid()) @db.Uuid
+  id               String                     @id @default(uuid()) @db.Char(36)
   spreadsheetId    String
-  studentId        String                     @db.Uuid
+  studentId        String                     @db.Char(36)
   type             StudentsSheetsOutboxType
   targetSheetTitle String?
   payload          Json?
@@ -409,14 +471,14 @@ model StudentsSheetsOutboxEvent {
 }
 
 model StudentsSheetsSyncLog {
-  id            String                     @id @default(uuid()) @db.Uuid
+  id            String                     @id @default(uuid()) @db.Char(36)
   spreadsheetId String
   runId         String
   level         StudentsSheetsLogLevel     @default(INFO)
   direction     StudentsSheetsLogDirection
   action        String
   sheetTitle    String?
-  studentId     String?                    @db.Uuid
+  studentId     String?                    @db.Char(36)
   message       String
   meta          Json?
   createdAt     DateTime                   @default(now())
@@ -439,8 +501,8 @@ model StudentsSheetsWorkerState {
 }
 
 model UserProfile {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @unique @db.Uuid
+  id          String   @id @default(uuid()) @db.Char(36)
+  userId      String   @unique @db.Char(36)
   interests   Json?
   preferences Json?
   notes       String?
@@ -452,8 +514,8 @@ model UserProfile {
 }
 
 model UserInvitation {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @db.Uuid
+  id        String    @id @default(uuid()) @db.Char(36)
+  userId    String    @db.Char(36)
   tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
@@ -464,7 +526,7 @@ model UserInvitation {
 }
 
 model AiModel {
-  id               String     @id @default(uuid()) @db.Uuid
+  id               String     @id @default(uuid()) @db.Char(36)
   provider         String
   model            String
   displayName      String
@@ -490,8 +552,8 @@ model AiSettings {
   isEnabled             Boolean  @default(true)
   systemPrompt          String   @default("")
   toolPlannerPrompt     String   @default("")
-  defaultUserChatModelId  String? @db.Uuid
-  defaultAdminChatModelId String? @db.Uuid
+  defaultUserChatModelId  String? @db.Char(36)
+  defaultAdminChatModelId String? @db.Char(36)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -516,8 +578,8 @@ model AiToolConfig {
 
 // Audit log for AI requests (admin-visible).
 model AiUsageLog {
-  id               String   @id @default(uuid()) @db.Uuid
-  userId           String?  @db.Uuid
+  id               String   @id @default(uuid()) @db.Char(36)
+  userId           String?  @db.Char(36)
   role             UserRole?
   requestId        String?
   provider         String?
@@ -541,9 +603,9 @@ model AiUsageLog {
 
 // Grades persisted from the Grades spreadsheet (GROUP_SUBJECT tabs).
 model GradeBook {
-  id              String     @id @default(uuid()) @db.Uuid
-  groupId         String     @db.Uuid
-  subjectId       String     @db.Uuid
+  id              String     @id @default(uuid()) @db.Char(36)
+  groupId         String     @db.Char(36)
+  subjectId       String     @db.Char(36)
   assignmentCount Int        @default(0)
   source          String     @default("GRADES_SHEETS")
   createdAt       DateTime   @default(now())
@@ -559,9 +621,9 @@ model GradeBook {
 }
 
 model GradeRecord {
-  id            String   @id @default(uuid()) @db.Uuid
-  gradeBookId   String   @db.Uuid
-  studentId     String   @db.Uuid
+  id            String   @id @default(uuid()) @db.Char(36)
+  gradeBookId   String   @db.Char(36)
+  studentId     String   @db.Char(36)
   assignmentIndex Int
   rawValue      String?
   score         Float?
@@ -577,8 +639,8 @@ model GradeRecord {
 }
 
 model LoginCode {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @db.Uuid
+  id        String    @id @default(uuid()) @db.Char(36)
+  userId    String    @db.Char(36)
   codeHash  String
   expiresAt DateTime
   usedAt    DateTime?

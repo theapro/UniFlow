@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { prisma } from "../../config/prisma";
 import { env } from "../../config/env";
 import { created, fail, ok } from "../../utils/responses";
+import { jsonStringArray } from "../../utils/json";
 import { AttendanceSheetsClient } from "../../services/attendance-sheets/AttendanceSheetsClient";
 import { AttendanceSheetsSyncService } from "../../services/attendance-sheets/AttendanceSheetsSyncService";
 
@@ -118,7 +119,7 @@ export class AdminAttendanceSheetsController {
       dbToSheetsEnabled: env.attendanceSheetsDbToSheetsEnabled,
       spreadsheetId: env.attendanceSheetsSpreadsheetId ?? null,
       spreadsheetIdMasked: maskSpreadsheetId(env.attendanceSheetsSpreadsheetId),
-      detectedTabs: state?.detectedTabs ?? [],
+      detectedTabs: jsonStringArray(state?.detectedTabs),
       processedTabs: state?.processedTabs ?? 0,
       syncedLessons: state?.syncedLessons ?? 0,
       syncedRecords: state?.syncedRecords ?? 0,

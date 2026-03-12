@@ -1,5 +1,6 @@
 import { prisma } from "../../config/prisma";
 import { getUTCDayRange, getWeekdayUTC } from "../../utils/weekday";
+import { formatDbTime } from "../../utils/time";
 
 export class TeacherService {
   async getTodayLessons(teacherId: string) {
@@ -21,7 +22,7 @@ export class TeacherService {
   async getGroupSchedule(teacherId: string, groupId: string) {
     const weekday = getWeekdayUTC();
 
-    return prisma.scheduleEntry.findMany({
+    const rows = await prisma.scheduleEntry.findMany({
       where: {
         teacherId,
         groupId,
@@ -32,7 +33,18 @@ export class TeacherService {
         timeSlot: true,
         room: true,
       },
-      orderBy: [{ timeSlot: { order: "asc" } }],
+      orderBy: [{ timeSlot: { slotNumber: "asc" } }],
     });
+
+    return rows.map((r) => ({
+      ...r,
+      timeSlot: r.timeSlot
+        ? {
+            ...r.timeSlot,
+            startTime: formatDbTime(r.timeSlot.startTime),
+            endTime: formatDbTime(r.timeSlot.endTime),
+          }
+        : r.timeSlot,
+    }));
   }
 }

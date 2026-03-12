@@ -16,6 +16,8 @@ import { AdminGroupController } from "../controllers/admin/AdminGroupController"
 import { AdminGroupService } from "../services/admin/AdminGroupService";
 import { AdminLessonController } from "../controllers/admin/AdminLessonController";
 import { AdminLessonService } from "../services/admin/AdminLessonService";
+import { AdminParentGroupController } from "../controllers/admin/AdminParentGroupController";
+import { AdminParentGroupService } from "../services/admin/AdminParentGroupService";
 import { AdminAiModelController } from "../controllers/admin/AdminAiModelController";
 import { AiModelService } from "../services/ai/AiModelService";
 import { AdminAiSettingsController } from "../controllers/admin/AdminAiSettingsController";
@@ -30,6 +32,12 @@ import { AdminTeachersSheetsController } from "../controllers/admin/AdminTeacher
 import { AdminAttendanceSheetsController } from "../controllers/admin/AdminAttendanceSheetsController";
 import { AdminGradesSheetsController } from "../controllers/admin/AdminGradesSheetsController";
 import { AdminPurgeController } from "../controllers/admin/AdminPurgeController";
+import { AdminMonthlyScheduleController } from "../controllers/admin/AdminMonthlyScheduleController";
+import { AdminMonthlyScheduleService } from "../services/admin/AdminMonthlyScheduleService";
+import { AdminRoomsController } from "../controllers/admin/AdminRoomsController";
+import { AdminRoomsService } from "../services/admin/AdminRoomsService";
+import { AdminTimeSlotsController } from "../controllers/admin/AdminTimeSlotsController";
+import { AdminTimeSlotsService } from "../services/admin/AdminTimeSlotsService";
 
 const router = Router();
 
@@ -66,6 +74,9 @@ const adminGroupController = new AdminGroupController(new AdminGroupService());
 const adminLessonController = new AdminLessonController(
   new AdminLessonService(),
 );
+const adminParentGroupController = new AdminParentGroupController(
+  new AdminParentGroupService(),
+);
 const adminAiModelController = new AdminAiModelController(new AiModelService());
 const adminAiSettingsController = new AdminAiSettingsController(
   new AiSettingsService(),
@@ -82,6 +93,13 @@ const adminTeachersSheetsController = new AdminTeachersSheetsController();
 const adminAttendanceSheetsController = new AdminAttendanceSheetsController();
 const adminGradesSheetsController = new AdminGradesSheetsController();
 const adminPurgeController = new AdminPurgeController();
+const adminMonthlyScheduleController = new AdminMonthlyScheduleController(
+  new AdminMonthlyScheduleService(),
+);
+const adminRoomsController = new AdminRoomsController(new AdminRoomsService());
+const adminTimeSlotsController = new AdminTimeSlotsController(
+  new AdminTimeSlotsService(),
+);
 
 // Inter-service wiring for Subjects <-> TeachersSheets
 adminSubjectController.setSyncService(
@@ -117,6 +135,20 @@ router.post("/schedule", adminScheduleController.create);
 router.put("/schedule/:id", adminScheduleController.update);
 router.delete("/schedule/:id", adminScheduleController.remove);
 
+// Monthly Schedule Builder
+router.get("/monthly-schedule", adminMonthlyScheduleController.list);
+router.post("/monthly-schedule", adminMonthlyScheduleController.create);
+router.put("/monthly-schedule/:id", adminMonthlyScheduleController.update);
+router.delete("/monthly-schedule/:id", adminMonthlyScheduleController.remove);
+
+// Rooms / TimeSlots
+router.get("/rooms", adminRoomsController.list);
+router.get("/rooms/:id", adminRoomsController.getById);
+router.post("/rooms", adminRoomsController.create);
+router.put("/rooms/:id", adminRoomsController.update);
+router.delete("/rooms/:id", adminRoomsController.remove);
+router.get("/time-slots", adminTimeSlotsController.list);
+
 // Attendance
 router.get("/attendance", adminAttendanceController.list);
 router.get("/attendance/by-date", adminAttendanceController.getByDate);
@@ -143,6 +175,13 @@ router.get("/groups/:id", adminGroupController.getById);
 router.post("/groups", adminGroupController.create);
 router.put("/groups/:id", adminGroupController.update);
 router.delete("/groups/:id", adminGroupController.remove);
+
+// Parent Groups
+router.get("/parent-groups", adminParentGroupController.list);
+router.get("/parent-groups/:id", adminParentGroupController.getById);
+router.post("/parent-groups", adminParentGroupController.create);
+router.put("/parent-groups/:id", adminParentGroupController.update);
+router.delete("/parent-groups/:id", adminParentGroupController.remove);
 
 // Lessons
 router.get("/lessons", adminLessonController.list);

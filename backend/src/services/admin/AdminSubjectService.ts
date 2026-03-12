@@ -16,8 +16,8 @@ export class AdminSubjectService {
     const where: Prisma.SubjectWhereInput = params?.q
       ? {
           OR: [
-            { name: { contains: params.q, mode: "insensitive" } },
-            { code: { contains: params.q, mode: "insensitive" } },
+            { name: { contains: params.q } },
+            { code: { contains: params.q } },
           ],
         }
       : {};

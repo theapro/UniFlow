@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { prisma } from "../../config/prisma";
 import { env } from "../../config/env";
 import { ok } from "../../utils/responses";
+import { jsonStringArray } from "../../utils/json";
 import { StudentsSheetsClient } from "../../services/students-sheets/StudentsSheetsClient";
 import { StudentsSheetsSyncService } from "../../services/students-sheets/StudentsSheetsSyncService";
 import { StudentsSheetsConflictService } from "../../services/students-sheets/StudentsSheetsConflictService";
@@ -124,7 +125,7 @@ export class AdminStudentsSheetsController {
       spreadsheetIdMasked: maskSpreadsheetId(env.studentsSheetsSpreadsheetId),
       syncedStudents: state?.syncedStudents ?? 0,
       spreadsheetRows: state?.spreadsheetRows ?? 0,
-      detectedGroups: state?.detectedGroups ?? [],
+      detectedGroups: jsonStringArray(state?.detectedGroups),
       lastRunId: state?.lastRunId ?? null,
       lastStatus: state?.lastStatus ?? null,
       lastSyncAt: state?.lastSyncAt ?? null,

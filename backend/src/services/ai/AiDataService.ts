@@ -14,7 +14,7 @@ export class AiDataService {
       prisma.department.findMany({ select: { id: true, name: true } }),
       prisma.group.findMany({ select: { id: true, name: true } }),
       prisma.room.findMany({ select: { id: true, name: true } }),
-      prisma.timeSlot.findMany({ orderBy: { order: "asc" } }),
+      prisma.timeSlot.findMany({ orderBy: { slotNumber: "asc" } }),
       prisma.student.count(),
       prisma.teacher.count(),
       prisma.lesson.count(),
@@ -37,8 +37,8 @@ export class AiDataService {
     return prisma.student.findMany({
       where: {
         OR: [
-          { fullName: { contains: query, mode: "insensitive" } },
-          { studentNumber: { contains: query, mode: "insensitive" } },
+          { fullName: { contains: query } },
+          { studentNumber: { contains: query } },
         ],
       },
       include: { group: { select: { name: true } } },
@@ -48,7 +48,7 @@ export class AiDataService {
 
   async getGroupDetails(groupName: string) {
     return prisma.group.findFirst({
-      where: { name: { equals: groupName, mode: "insensitive" } },
+      where: { name: { equals: groupName } },
       include: {
         students: { select: { fullName: true, studentNumber: true } },
         lessons: {

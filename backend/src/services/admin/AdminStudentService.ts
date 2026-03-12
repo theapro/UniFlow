@@ -49,9 +49,9 @@ export class AdminStudentService {
     const where: Prisma.StudentWhereInput = params?.q
       ? {
           OR: [
-            { fullName: { contains: params.q, mode: "insensitive" } },
-            { studentNumber: { contains: params.q, mode: "insensitive" } },
-            { email: { contains: params.q, mode: "insensitive" } },
+            { fullName: { contains: params.q } },
+            { studentNumber: { contains: params.q } },
+            { email: { contains: params.q } },
           ],
         }
       : {};

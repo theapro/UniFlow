@@ -58,8 +58,14 @@ function weekdayFromDate(d: Date): Weekday {
 }
 
 function parseTimeToParts(
-  value: string | null | undefined,
+  value: string | Date | null | undefined,
 ): { hh: number; mm: number } | null {
+  if (value instanceof Date) {
+    const hh = value.getUTCHours();
+    const mm = value.getUTCMinutes();
+    if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+    return { hh, mm };
+  }
   const v = String(value ?? "").trim();
   if (!v) return null;
   const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(v);
@@ -411,7 +417,7 @@ export class AttendanceSheetsSyncService {
         weekday,
       },
       include: { timeSlot: true, room: true },
-      orderBy: { timeSlot: { order: "asc" } },
+      orderBy: { timeSlot: { slotNumber: "asc" } },
       take: 3,
     });
 
@@ -468,7 +474,7 @@ export class AttendanceSheetsSyncService {
           candidates: scheduleEntries.map((e) => ({
             teacherId: e.teacherId,
             timeSlot: {
-              order: e.timeSlot.order,
+              slotNumber: e.timeSlot.slotNumber,
               startTime: e.timeSlot.startTime,
               endTime: e.timeSlot.endTime,
             },

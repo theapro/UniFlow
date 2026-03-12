@@ -32,8 +32,8 @@ export class AdminTeacherService {
     const where: Prisma.TeacherWhereInput = params?.q
       ? {
           OR: [
-            { fullName: { contains: params.q, mode: "insensitive" } },
-            { staffNo: { contains: params.q, mode: "insensitive" } },
+            { fullName: { contains: params.q } },
+            { staffNo: { contains: params.q } },
           ],
         }
       : {};

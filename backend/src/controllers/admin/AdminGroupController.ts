@@ -64,7 +64,20 @@ export class AdminGroupController {
 
   update = async (req: Request, res: Response) => {
     try {
-      const { name } = req.body ?? {};
+      const { name, parentGroupId } = req.body ?? {};
+
+      if (
+        parentGroupId !== undefined &&
+        parentGroupId !== null &&
+        typeof parentGroupId !== "string"
+      ) {
+        return fail(res, 400, "parentGroupId must be a string or null");
+      }
+
+      const normalizedParentGroupId =
+        parentGroupId === ""
+          ? null
+          : (parentGroupId as string | null | undefined);
 
       const prev =
         typeof name === "string"
@@ -73,6 +86,9 @@ export class AdminGroupController {
 
       const group = await this.groupService.update(req.params.id, {
         ...(name !== undefined ? { name } : {}),
+        ...(normalizedParentGroupId !== undefined
+          ? { parentGroupId: normalizedParentGroupId }
+          : {}),
       });
 
       // Best-effort: rename/create Sheets tab if group name changed.

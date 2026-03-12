@@ -54,8 +54,14 @@ export class AdminAttendanceService {
   }
 
   private parseTimeToParts(
-    value: string | null | undefined,
+    value: string | Date | null | undefined,
   ): { hh: number; mm: number } | null {
+    if (value instanceof Date) {
+      const hh = value.getUTCHours();
+      const mm = value.getUTCMinutes();
+      if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+      return { hh, mm };
+    }
     const v = String(value ?? "").trim();
     if (!v) return null;
     const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(v);
@@ -131,7 +137,7 @@ export class AdminAttendanceService {
         weekday,
       },
       include: { timeSlot: true, room: true },
-      orderBy: { timeSlot: { order: "asc" } },
+      orderBy: { timeSlot: { slotNumber: "asc" } },
     });
 
     const teacherId = picked?.teacherId ?? subject.teachers?.[0]?.id ?? null;

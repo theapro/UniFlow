@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma";
+import { formatTimeRange } from "../../utils/time";
 
 export type StudentFullContext = {
   meta: {
@@ -172,14 +173,17 @@ export class StudentFullContextService {
                 timeSlot: {
                   select: {
                     id: true,
-                    order: true,
+                    slotNumber: true,
                     startTime: true,
                     endTime: true,
                   },
                 },
                 room: { select: { id: true, name: true } },
               },
-              orderBy: [{ weekday: "asc" }, { timeSlot: { order: "asc" } }],
+              orderBy: [
+                { weekday: "asc" },
+                { timeSlot: { slotNumber: "asc" } },
+              ],
             },
           },
         },
@@ -282,7 +286,9 @@ export class StudentFullContextService {
 
     const schedule = scheduleEntries.map((e) => ({
       day: String(e.weekday),
-      time: e.timeSlot ? `${e.timeSlot.startTime}-${e.timeSlot.endTime}` : null,
+      time: e.timeSlot
+        ? formatTimeRange(e.timeSlot.startTime, e.timeSlot.endTime)
+        : null,
       subject: e.subject ? { id: e.subject.id, name: e.subject.name } : null,
       teacher: e.teacher
         ? { id: e.teacher.id, name: e.teacher.fullName }

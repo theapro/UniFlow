@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { prisma } from "../../config/prisma";
 import { env } from "../../config/env";
 import { fail, ok } from "../../utils/responses";
+import { jsonStringArray } from "../../utils/json";
 import { TeachersSheetsClient } from "../../services/teachers-sheets/TeachersSheetsClient";
 import { TeachersSheetsSyncService } from "../../services/teachers-sheets/TeachersSheetsSyncService";
 
@@ -111,7 +112,7 @@ export class AdminTeachersSheetsController {
       enabled: env.teachersSheetsEnabled,
       spreadsheetId: env.teachersSheetsSpreadsheetId ?? null,
       spreadsheetIdMasked: maskSpreadsheetId(env.teachersSheetsSpreadsheetId),
-      detectedSubjects: state?.detectedSubjects ?? [],
+      detectedSubjects: jsonStringArray(state?.detectedSubjects),
       syncedTeachers: state?.syncedTeachers ?? 0,
       spreadsheetRows: state?.spreadsheetRows ?? 0,
       lastRunId: state?.lastRunId ?? null,

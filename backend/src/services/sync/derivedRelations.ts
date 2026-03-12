@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import type { PrismaClient } from ".prisma/client";
+import { jsonStringArray } from "../../utils/json";
 
 function uniqStrings(items: Array<string | null | undefined>): string[] {
   const out: string[] = [];
@@ -66,17 +67,15 @@ export async function syncGroupSubjectDerivedLinks(
   let studentsUpdated = 0;
 
   for (const s of students) {
-    const merged = uniqStrings([
-      ...(s.teacherIds ?? []),
-      ...discoveredTeacherIds,
-    ]);
-    const prev = uniqStrings(s.teacherIds ?? []);
+    const prevTeacherIds = jsonStringArray(s.teacherIds);
+    const merged = uniqStrings([...prevTeacherIds, ...discoveredTeacherIds]);
+    const prev = uniqStrings(prevTeacherIds);
     if (merged.length === prev.length) continue;
     studentsUpdated++;
     updates.push(
       prisma.student.update({
         where: { id: s.id },
-        data: { teacherIds: { set: merged } },
+        data: { teacherIds: merged },
         select: { id: true },
       }),
     );

@@ -102,7 +102,7 @@ export class GradesSheetsSyncService {
     if (assignmentCount <= 0) return;
 
     const group = await this.prisma.group.findFirst({
-      where: { name: { equals: opts.groupName, mode: "insensitive" } },
+      where: { name: { equals: opts.groupName } },
       select: { id: true, name: true },
     });
     if (!group) {
@@ -110,7 +110,7 @@ export class GradesSheetsSyncService {
     }
 
     const subject = await this.prisma.subject.findFirst({
-      where: { name: { equals: opts.subjectName, mode: "insensitive" } },
+      where: { name: { equals: opts.subjectName } },
       select: { id: true, name: true },
     });
     if (!subject) {

@@ -7,18 +7,20 @@ export type CreateGroupInput = {
 
 export type UpdateGroupInput = {
   name?: string;
+  parentGroupId?: string | null;
 };
 
 export class AdminGroupService {
   async list(params?: { q?: string; take?: number; skip?: number }) {
     const where: Prisma.GroupWhereInput = params?.q
-      ? { name: { contains: params.q, mode: "insensitive" } }
+      ? { name: { contains: params.q } }
       : {};
 
     return prisma.group.findMany({
       where,
       orderBy: { name: "asc" },
       include: {
+        parentGroup: { select: { id: true, name: true } },
         _count: { select: { students: true } },
       },
       take: params?.take ?? 100,
@@ -30,6 +32,7 @@ export class AdminGroupService {
     return prisma.group.findUnique({
       where: { id },
       include: {
+        parentGroup: { select: { id: true, name: true } },
         students: { take: 5 },
         _count: { select: { students: true } },
       },
@@ -45,6 +48,9 @@ export class AdminGroupService {
       where: { id },
       data: {
         ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.parentGroupId !== undefined
+          ? { parentGroupId: input.parentGroupId }
+          : {}),
       },
     });
   }

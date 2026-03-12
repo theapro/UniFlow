@@ -8,6 +8,16 @@ const DEFAULTS = {
   adminPassword: process.env.SEED_ADMIN_PASSWORD ?? "admin123",
 };
 
+function timeToUtcDate(hhmm: string): Date {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm ?? "").trim());
+  if (!m) throw new Error(`Invalid time: ${hhmm}`);
+  const hh = Number(m[1]);
+  const mm = Number(m[2]);
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59)
+    throw new Error(`Invalid time: ${hhmm}`);
+  return new Date(Date.UTC(1970, 0, 1, hh, mm, 0, 0));
+}
+
 async function upsertAdmin() {
   const passwordHash = bcrypt.hashSync(DEFAULTS.adminPassword, 10);
   await prisma.user.upsert({
@@ -45,17 +55,24 @@ async function seedReferenceData() {
 
   // 1..6 slots
   for (const slot of [
-    { order: 1, startTime: "08:30", endTime: "09:50" },
-    { order: 2, startTime: "10:00", endTime: "11:20" },
-    { order: 3, startTime: "11:30", endTime: "12:50" },
-    { order: 4, startTime: "13:30", endTime: "14:50" },
-    { order: 5, startTime: "15:00", endTime: "16:20" },
-    { order: 6, startTime: "16:30", endTime: "17:50" },
+    { slotNumber: 1, startTime: "08:30", endTime: "09:50" },
+    { slotNumber: 2, startTime: "10:00", endTime: "11:20" },
+    { slotNumber: 3, startTime: "11:30", endTime: "12:50" },
+    { slotNumber: 4, startTime: "13:30", endTime: "14:50" },
+    { slotNumber: 5, startTime: "15:00", endTime: "16:20" },
+    { slotNumber: 6, startTime: "16:30", endTime: "17:50" },
   ]) {
     await prisma.timeSlot.upsert({
-      where: { order: slot.order },
-      update: { startTime: slot.startTime, endTime: slot.endTime },
-      create: slot,
+      where: { slotNumber: slot.slotNumber },
+      update: {
+        startTime: timeToUtcDate(slot.startTime),
+        endTime: timeToUtcDate(slot.endTime),
+      },
+      create: {
+        slotNumber: slot.slotNumber,
+        startTime: timeToUtcDate(slot.startTime),
+        endTime: timeToUtcDate(slot.endTime),
+      },
     });
   }
 
@@ -70,11 +87,11 @@ async function seedReferenceData() {
   });
 
   const student = await prisma.student.upsert({
-    where: { studentNo: "S001" },
+    where: { studentNumber: "S001" },
     update: { groupId: group.id },
     create: {
       fullName: "Jane Student",
-      studentNo: "S001",
+      studentNumber: "S001",
       groupId: group.id,
     },
   });
@@ -107,7 +124,7 @@ async function seedReferenceData() {
     create: { name: "Introduction to Programming", code: "CS101" },
   });
 
-  const slot1 = await prisma.timeSlot.findUnique({ where: { order: 1 } });
+  const slot1 = await prisma.timeSlot.findUnique({ where: { slotNumber: 1 } });
   if (slot1) {
     await prisma.scheduleEntry.upsert({
       where: {
