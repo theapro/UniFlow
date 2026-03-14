@@ -45,5 +45,5 @@ export function setLessonAtCell(
 export function isLessonComplete(lesson: LessonCardState | undefined) {
   if (!lesson) return false;
   if (lesson.kind === "saved") return true;
-  return Boolean(lesson.subjectId && lesson.teacherId && lesson.roomId);
+  return Boolean(lesson.subjectId && lesson.teacherId);
 }

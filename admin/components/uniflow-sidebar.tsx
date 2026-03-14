@@ -34,8 +34,8 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarGroup,
-  SidebarGroupLabel,
 } from "@/components/ui/sidebar";
+
 import {
   Collapsible,
   CollapsibleContent,
@@ -61,11 +61,16 @@ export function UniFlowSidebar({
     }
   }, []);
 
-  const managementItems = [
+  const academicItems = [
     {
       name: dict?.nav?.students ?? "Students",
       url: `${dashboardBase}/students`,
       icon: UsersIcon,
+    },
+    {
+      name: dict?.nav?.teachers ?? "Teachers",
+      url: `${dashboardBase}/teachers`,
+      icon: GraduationCapIcon,
     },
     {
       name: dict?.nav?.groups ?? "Groups",
@@ -73,15 +78,13 @@ export function UniFlowSidebar({
       icon: LayersIcon,
     },
     {
-      name: dict?.nav?.parentGroups ?? "Parent Groups",
+      name: dict?.nav?.parentGroups ?? "Department Groups",
       url: `${dashboardBase}/parent-groups`,
       icon: LayersIcon,
     },
-    {
-      name: dict?.nav?.teachers ?? "Teachers",
-      url: `${dashboardBase}/teachers`,
-      icon: GraduationCapIcon,
-    },
+  ];
+
+  const learningItems = [
     {
       name: dict?.nav?.subjects ?? "Subjects",
       url: `${dashboardBase}/subjects`,
@@ -97,6 +100,9 @@ export function UniFlowSidebar({
       url: `${dashboardBase}/schedule`,
       icon: CalendarIcon,
     },
+  ];
+
+  const analyticsItems = [
     {
       name: dict?.nav?.attendance ?? "Attendance",
       url: `${dashboardBase}/attendance`,
@@ -107,6 +113,9 @@ export function UniFlowSidebar({
       url: `${dashboardBase}/grades`,
       icon: ClipboardListIcon,
     },
+  ];
+
+  const systemItems = [
     {
       name: dict?.nav?.settings ?? "Settings",
       url: `${dashboardBase}/settings`,
@@ -155,6 +164,18 @@ export function UniFlowSidebar({
     },
   ];
 
+  const isAcademicActive = academicItems.some(
+    (i) => pathname === i.url || pathname.startsWith(i.url + "/"),
+  );
+  const isLearningActive = learningItems.some(
+    (i) => pathname === i.url || pathname.startsWith(i.url + "/"),
+  );
+  const isAnalyticsActive = analyticsItems.some(
+    (i) => pathname === i.url || pathname.startsWith(i.url + "/"),
+  );
+  const isSystemActive = systemItems.some(
+    (i) => pathname === i.url || pathname.startsWith(i.url + "/"),
+  );
   const isSheetsActive = pathname.startsWith(`${dashboardBase}/sheets`);
   const isAiActive =
     pathname.startsWith(`${dashboardBase}/ai-monitor`) ||
@@ -191,25 +212,159 @@ export function UniFlowSidebar({
         />
 
         <SidebarGroup>
-          <SidebarGroupLabel>
-            {dict?.nav?.management ?? "Management"}
-          </SidebarGroupLabel>
           <SidebarMenu>
-            {managementItems.map((item) => (
-              <SidebarMenuItem key={item.name}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={
-                    pathname === item.url || pathname.startsWith(item.url + "/")
-                  }
-                >
-                  <Link href={item.url}>
-                    <item.icon />
-                    <span>{item.name}</span>
-                  </Link>
-                </SidebarMenuButton>
+            <Collapsible
+              asChild
+              defaultOpen={isAcademicActive}
+              className="group/collapsible"
+            >
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton
+                    tooltip="Academic"
+                    isActive={isAcademicActive}
+                  >
+                    <GraduationCapIcon />
+                    <span>Academic</span>
+                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {academicItems.map((item) => (
+                      <SidebarMenuSubItem key={item.name}>
+                        <SidebarMenuSubButton
+                          asChild
+                          isActive={
+                            pathname === item.url ||
+                            pathname.startsWith(item.url + "/")
+                          }
+                        >
+                          <Link href={item.url}>
+                            <item.icon className="h-4 w-4" />
+                            <span>{item.name}</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    ))}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
               </SidebarMenuItem>
-            ))}
+            </Collapsible>
+
+            <Collapsible
+              asChild
+              defaultOpen={isLearningActive}
+              className="group/collapsible"
+            >
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton
+                    tooltip="Learning"
+                    isActive={isLearningActive}
+                  >
+                    <BookOpenIcon />
+                    <span>Learning</span>
+                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {learningItems.map((item) => (
+                      <SidebarMenuSubItem key={item.name}>
+                        <SidebarMenuSubButton
+                          asChild
+                          isActive={
+                            pathname === item.url ||
+                            pathname.startsWith(item.url + "/")
+                          }
+                        >
+                          <Link href={item.url}>
+                            <item.icon className="h-4 w-4" />
+                            <span>{item.name}</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    ))}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+
+            <Collapsible
+              asChild
+              defaultOpen={isAnalyticsActive}
+              className="group/collapsible"
+            >
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton
+                    tooltip="Analytics"
+                    isActive={isAnalyticsActive}
+                  >
+                    <ClipboardListIcon />
+                    <span>Analytics</span>
+                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {analyticsItems.map((item) => (
+                      <SidebarMenuSubItem key={item.name}>
+                        <SidebarMenuSubButton
+                          asChild
+                          isActive={
+                            pathname === item.url ||
+                            pathname.startsWith(item.url + "/")
+                          }
+                        >
+                          <Link href={item.url}>
+                            <item.icon className="h-4 w-4" />
+                            <span>{item.name}</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    ))}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+
+            <Collapsible
+              asChild
+              defaultOpen={isSystemActive}
+              className="group/collapsible"
+            >
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip="System" isActive={isSystemActive}>
+                    <SettingsIcon />
+                    <span>System</span>
+                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {systemItems.map((item) => (
+                      <SidebarMenuSubItem key={item.name}>
+                        <SidebarMenuSubButton
+                          asChild
+                          isActive={
+                            pathname === item.url ||
+                            pathname.startsWith(item.url + "/")
+                          }
+                        >
+                          <Link href={item.url}>
+                            <item.icon className="h-4 w-4" />
+                            <span>{item.name}</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    ))}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
 
             <Collapsible
               asChild
@@ -219,11 +374,11 @@ export function UniFlowSidebar({
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
                   <SidebarMenuButton
-                    tooltip={dict?.nav?.aiMonitor ?? "AI Monitor"}
+                    tooltip={dict?.nav?.aiMonitor ?? "AI Settings"}
                     isActive={isAiActive}
                   >
                     <BrainIcon />
-                    <span>{dict?.nav?.aiMonitor ?? "AI Monitor"}</span>
+                    <span>{dict?.nav?.aiMonitor ?? "AI Settings"}</span>
                     <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                   </SidebarMenuButton>
                 </CollapsibleTrigger>
@@ -275,6 +430,7 @@ export function UniFlowSidebar({
                           isActive={pathname === subItem.url}
                         >
                           <Link href={subItem.url}>
+                            <subItem.icon className="h-4 w-4" />
                             <span>{subItem.title}</span>
                           </Link>
                         </SidebarMenuSubButton>

@@ -154,6 +154,8 @@ export const scheduleApi = {
 };
 
 export const monthlyScheduleApi = {
+  months: () => axios.get("/api/admin/monthly-schedule/months"),
+
   list: (params: {
     month: number;
     year: number;
@@ -174,6 +176,9 @@ export const monthlyScheduleApi = {
   update: (
     id: string,
     patch: {
+      date?: string;
+      timeSlotId?: string;
+      groupId?: string;
       teacherId?: string;
       subjectId?: string;
       roomId?: string | null;

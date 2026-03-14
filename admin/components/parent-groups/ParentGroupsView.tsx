@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MoreVertical, Plus, Trash2, Pencil, Layers } from "lucide-react";
 import { toast } from "sonner";
 
-import { parentGroupsApi } from "@/lib/api";
+import { groupsApi, parentGroupsApi } from "@/lib/api";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTable } from "@/components/shared/DataTable";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -30,6 +30,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 import type { ColumnDef } from "@tanstack/react-table";
 
@@ -41,6 +43,13 @@ type ParentGroup = {
   _count?: {
     groups?: number;
   };
+};
+
+type GroupRow = {
+  id: string;
+  name: string;
+  parentGroupId?: string | null;
+  parentGroup?: { id: string; name: string } | null;
 };
 
 function fmtDate(value: string | undefined) {
@@ -56,6 +65,17 @@ export function ParentGroupsView({ lang, dict }: { lang: string; dict: any }) {
   const [editOpen, setEditOpen] = React.useState(false);
   const [deleteId, setDeleteId] = React.useState<string | null>(null);
 
+  const [manageOpen, setManageOpen] = React.useState(false);
+  const [manageTarget, setManageTarget] = React.useState<ParentGroup | null>(
+    null,
+  );
+  const [manageSelectedGroupIds, setManageSelectedGroupIds] = React.useState<
+    string[]
+  >([]);
+  const [manageOriginalGroupIds, setManageOriginalGroupIds] = React.useState<
+    string[]
+  >([]);
+
   const [nameDraft, setNameDraft] = React.useState("");
   const [editTarget, setEditTarget] = React.useState<ParentGroup | null>(null);
 
@@ -65,6 +85,12 @@ export function ParentGroupsView({ lang, dict }: { lang: string; dict: any }) {
       parentGroupsApi
         .list({ take: 1000 })
         .then((r) => r.data.data as ParentGroup[]),
+  });
+
+  const { data: groups } = useQuery({
+    queryKey: ["groups", "bulk"],
+    queryFn: () =>
+      groupsApi.list({ take: 2000 }).then((r) => r.data.data as GroupRow[]),
   });
 
   const createMutation = useMutation({
@@ -92,6 +118,7 @@ export function ParentGroupsView({ lang, dict }: { lang: string; dict: any }) {
       setNameDraft("");
       await queryClient.invalidateQueries({ queryKey: ["parent-groups"] });
       await queryClient.invalidateQueries({ queryKey: ["groups"] });
+      await queryClient.invalidateQueries({ queryKey: ["groups", "bulk"] });
     },
     onError: (err: any) => {
       toast.error(
@@ -107,10 +134,63 @@ export function ParentGroupsView({ lang, dict }: { lang: string; dict: any }) {
       setDeleteId(null);
       await queryClient.invalidateQueries({ queryKey: ["parent-groups"] });
       await queryClient.invalidateQueries({ queryKey: ["groups"] });
+      await queryClient.invalidateQueries({ queryKey: ["groups", "bulk"] });
     },
     onError: (err: any) => {
       toast.error(
         err?.response?.data?.message || err?.message || "Failed to delete",
+      );
+    },
+  });
+
+  const manageGroupsMutation = useMutation({
+    mutationFn: async (payload: {
+      parentGroupId: string;
+      groupIds: string[];
+    }) => {
+      const allGroups = groups ?? [];
+      const targetId = payload.parentGroupId;
+      const desired = new Set(payload.groupIds);
+
+      const currentlyInThis = new Set(
+        allGroups
+          .filter((g) => (g.parentGroup?.id ?? g.parentGroupId) === targetId)
+          .map((g) => g.id),
+      );
+
+      const updates: Array<Promise<any>> = [];
+
+      for (const g of allGroups) {
+        const isInThis = currentlyInThis.has(g.id);
+        const shouldBeInThis = desired.has(g.id);
+
+        if (shouldBeInThis && !isInThis) {
+          updates.push(groupsApi.update(g.id, { parentGroupId: targetId }));
+        }
+
+        if (!shouldBeInThis && isInThis) {
+          updates.push(groupsApi.update(g.id, { parentGroupId: null }));
+        }
+      }
+
+      await Promise.all(updates);
+      return true;
+    },
+    onSuccess: async () => {
+      toast.success(dict?.common?.success ?? "Saved");
+      setManageOpen(false);
+      setManageTarget(null);
+      setManageSelectedGroupIds([]);
+      setManageOriginalGroupIds([]);
+      await queryClient.invalidateQueries({ queryKey: ["parent-groups"] });
+      await queryClient.invalidateQueries({ queryKey: ["groups"] });
+      await queryClient.invalidateQueries({ queryKey: ["groups", "bulk"] });
+    },
+    onError: (err: any) => {
+      toast.error(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to update groups",
       );
     },
   });
@@ -170,6 +250,24 @@ export function ParentGroupsView({ lang, dict }: { lang: string; dict: any }) {
                 <Pencil className="mr-2 h-4 w-4" />
                 {dict?.common?.edit ?? "Edit"}
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  const initial = (groups ?? [])
+                    .filter(
+                      (g) => (g.parentGroup?.id ?? g.parentGroupId) === pg.id,
+                    )
+                    .map((g) => g.id);
+
+                  setManageTarget(pg);
+                  setManageOriginalGroupIds(initial);
+                  setManageSelectedGroupIds(initial);
+                  setManageOpen(true);
+                }}
+                className="cursor-pointer"
+              >
+                <Layers className="mr-2 h-4 w-4" />
+                {dict?.parentGroups?.manageGroups ?? "Manage groups"}
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => setDeleteId(pg.id)}
@@ -190,10 +288,10 @@ export function ParentGroupsView({ lang, dict }: { lang: string; dict: any }) {
   return (
     <div className="container space-y-6 py-4">
       <PageHeader
-        title={dict?.nav?.parentGroups ?? "Parent Groups"}
+        title={dict?.nav?.parentGroups ?? "Department Groups"}
         description={
           dict?.parentGroups?.description ??
-          "Create parent groups and assign groups under them."
+          "Create department groups and assign groups under them."
         }
         actions={
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -206,11 +304,11 @@ export function ParentGroupsView({ lang, dict }: { lang: string; dict: any }) {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>
-                  {dict?.parentGroups?.createTitle ?? "New parent group"}
+                  {dict?.parentGroups?.createTitle ?? "New department group"}
                 </DialogTitle>
                 <DialogDescription>
                   {dict?.parentGroups?.createHint ??
-                    "A parent group is a container for multiple groups."}
+                    "A department group is a container for multiple groups."}
                 </DialogDescription>
               </DialogHeader>
 
@@ -256,7 +354,9 @@ export function ParentGroupsView({ lang, dict }: { lang: string; dict: any }) {
             data={items ?? []}
             columns={columns}
             isLoading={isLoading}
-            emptyLabel={dict?.parentGroups?.empty ?? "No parent groups yet."}
+            emptyLabel={
+              dict?.parentGroups?.empty ?? "No department groups yet."
+            }
           />
 
           {!isLoading && (items ?? []).length === 0 ? (
@@ -318,13 +418,145 @@ export function ParentGroupsView({ lang, dict }: { lang: string; dict: any }) {
         </DialogContent>
       </Dialog>
 
+      {/* Manage Groups Dialog */}
+      <Dialog
+        open={manageOpen}
+        onOpenChange={(open) => {
+          setManageOpen(open);
+          if (!open) {
+            setManageTarget(null);
+            setManageSelectedGroupIds([]);
+            setManageOriginalGroupIds([]);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {dict?.parentGroups?.manageGroupsTitle ?? "Manage groups"}
+            </DialogTitle>
+            <DialogDescription>
+              {manageTarget
+                ? (dict?.parentGroups?.manageGroupsHint ??
+                  "Select which groups belong to this department group.")
+                : (dict?.parentGroups?.manageGroupsHint ??
+                  "Select which groups belong to this department group.")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex items-center justify-between text-sm">
+            <div className="text-muted-foreground">
+              {manageTarget?.name ?? "-"}
+            </div>
+            <div>
+              {(dict?.parentGroups?.selected ?? "Selected") + ": "}
+              <span className="font-medium">
+                {manageSelectedGroupIds.length}
+              </span>
+            </div>
+          </div>
+
+          <ScrollArea className="max-h-[50vh] rounded-md border p-2">
+            {groups ? (
+              <div className="space-y-1">
+                {[...groups]
+                  .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""))
+                  .map((g) => {
+                    const checked = manageSelectedGroupIds.includes(g.id);
+                    const currentParentId =
+                      g.parentGroup?.id ?? g.parentGroupId;
+                    const currentParentName = g.parentGroup?.name;
+                    const showHint =
+                      currentParentId &&
+                      manageTarget &&
+                      currentParentId !== manageTarget.id;
+
+                    return (
+                      <label
+                        key={g.id}
+                        className="flex items-start gap-3 rounded-md px-2 py-2 hover:bg-muted/50 cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(next) => {
+                            const isChecked = next === true;
+                            setManageSelectedGroupIds((prev) => {
+                              if (isChecked) {
+                                return prev.includes(g.id)
+                                  ? prev
+                                  : [...prev, g.id];
+                              }
+                              return prev.filter((id) => id !== g.id);
+                            });
+                          }}
+                        />
+                        <span className="flex-1">
+                          <span className="block text-sm font-medium">
+                            {g.name}
+                          </span>
+                          {showHint ? (
+                            <span className="block text-xs text-muted-foreground">
+                              {(dict?.parentGroups?.currentlyIn ??
+                                "Currently in") + ": "}
+                              {currentParentName || currentParentId}
+                            </span>
+                          ) : null}
+                        </span>
+                      </label>
+                    );
+                  })}
+              </div>
+            ) : (
+              <div className="p-4 text-sm text-muted-foreground">
+                {dict?.common?.loading ?? "Loading..."}
+              </div>
+            )}
+          </ScrollArea>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setManageOpen(false)}
+              disabled={manageGroupsMutation.isPending}
+            >
+              {dict?.common?.cancel ?? "Cancel"}
+            </Button>
+            <Button
+              onClick={() =>
+                manageTarget &&
+                manageGroupsMutation.mutate({
+                  parentGroupId: manageTarget.id,
+                  groupIds: manageSelectedGroupIds,
+                })
+              }
+              disabled={
+                manageGroupsMutation.isPending ||
+                !manageTarget ||
+                !groups ||
+                (() => {
+                  const a = new Set(manageOriginalGroupIds);
+                  const b = new Set(manageSelectedGroupIds);
+                  if (a.size !== b.size) return false;
+                  for (const id of a) if (!b.has(id)) return false;
+                  return true;
+                })()
+              }
+            >
+              {manageGroupsMutation.isPending
+                ? (dict?.common?.loading ?? "Saving...")
+                : (dict?.common?.save ?? "Save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <ConfirmDialog
         open={!!deleteId}
         onOpenChange={(open) => !open && setDeleteId(null)}
         title={dict?.common?.delete ?? "Delete"}
         description={
           dict?.parentGroups?.deleteConfirm ??
-          "Delete this parent group? Groups will not be deleted; they will just be unassigned."
+          "Delete this department group? Groups will not be deleted; they will just be unassigned."
         }
         confirmLabel={dict?.common?.delete ?? "Delete"}
         cancelLabel={dict?.common?.cancel ?? "Cancel"}

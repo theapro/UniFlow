@@ -4,6 +4,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { createContext, useContext } from "react";
 import type {
   DragItem,
+  DepartmentGroupAssignment,
   IdName,
   ScheduleGridState,
   Teacher,
@@ -12,6 +13,8 @@ import type {
 import type { TimetableRow } from "../utils/timeSlots";
 
 export type ScheduleBuilderCtx = {
+  readOnly: boolean;
+
   firstLessonDate: string;
   setFirstLessonDate: Dispatch<SetStateAction<string>>;
 
@@ -28,8 +31,14 @@ export type ScheduleBuilderCtx = {
   classrooms: IdName[];
   timeSlots: TimeSlot[];
 
-  groupOrder: string[];
-  setGroupOrder: Dispatch<SetStateAction<string[]>>;
+  // Primary group per visible schedule column (index = workspace column position)
+  groupOrder: Array<string | null>;
+  setGroupOrder: Dispatch<SetStateAction<Array<string | null>>>;
+
+  // How many group columns exist (excluding the trailing "+" add column).
+  positionCount: number;
+  setPositionCount: Dispatch<SetStateAction<number>>;
+  maxPositionCount: number;
 
   groupsInOrder: IdName[];
 
@@ -38,9 +47,20 @@ export type ScheduleBuilderCtx = {
 
   timetableRows: TimetableRow[];
   gridTemplateColumns: string;
+  groupCols: number;
   hasSelectedGroups: boolean;
 
   activeDrag: DragItem | null;
+
+  departmentGroupAssignments: DepartmentGroupAssignment[];
+  setDepartmentGroupAssignments: Dispatch<
+    SetStateAction<DepartmentGroupAssignment[]>
+  >;
+
+  // UI-only: a lesson can span across multiple adjacent group columns.
+  // Key: `${date}@@${timeSlotId}@@${primaryGroupId}`; Value: groupIds covered (including primary).
+  lessonGroupSpans: Record<string, string[]>;
+  setLessonGroupSpans: Dispatch<SetStateAction<Record<string, string[]>>>;
 };
 
 const Ctx = createContext<ScheduleBuilderCtx | null>(null);

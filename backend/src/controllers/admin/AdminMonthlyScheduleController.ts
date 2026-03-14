@@ -5,6 +5,15 @@ import { created, fail, ok } from "../../utils/responses";
 export class AdminMonthlyScheduleController {
   constructor(private readonly scheduleService: AdminMonthlyScheduleService) {}
 
+  listMonths = async (_req: Request, res: Response) => {
+    try {
+      const rows = await this.scheduleService.listMonths();
+      return ok(res, "Monthly schedule months fetched", rows);
+    } catch {
+      return fail(res, 500, "Failed to fetch monthly schedule months");
+    }
+  };
+
   list = async (req: Request, res: Response) => {
     try {
       const month =
@@ -76,9 +85,13 @@ export class AdminMonthlyScheduleController {
 
   update = async (req: Request, res: Response) => {
     try {
-      const { teacherId, subjectId, roomId, note } = req.body ?? {};
+      const { date, timeSlotId, groupId, teacherId, subjectId, roomId, note } =
+        req.body ?? {};
 
       const result = await this.scheduleService.update(req.params.id, {
+        ...(date !== undefined ? { date: String(date) } : {}),
+        ...(timeSlotId !== undefined ? { timeSlotId: String(timeSlotId) } : {}),
+        ...(groupId !== undefined ? { groupId: String(groupId) } : {}),
         ...(teacherId !== undefined ? { teacherId: String(teacherId) } : {}),
         ...(subjectId !== undefined ? { subjectId: String(subjectId) } : {}),
         ...(roomId !== undefined
@@ -99,7 +112,10 @@ export class AdminMonthlyScheduleController {
 
   remove = async (req: Request, res: Response) => {
     try {
-      await this.scheduleService.remove(req.params.id);
+      const result = await this.scheduleService.remove(req.params.id);
+      if (!result.ok) {
+        return fail(res, result.status, result.message);
+      }
       return ok(res, "Schedule deleted");
     } catch {
       return fail(res, 500, "Failed to delete schedule");

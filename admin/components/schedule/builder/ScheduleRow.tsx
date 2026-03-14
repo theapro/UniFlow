@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { Plus } from "lucide-react";
 import { memo } from "react";
 
 import type { CellRef, IdName } from "./types";
@@ -11,6 +12,7 @@ export const ScheduleRow = memo(function ScheduleRow(props: {
   date: string;
   row: TimetableRow;
   groups: IdName[];
+  groupCols: number;
   showDateLabel: boolean;
   gridTemplateColumns: string;
   hasSelectedGroups: boolean;
@@ -18,6 +20,8 @@ export const ScheduleRow = memo(function ScheduleRow(props: {
 }) {
   const weekday = formatWeekdayUTC(props.date);
   const shortDate = formatDateShort(props.date);
+  const totalGroupCols = Math.max(props.groupCols, 1);
+  const trailingEmptyCols = Math.max(totalGroupCols - props.groups.length, 0);
 
   if (props.row.type === "break") {
     return (
@@ -61,7 +65,7 @@ export const ScheduleRow = memo(function ScheduleRow(props: {
             "border-b p-2 text-sm text-muted-foreground",
             "bg-muted/20",
           )}
-          style={{ gridColumn: `4 / span ${Math.max(props.groups.length, 1)}` }}
+          style={{ gridColumn: `4 / span ${totalGroupCols}` }}
         >
           {props.row.label}
         </div>
@@ -98,11 +102,11 @@ export const ScheduleRow = memo(function ScheduleRow(props: {
       </div>
       <div
         className={cn(
-          "border-r border-b p-2 text-xs text-muted-foreground",
+          "border-r border-b p-2 text-xl font-bold text-muted-foreground flex flex-col",
           "bg-background sticky left-[160px] z-10",
         )}
       >
-        {props.row.slotNumber} Para
+        {props.row.slotNumber}
       </div>
       <div
         className={cn(
@@ -114,22 +118,36 @@ export const ScheduleRow = memo(function ScheduleRow(props: {
       </div>
 
       {props.hasSelectedGroups ? (
-        props.groups.map((g) => (
-          <div key={g.id} className="contents">
-            {props.renderCell({
-              date: props.date,
-              timeSlotId: row.timeSlotId,
-              groupId: g.id,
-            })}
-          </div>
-        ))
+        <>
+          {props.groups.map((g) => (
+            <div key={g.id} className="contents">
+              {props.renderCell({
+                date: props.date,
+                timeSlotId: row.timeSlotId,
+                groupId: g.id,
+              })}
+            </div>
+          ))}
+
+          {Array.from({ length: trailingEmptyCols }).map((_, idx) => (
+            <div
+              key={`__empty_col__:${idx}`}
+              className={cn(
+                "relative min-h-[96px] border-r border-b bg-background",
+                "flex items-center justify-center",
+              )}
+            >
+              {idx === 0 ? (
+                <Plus className="h-4 w-4 text-muted-foreground/40" />
+              ) : null}
+            </div>
+          ))}
+        </>
       ) : (
         <div
-          className="border-b border-r p-2 text-xs text-muted-foreground"
-          style={{ gridColumn: `4 / span ${Math.max(props.groups.length, 1)}` }}
-        >
-          Drop a Group into the header
-        </div>
+          className="border-b border-r"
+          style={{ gridColumn: `4 / span ${totalGroupCols}` }}
+        />
       )}
     </div>
   );

@@ -11,8 +11,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { arrayMove } from "@dnd-kit/sortable";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -33,7 +32,9 @@ import {
 import type {
   CellRef,
   DragItem,
+  DepartmentGroupAssignment,
   IdName,
+  LessonDraft,
   LessonCardState,
   ScheduleGridState,
   Teacher,
@@ -48,7 +49,16 @@ import {
   parseCellDroppableId,
   setLessonAtCell,
 } from "../utils/grid";
-import { buildTimetableRows } from "../utils/timeSlots";
+import {
+  deptKeyToDepartment,
+  parseDeptGroupCellDroppableId,
+} from "../utils/departmentGroupGrid";
+import { sortGroupIdsForPosition } from "../utils/department";
+import {
+  buildTimetableRows,
+  getMissingTimeSlotSlotNumber,
+  isMissingTimeSlotId,
+} from "../utils/timeSlots";
 
 import {
   ScheduleBuilderContextProvider,
@@ -68,6 +78,14 @@ type MonthlyScheduleRow = {
   timeSlot?: TimeSlot;
 };
 
+type StoredLayoutV1 = {
+  v: 1;
+  assignments: DepartmentGroupAssignment[];
+  groupOrder: Array<string | null>;
+};
+
+const MAX_POSITION_COLS = 30;
+
 function pad2(n: number) {
   return String(n).padStart(2, "0");
 }
@@ -79,8 +97,92 @@ function todayISODateUTC() {
   )}`;
 }
 
-export function ScheduleBuilderProvider(props: { children: React.ReactNode }) {
-  const [firstLessonDate, setFirstLessonDate] = useState(todayISODateUTC);
+function primaryCellKey(date: string, timeSlotId: string, groupId: string) {
+  return `${date}@@${timeSlotId}@@${groupId}`;
+}
+
+function normalizePositions(assignments: DepartmentGroupAssignment[]) {
+  const used = Array.from(new Set(assignments.map((a) => a.position)))
+    .filter((n) => Number.isInteger(n) && n >= 0)
+    .sort((a, b) => a - b);
+
+  const positionMap = new Map<number, number>();
+  used.forEach((oldPos, idx) => positionMap.set(oldPos, idx));
+
+  const normalized: DepartmentGroupAssignment[] = assignments
+    .map((a) => {
+      const newPos = positionMap.get(a.position);
+      if (typeof newPos !== "number") return null;
+      return { ...a, position: newPos };
+    })
+    .filter(Boolean) as DepartmentGroupAssignment[];
+
+  normalized.sort((a, b) => {
+    if (a.position !== b.position) return a.position - b.position;
+    if (a.department !== b.department)
+      return a.department.localeCompare(b.department);
+    return a.groupId.localeCompare(b.groupId);
+  });
+
+  return { normalized, positionCount: used.length, positionMap };
+}
+
+function monthToFirstDayISO(value: string | null | undefined): string | null {
+  const raw = String(value ?? "").trim();
+  const m = /^([0-9]{4})-([0-9]{2})$/.exec(raw);
+  if (!m) return null;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  if (!Number.isFinite(year) || year < 2000 || year > 2100) return null;
+  if (!Number.isFinite(month) || month < 1 || month > 12) return null;
+  return `${m[1]}-${m[2]}-01`;
+}
+
+function layoutStorageKey(year: number, month: number) {
+  return `uniflow.admin.scheduleBuilder.layout.v1:${year}-${pad2(month)}`;
+}
+
+function readStoredLayout(key: string): StoredLayoutV1 | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.v !== 1) return null;
+    const assignments = Array.isArray(parsed.assignments)
+      ? (parsed.assignments as DepartmentGroupAssignment[])
+      : [];
+    const groupOrder = Array.isArray(parsed.groupOrder)
+      ? (parsed.groupOrder as Array<string | null>)
+      : [];
+    return { v: 1, assignments, groupOrder };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredLayout(key: string, value: StoredLayoutV1) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore quota / privacy-mode write errors
+  }
+}
+
+export function ScheduleBuilderProvider(props: {
+  children: React.ReactNode;
+  readOnly?: boolean;
+  initialMonth?: string | null;
+}) {
+  const readOnly = Boolean(props.readOnly);
+  const [firstLessonDate, setFirstLessonDate] = useState(() => {
+    return monthToFirstDayISO(props.initialMonth) ?? todayISODateUTC();
+  });
+
+  useEffect(() => {
+    const next = monthToFirstDayISO(props.initialMonth);
+    if (!next) return;
+    setFirstLessonDate((prev) => (prev === next ? prev : next));
+  }, [props.initialMonth]);
 
   const [loadingMeta, setLoadingMeta] = useState(false);
   const [loadingGrid, setLoadingGrid] = useState(false);
@@ -91,9 +193,23 @@ export function ScheduleBuilderProvider(props: { children: React.ReactNode }) {
   const [classrooms, setClassrooms] = useState<IdName[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
 
-  // Selected groups (columns) must start empty per spec.
-  const [groupOrder, setGroupOrder] = useState<string[]>([]);
+  // Primary group per position (index = position). Positions are dynamic.
+  const [groupOrder, setGroupOrder] = useState<Array<string | null>>([]);
+
+  // Count of *used* positions (columns with at least one group assigned).
+  const [positionCount, setPositionCount] = useState(0);
+  const maxPositionCount = MAX_POSITION_COLS;
+
   const [grid, setGrid] = useState<ScheduleGridState>({});
+
+  const [departmentGroupAssignments, setDepartmentGroupAssignments] = useState<
+    DepartmentGroupAssignment[]
+  >([]);
+
+  // UI-only: primary cell key -> covered groupIds
+  const [lessonGroupSpans, setLessonGroupSpans] = useState<
+    Record<string, string[]>
+  >({});
 
   const [activeDrag, setActiveDrag] = useState<DragItem | null>(null);
 
@@ -101,6 +217,10 @@ export function ScheduleBuilderProvider(props: { children: React.ReactNode }) {
     () => toMonthYearUTC(firstLessonDate),
     [firstLessonDate],
   );
+
+  const layoutKey = useMemo(() => layoutStorageKey(year, month), [year, month]);
+  const hasStoredLayoutRef = useRef(false);
+  const [layoutHydrated, setLayoutHydrated] = useState(false);
 
   const datesInView = useMemo(
     () => generateDatesForMonthFromStartDateUTC(firstLessonDate),
@@ -129,23 +249,87 @@ export function ScheduleBuilderProvider(props: { children: React.ReactNode }) {
     return map;
   }, [classrooms]);
 
-  const groupsInOrder = useMemo(() => {
-    const byId = new Map(groups.map((g) => [g.id, g] as const));
-    return groupOrder.map((id) => byId.get(id)).filter(Boolean) as IdName[];
-  }, [groups, groupOrder]);
+  const groupsById = useMemo(() => {
+    const map = new Map<string, IdName>();
+    for (const g of groups) map.set(g.id, g);
+    return map;
+  }, [groups]);
 
-  const hasSelectedGroups = groupsInOrder.length > 0;
+  const groupsInOrder = useMemo(() => {
+    const out: IdName[] = [];
+    for (let pos = 0; pos < positionCount; pos += 1) {
+      const ids = sortGroupIdsForPosition(departmentGroupAssignments, pos);
+      const preferred = groupOrder[pos] ?? null;
+      const chosen =
+        preferred && ids.includes(preferred) ? preferred : (ids[0] ?? null);
+      if (!chosen) continue;
+      const g = groupsById.get(chosen);
+      if (g) out.push(g);
+    }
+    return out;
+  }, [departmentGroupAssignments, groupOrder, groupsById, positionCount]);
+
+  const hasSelectedGroups = useMemo(
+    () => groupsInOrder.length > 0,
+    [groupsInOrder.length],
+  );
 
   const timetableRows = useMemo(
     () => buildTimetableRows(timeSlots),
     [timeSlots],
   );
 
+  // Trailing "+" add column (hidden when max is reached).
+  const groupCols = positionCount + (positionCount < maxPositionCount ? 1 : 0);
+
   const gridTemplateColumns = useMemo(() => {
-    // When no selected groups, keep one placeholder column visible.
-    const groupCols = Math.max(groupsInOrder.length, 1);
     return `160px 90px 120px repeat(${groupCols}, 220px)`;
-  }, [groupsInOrder.length]);
+  }, [groupCols]);
+
+  // Layout (department rows + primary group per column) is UI state and must survive refresh.
+  // Persist per month/year in localStorage.
+  useEffect(() => {
+    hasStoredLayoutRef.current = false;
+    setLayoutHydrated(false);
+
+    const stored = readStoredLayout(layoutKey);
+    hasStoredLayoutRef.current = Boolean(stored);
+
+    if (stored) {
+      setDepartmentGroupAssignments(stored.assignments);
+      setGroupOrder(stored.groupOrder);
+    } else {
+      // New month (or cleared storage): start with empty layout.
+      setDepartmentGroupAssignments([]);
+      setGroupOrder([]);
+    }
+
+    // Spans are UI-only and should not leak between months.
+    setLessonGroupSpans({});
+    setLayoutHydrated(true);
+  }, [layoutKey]);
+
+  useEffect(() => {
+    if (readOnly) return;
+    if (!layoutHydrated) return;
+
+    const isEmptyLayout =
+      departmentGroupAssignments.length === 0 && groupOrder.length === 0;
+    if (isEmptyLayout && !hasStoredLayoutRef.current) return;
+
+    writeStoredLayout(layoutKey, {
+      v: 1,
+      assignments: departmentGroupAssignments,
+      groupOrder,
+    });
+    hasStoredLayoutRef.current = true;
+  }, [
+    departmentGroupAssignments,
+    groupOrder,
+    layoutHydrated,
+    layoutKey,
+    readOnly,
+  ]);
 
   useEffect(() => {
     let active = true;
@@ -207,6 +391,25 @@ export function ScheduleBuilderProvider(props: { children: React.ReactNode }) {
           );
         }
 
+        // If there is no stored layout yet, derive a reasonable default from saved lessons
+        // (one group per column). IMPORTANT: if a layout exists in storage, do NOT override it.
+        if (!hasStoredLayoutRef.current) {
+          const groupIds = Array.from(new Set(rows.map((r) => r.groupId)));
+          const sortedGroupIds = groupIds
+            .slice()
+            .sort((a, b) => a.localeCompare(b))
+            .slice(0, maxPositionCount);
+
+          setDepartmentGroupAssignments(
+            sortedGroupIds.map((groupId, position) => ({
+              department: "IT",
+              position,
+              groupId,
+            })),
+          );
+          setGroupOrder(sortedGroupIds.map((id) => id));
+        }
+
         setGrid(nextGrid);
       } catch (err: any) {
         if (!active) return;
@@ -221,9 +424,61 @@ export function ScheduleBuilderProvider(props: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, [month, year]);
+  }, [month, year, maxPositionCount]);
+
+  // Keep positions compact (no gaps) so we don't render empty columns/cells.
+  useEffect(() => {
+    const {
+      normalized,
+      positionCount: usedCount,
+      positionMap,
+    } = normalizePositions(departmentGroupAssignments);
+
+    const changed =
+      normalized.length !== departmentGroupAssignments.length ||
+      normalized.some((a, i) => {
+        const b = departmentGroupAssignments[i];
+        return (
+          !b ||
+          a.department !== b.department ||
+          a.position !== b.position ||
+          a.groupId !== b.groupId
+        );
+      });
+
+    if (changed) {
+      setDepartmentGroupAssignments(normalized);
+      return;
+    }
+
+    setPositionCount(usedCount);
+
+    // Ensure groupOrder stays valid for each position.
+    setGroupOrder((prev) => {
+      const remapped: Array<string | null> = Array.from(
+        { length: usedCount },
+        () => null,
+      );
+
+      for (let oldPos = 0; oldPos < prev.length; oldPos += 1) {
+        const newPos = positionMap.get(oldPos);
+        if (typeof newPos !== "number") continue;
+        remapped[newPos] = prev[oldPos] ?? null;
+      }
+
+      for (let pos = 0; pos < usedCount; pos += 1) {
+        const ids = sortGroupIdsForPosition(departmentGroupAssignments, pos);
+        const current = remapped[pos];
+        if (current && ids.includes(current)) continue;
+        remapped[pos] = ids.length ? ids[0] : null;
+      }
+
+      return remapped;
+    });
+  }, [departmentGroupAssignments]);
 
   const onDragStart = (e: DragStartEvent) => {
+    if (readOnly) return;
     setActiveDrag((e.active.data.current as any) ?? null);
   };
 
@@ -232,51 +487,56 @@ export function ScheduleBuilderProvider(props: { children: React.ReactNode }) {
   };
 
   const onDragEnd = async (e: DragEndEvent) => {
+    if (readOnly) {
+      setActiveDrag(null);
+      return;
+    }
     const overId = e.over?.id ? String(e.over.id) : "";
     const activeId = e.active?.id ? String(e.active.id) : "";
     const activeData =
       (e.active.data.current as DragItem | undefined) ?? undefined;
 
-    // Add group columns only when the group is dragged from the sidebar.
-    if (activeData?.type === "group" && activeId.startsWith("sidebar:group:")) {
-      const groupId = activeData.groupId;
-      if (overId === "groups-dropzone") {
-        setGroupOrder((prev) =>
-          prev.includes(groupId) ? prev : [...prev, groupId],
-        );
-        setActiveDrag(null);
-        return;
-      }
+    // Reordering group columns is intentionally disabled with fixed slots.
 
-      if (overId.startsWith("group:")) {
-        const beforeId = overId.slice("group:".length);
+    // Assign department/group prep cell.
+    if (activeData?.type === "group") {
+      const deptCell = parseDeptGroupCellDroppableId(overId);
+      if (deptCell) {
+        const department = deptKeyToDepartment(deptCell.departmentKey);
+        const position = deptCell.position;
+
+        if (position >= maxPositionCount) {
+          toast.error(`Max columns reached (${maxPositionCount})`);
+          setActiveDrag(null);
+          return;
+        }
+
+        setDepartmentGroupAssignments((prev) => {
+          // A group should appear in only one cell total.
+          const withoutGroup = prev.filter(
+            (a) => a.groupId !== activeData.groupId,
+          );
+          // Replace the exact cell (department+position), but DO NOT clear other departments at the same position.
+          const withoutCell = withoutGroup.filter(
+            (a) => !(a.department === department && a.position === position),
+          );
+          return [
+            ...withoutCell,
+            { department, position, groupId: activeData.groupId },
+          ];
+        });
+
+        // Only set the primary column group for this position if it's empty.
         setGroupOrder((prev) => {
-          if (prev.includes(groupId)) return prev;
-          const idx = prev.indexOf(beforeId);
-          if (idx === -1) return [...prev, groupId];
           const next = [...prev];
-          next.splice(idx, 0, groupId);
+          while (next.length <= position) next.push(null);
+          if (!next[position]) next[position] = activeData.groupId;
           return next;
         });
+
         setActiveDrag(null);
         return;
       }
-    }
-
-    // Reorder selected group columns.
-    if (activeId.startsWith("group:") && overId.startsWith("group:")) {
-      const fromId = activeId.slice("group:".length);
-      const toId = overId.slice("group:".length);
-      if (fromId && toId && fromId !== toId) {
-        setGroupOrder((prev) => {
-          const oldIndex = prev.indexOf(fromId);
-          const newIndex = prev.indexOf(toId);
-          if (oldIndex === -1 || newIndex === -1) return prev;
-          return arrayMove(prev, oldIndex, newIndex);
-        });
-      }
-      setActiveDrag(null);
-      return;
     }
 
     const cell = parseCellDroppableId(overId);
@@ -285,8 +545,21 @@ export function ScheduleBuilderProvider(props: { children: React.ReactNode }) {
       return;
     }
 
-    // Guard: if group is not selected, ignore.
-    if (groupOrder.length && !groupOrder.includes(cell.groupId)) {
+    // Guard: don't allow drops into placeholder/unknown groups.
+    if (!groupsById.has(cell.groupId)) {
+      toast.error("Select a group in that column first");
+      setActiveDrag(null);
+      return;
+    }
+
+    // Guard: timetable rows must be backed by a real DB TimeSlot.
+    if (isMissingTimeSlotId(cell.timeSlotId)) {
+      const slotNo = getMissingTimeSlotSlotNumber(cell.timeSlotId);
+      toast.error(
+        slotNo
+          ? `Time slots are not configured (missing slot #${slotNo}). Run backend db seed first.`
+          : "Time slots are not configured. Run backend db seed first.",
+      );
       setActiveDrag(null);
       return;
     }
@@ -331,46 +604,21 @@ export function ScheduleBuilderProvider(props: { children: React.ReactNode }) {
       });
 
       try {
-        const createdRes = await monthlyScheduleApi.create({
+        const updatedRes = await monthlyScheduleApi.update(lesson.scheduleId, {
           date: cell.date,
           timeSlotId: cell.timeSlotId,
           groupId: cell.groupId,
-          teacherId: lesson.teacherId,
-          subjectId: lesson.subjectId,
-          roomId: lesson.roomId ?? null,
-          note: lesson.note ?? null,
         });
 
-        const created = createdRes.data?.data as MonthlyScheduleRow;
-
-        try {
-          await monthlyScheduleApi.remove(lesson.scheduleId);
-        } catch (removeErr: any) {
-          // Keep both visible if we couldn't delete old
-          setGrid((prev) =>
-            setLessonAtCell(prev, fromCell, {
-              kind: "saved",
-              scheduleId: lesson.scheduleId,
-              subjectId: lesson.subjectId,
-              teacherId: lesson.teacherId,
-              roomId: lesson.roomId ?? null,
-              note: lesson.note ?? null,
-            }),
-          );
-          toast.error(
-            removeErr?.response?.data?.message ??
-              "Moved, but failed to delete old entry",
-          );
-        }
-
+        const updated = updatedRes.data?.data as MonthlyScheduleRow;
         setGrid((prev) =>
           setLessonAtCell(prev, cell, {
             kind: "saved",
-            scheduleId: created.id,
-            subjectId: created.subjectId,
-            teacherId: created.teacherId,
-            roomId: created.roomId,
-            note: created.note ?? null,
+            scheduleId: updated.id,
+            subjectId: updated.subjectId,
+            teacherId: updated.teacherId,
+            roomId: updated.roomId,
+            note: updated.note ?? null,
           }),
         );
       } catch (err: any) {
@@ -386,6 +634,11 @@ export function ScheduleBuilderProvider(props: { children: React.ReactNode }) {
     if (activeData.type === "mini") {
       const existing = getLessonAtCell(grid, cell);
 
+      const spanGroupIds = lessonGroupSpans[
+        primaryCellKey(cell.date, cell.timeSlotId, cell.groupId)
+      ] ?? [cell.groupId];
+      const spanCells = spanGroupIds.map((groupId) => ({ ...cell, groupId }));
+
       if (existing?.kind === "saved") {
         const patch =
           activeData.kind === "subject"
@@ -395,29 +648,63 @@ export function ScheduleBuilderProvider(props: { children: React.ReactNode }) {
               : { roomId: activeData.id };
 
         const prevGrid = grid;
-        setGrid((prev) =>
-          setLessonAtCell(prev, cell, {
-            ...existing,
-            ...(patch as any),
-          }),
-        );
+        setGrid((prev) => {
+          let next = prev;
+          for (const c of spanCells) {
+            const l = getLessonAtCell(prev, c);
+            if (l?.kind === "saved") {
+              next = setLessonAtCell(next, c, {
+                ...l,
+                ...(patch as any),
+              });
+            }
+          }
+          return next;
+        });
 
         try {
-          const res = await monthlyScheduleApi.update(
-            existing.scheduleId,
-            patch,
+          const savedTargets = spanCells
+            .map((c) => ({ c, l: getLessonAtCell(prevGrid, c) }))
+            .filter((x): x is { c: CellRef; l: any } => x.l?.kind === "saved")
+            .map((x) => ({ c: x.c, l: x.l as any }));
+
+          const results = await Promise.allSettled(
+            savedTargets.map((x) =>
+              monthlyScheduleApi
+                .update(x.l.scheduleId, patch)
+                .then((res) => ({ cell: x.c, row: res.data?.data as any })),
+            ),
           );
-          const updated = res.data?.data as MonthlyScheduleRow;
-          setGrid((prev) =>
-            setLessonAtCell(prev, cell, {
-              kind: "saved",
-              scheduleId: updated.id,
-              subjectId: updated.subjectId,
-              teacherId: updated.teacherId,
-              roomId: updated.roomId,
-              note: updated.note ?? null,
-            }),
-          );
+
+          const failed = results.filter((r) => r.status === "rejected").length;
+
+          setGrid((prev) => {
+            let next = prev;
+            for (let i = 0; i < results.length; i += 1) {
+              const c = savedTargets[i]?.c;
+              if (!c) continue;
+
+              const r = results[i];
+              if (r.status === "fulfilled") {
+                const updated = r.value.row as MonthlyScheduleRow;
+                next = setLessonAtCell(next, c, {
+                  kind: "saved",
+                  scheduleId: updated.id,
+                  subjectId: updated.subjectId,
+                  teacherId: updated.teacherId,
+                  roomId: updated.roomId,
+                  note: updated.note ?? null,
+                });
+              } else {
+                next = setLessonAtCell(next, c, getLessonAtCell(prevGrid, c));
+              }
+            }
+            return next;
+          });
+
+          if (failed) {
+            toast.error("Some lessons failed to update");
+          }
         } catch (err: any) {
           setGrid(prevGrid);
           toast.error(
@@ -438,34 +725,66 @@ export function ScheduleBuilderProvider(props: { children: React.ReactNode }) {
         ...(activeData.kind === "room" ? { roomId: activeData.id } : {}),
       };
 
-      setGrid((prev) => setLessonAtCell(prev, cell, nextDraft));
+      setGrid((prev) => {
+        let next = prev;
+        for (const c of spanCells) {
+          const l = getLessonAtCell(prev, c);
+          const base = l?.kind === "draft" ? l : {};
+          next = setLessonAtCell(next, c, {
+            kind: "draft",
+            ...(base as any),
+            ...(nextDraft as any),
+          });
+        }
+        return next;
+      });
 
-      if (!nextDraft.subjectId || !nextDraft.teacherId || !nextDraft.roomId) {
+      // Only persist to backend when subject + teacher are known. Room is optional.
+      if (!nextDraft.subjectId || !nextDraft.teacherId) {
         setActiveDrag(null);
         return;
       }
 
       try {
-        const res = await monthlyScheduleApi.create({
-          date: cell.date,
-          timeSlotId: cell.timeSlotId,
-          groupId: cell.groupId,
-          subjectId: nextDraft.subjectId,
-          teacherId: nextDraft.teacherId,
-          roomId: nextDraft.roomId ?? null,
-        });
-
-        const created = res.data?.data as MonthlyScheduleRow;
-        setGrid((prev) =>
-          setLessonAtCell(prev, cell, {
-            kind: "saved",
-            scheduleId: created.id,
-            subjectId: created.subjectId,
-            teacherId: created.teacherId,
-            roomId: created.roomId,
-            note: created.note ?? null,
-          }),
+        const results = await Promise.allSettled(
+          spanCells.map((c) =>
+            monthlyScheduleApi
+              .create({
+                date: c.date,
+                timeSlotId: c.timeSlotId,
+                groupId: c.groupId,
+                subjectId: nextDraft.subjectId!,
+                teacherId: nextDraft.teacherId!,
+                roomId: nextDraft.roomId ?? null,
+                note: nextDraft.note ?? null,
+              })
+              .then((res) => ({ cell: c, row: res.data?.data as any })),
+          ),
         );
+
+        results.forEach((r, i) => {
+          const c = spanCells[i];
+          if (!c) return;
+          if (r.status === "fulfilled") {
+            const created = r.value.row as MonthlyScheduleRow;
+            setGrid((prev) =>
+              setLessonAtCell(prev, c, {
+                kind: "saved",
+                scheduleId: created.id,
+                subjectId: created.subjectId,
+                teacherId: created.teacherId,
+                roomId: created.roomId,
+                note: created.note ?? null,
+              }),
+            );
+          } else {
+            setGrid((prev) => setLessonAtCell(prev, c, undefined));
+            const reason: any = r.reason;
+            toast.error(
+              reason?.response?.data?.message ?? "Failed to create lesson",
+            );
+          }
+        });
       } catch (err: any) {
         toast.error(err?.response?.data?.message ?? "Failed to create lesson");
       }
@@ -478,6 +797,7 @@ export function ScheduleBuilderProvider(props: { children: React.ReactNode }) {
   };
 
   const ctxValue: ScheduleBuilderCtx = {
+    readOnly,
     firstLessonDate,
     setFirstLessonDate,
     month,
@@ -492,13 +812,21 @@ export function ScheduleBuilderProvider(props: { children: React.ReactNode }) {
     timeSlots,
     groupOrder,
     setGroupOrder,
+    positionCount,
+    setPositionCount,
+    maxPositionCount,
     groupsInOrder,
     grid,
     setGrid,
     timetableRows,
     gridTemplateColumns,
+    groupCols,
     hasSelectedGroups,
     activeDrag,
+    departmentGroupAssignments,
+    setDepartmentGroupAssignments,
+    lessonGroupSpans,
+    setLessonGroupSpans,
   };
 
   return (

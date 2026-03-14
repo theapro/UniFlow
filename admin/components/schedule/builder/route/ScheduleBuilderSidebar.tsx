@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, LayoutGrid } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 import {
   Sidebar,
@@ -34,6 +35,7 @@ export function ScheduleBuilderSidebar({
   className?: string;
 } & React.ComponentProps<typeof Sidebar>) {
   const {
+    readOnly,
     subjects,
     teachers,
     classrooms,
@@ -48,6 +50,8 @@ export function ScheduleBuilderSidebar({
 
   const rightLabel =
     loadingMeta || loadingGrid ? "Loading…" : `Month: ${year}-${pad2(month)}`;
+
+  const monthValue = `${year}-${pad2(month)}`;
 
   return (
     <Sidebar collapsible="offcanvas" className={cn(className)} {...props}>
@@ -69,13 +73,6 @@ export function ScheduleBuilderSidebar({
 
       <SidebarContent className="scrollbar-thin">
         <SidebarGroup>
-          <SidebarGroupLabel>Builder</SidebarGroupLabel>
-          <div className="px-2 pb-2 text-xs text-muted-foreground">
-            Drag Groups into the header to add columns.
-          </div>
-        </SidebarGroup>
-
-        <SidebarGroup>
           <SidebarGroupLabel>Start Date</SidebarGroupLabel>
           <div className="px-2 pb-2">
             <Input
@@ -89,20 +86,38 @@ export function ScheduleBuilderSidebar({
           </div>
         </SidebarGroup>
 
-        <ScheduleSidebar
-          groups={groups}
-          subjects={subjects}
-          teachers={teachers}
-          classrooms={classrooms}
-          className="px-2"
-        />
-
-        <div className="mt-auto px-2 pb-2 text-xs text-muted-foreground">
-          <div className="inline-flex items-center gap-2">
-            <LayoutGrid className="h-4 w-4" />
-            <span>Excel-like workspace</span>
+        <SidebarGroup>
+          <SidebarGroupLabel>Mode</SidebarGroupLabel>
+          <div className="px-2 pb-2 space-y-2">
+            {!readOnly ? (
+              <Button asChild variant="outline" className="w-full">
+                <Link
+                  href={`/${lang}/dashboard/schedule/view?month=${encodeURIComponent(monthValue)}`}
+                >
+                  Open read-only view
+                </Link>
+              </Button>
+            ) : (
+              <Button asChild variant="outline" className="w-full">
+                <Link
+                  href={`/${lang}/dashboard/schedule/manage?month=${encodeURIComponent(monthValue)}`}
+                >
+                  Back to manage
+                </Link>
+              </Button>
+            )}
           </div>
-        </div>
+        </SidebarGroup>
+
+        {!readOnly ? (
+          <ScheduleSidebar
+            groups={groups}
+            subjects={subjects}
+            teachers={teachers}
+            classrooms={classrooms}
+            className="px-2"
+          />
+        ) : null}
       </SidebarContent>
     </Sidebar>
   );

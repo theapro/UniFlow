@@ -14,19 +14,19 @@ export class AdminParentGroupController {
         typeof req.query.skip === "string" ? Number(req.query.skip) : undefined;
 
       const rows = await this.service.list({ q, take, skip });
-      return ok(res, "Parent groups fetched", rows);
+      return ok(res, "Department groups fetched", rows);
     } catch {
-      return fail(res, 500, "Failed to fetch parent groups");
+      return fail(res, 500, "Failed to fetch department groups");
     }
   };
 
   getById = async (req: Request, res: Response) => {
     try {
       const row = await this.service.getById(req.params.id);
-      if (!row) return fail(res, 404, "Parent group not found");
-      return ok(res, "Parent group fetched", row);
+      if (!row) return fail(res, 404, "Department group not found");
+      return ok(res, "Department group fetched", row);
     } catch {
-      return fail(res, 500, "Failed to fetch parent group");
+      return fail(res, 500, "Failed to fetch department group");
     }
   };
 
@@ -38,7 +38,7 @@ export class AdminParentGroupController {
       }
 
       const row = await this.service.create({ name: name.trim() });
-      return created(res, "Parent group created", row);
+      return created(res, "Department group created", row);
     } catch (e: any) {
       const msg =
         typeof e?.message === "string" ? e.message : "Failed to create";
@@ -57,18 +57,18 @@ export class AdminParentGroupController {
         ...(name !== undefined ? { name: String(name).trim() } : {}),
       });
 
-      return ok(res, "Parent group updated", row);
+      return ok(res, "Department group updated", row);
     } catch {
-      return fail(res, 500, "Failed to update parent group");
+      return fail(res, 500, "Failed to update department group");
     }
   };
 
   remove = async (req: Request, res: Response) => {
     try {
       await this.service.remove(req.params.id);
-      return ok(res, "Parent group deleted", true);
+      return ok(res, "Department group deleted", true);
     } catch {
-      return fail(res, 500, "Failed to delete parent group");
+      return fail(res, 500, "Failed to delete department group");
     }
   };
 }

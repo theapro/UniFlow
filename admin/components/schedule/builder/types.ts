@@ -56,3 +56,31 @@ export type DragItem =
       type: "group";
       groupId: string;
     };
+
+export type DepartmentGroupCategoryKey =
+  | "it"
+  | "japanese"
+  | "partner_university"
+  | "language_university";
+
+export type DepartmentGroupDepartment =
+  | "IT"
+  | "Japanese"
+  | "Partner University"
+  | "Language University";
+
+export const DEPARTMENT_GROUP_ROWS: Array<{
+  key: DepartmentGroupCategoryKey;
+  label: DepartmentGroupDepartment;
+}> = [
+  { key: "it", label: "IT" },
+  { key: "japanese", label: "Japanese" },
+  { key: "partner_university", label: "Partner University" },
+  { key: "language_university", label: "Language University" },
+];
+
+export type DepartmentGroupAssignment = {
+  department: DepartmentGroupDepartment;
+  position: number;
+  groupId: string;
+};

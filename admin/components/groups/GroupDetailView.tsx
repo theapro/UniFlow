@@ -187,7 +187,7 @@ export function GroupDetailView({
 
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">
-                {dict?.parentGroups?.label ?? "Parent group"}:
+                {dict?.parentGroups?.label ?? "Department group"}:
               </span>
               <Select
                 value={group?.parentGroup?.id ?? "none"}

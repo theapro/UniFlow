@@ -31,23 +31,47 @@ export type TimetableRow =
       label: string;
     };
 
+export function isMissingTimeSlotId(timeSlotId: string) {
+  return String(timeSlotId ?? "").startsWith("missing:");
+}
+
+export function getMissingTimeSlotSlotNumber(timeSlotId: string) {
+  const m = /^missing:(\d+)$/.exec(String(timeSlotId ?? ""));
+  return m ? Number(m[1]) : null;
+}
+
 export function buildTimetableRows(timeSlots: TimeSlot[]) {
   const bySlotNumber = new Map<number, TimeSlot>();
   for (const s of timeSlots) bySlotNumber.set(s.slotNumber, s);
 
+  const templateBySlotNumber = new Map<number, ParaTemplate>();
+  for (const p of PARA_TEMPLATE) templateBySlotNumber.set(p.slotNumber, p);
+
+  // Slot numbers to show: union(template, db). This keeps the UI stable (1..6)
+  // while still supporting additional DB-defined slots if they exist.
+  const slotNumbers = new Set<number>();
+  for (const p of PARA_TEMPLATE) slotNumbers.add(p.slotNumber);
+  for (const s of timeSlots) slotNumbers.add(s.slotNumber);
+
+  const orderedSlotNumbers = Array.from(slotNumbers)
+    .filter((n) => Number.isInteger(n) && n > 0)
+    .sort((a, b) => a - b);
+
   const rows: TimetableRow[] = [];
-  for (const para of PARA_TEMPLATE) {
-    const db = bySlotNumber.get(para.slotNumber);
+  for (const slotNumber of orderedSlotNumbers) {
+    const db = bySlotNumber.get(slotNumber);
+    const tpl = templateBySlotNumber.get(slotNumber);
+
     rows.push({
       type: "lesson",
-      key: `para:${para.slotNumber}`,
-      slotNumber: para.slotNumber,
-      startTime: para.startTime,
-      endTime: para.endTime,
-      timeSlotId: db?.id ?? `missing:${para.slotNumber}`,
+      key: `para:${slotNumber}`,
+      slotNumber,
+      startTime: db?.startTime ?? tpl?.startTime ?? "",
+      endTime: db?.endTime ?? tpl?.endTime ?? "",
+      timeSlotId: db?.id ?? `missing:${slotNumber}`,
     });
 
-    if (para.slotNumber === 3) {
+    if (slotNumber === 3) {
       rows.push({ type: "break", key: "__lunch__", label: "Lunch Break" });
     }
   }

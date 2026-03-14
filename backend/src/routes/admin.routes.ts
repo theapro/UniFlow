@@ -136,6 +136,10 @@ router.put("/schedule/:id", adminScheduleController.update);
 router.delete("/schedule/:id", adminScheduleController.remove);
 
 // Monthly Schedule Builder
+router.get(
+  "/monthly-schedule/months",
+  adminMonthlyScheduleController.listMonths,
+);
 router.get("/monthly-schedule", adminMonthlyScheduleController.list);
 router.post("/monthly-schedule", adminMonthlyScheduleController.create);
 router.put("/monthly-schedule/:id", adminMonthlyScheduleController.update);

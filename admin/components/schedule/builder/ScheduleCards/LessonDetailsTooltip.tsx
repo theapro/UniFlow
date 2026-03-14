@@ -26,6 +26,7 @@ function safeDate(date: string | undefined): Date | null {
 export function LessonDetailsTooltip(props: {
   disabled?: boolean;
   meta?: LessonDetailsMeta;
+  groupName?: string;
   subjectName?: string;
   teacherName?: string;
   roomName?: string;
@@ -54,14 +55,14 @@ export function LessonDetailsTooltip(props: {
   ].filter(Boolean);
 
   return (
-    <Tooltip delayDuration={3000}>
+    <Tooltip delayDuration={3000} disableHoverableContent>
       <TooltipTrigger asChild>{props.children as any}</TooltipTrigger>
       <TooltipContent
         side="right"
         align="start"
         className={cn(
-          "max-w-[280px]",
-          "bg-popover text-popover-foreground border border-border shadow-md",
+          "max-w-[320px]",
+          "bg-popover/90 text-popover-foreground border border-border shadow-md",
           "px-3 py-2",
         )}
       >
@@ -79,18 +80,24 @@ export function LessonDetailsTooltip(props: {
             <div className="space-y-0.5 text-xs">
               {whenLineParts.length ? (
                 <div className="text-muted-foreground">
-                  {whenLineParts.join(" ")}
+                  Day: {whenLineParts.join(" ")}
                 </div>
               ) : null}
               {timeLineParts.length ? (
                 <div className="text-muted-foreground">
-                  {timeLineParts.join(" · ")}
+                  Slot: {timeLineParts.join(" · ")}
                 </div>
               ) : null}
             </div>
           ) : null}
 
           <div className="grid grid-cols-1 gap-1 text-xs">
+            {props.groupName ? (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground">Group</span>
+                <span className="truncate font-medium">{props.groupName}</span>
+              </div>
+            ) : null}
             <div className="flex items-center justify-between gap-2">
               <span className="text-muted-foreground">Teacher</span>
               <span className="truncate font-medium">
@@ -115,7 +122,7 @@ export function LessonDetailsTooltip(props: {
           ) : null}
 
           <div className="text-[10px] text-muted-foreground">
-            Hover 3 seconds to open
+            Hover 3 seconds to open · moves away closes
           </div>
         </div>
       </TooltipContent>

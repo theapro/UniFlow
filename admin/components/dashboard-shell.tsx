@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { UniFlowSidebar } from "@/components/uniflow-sidebar";
 import { SiteHeader } from "@/components/site-header";
@@ -16,15 +16,24 @@ export function DashboardShell(props: {
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const monthParam = searchParams.get("month");
 
-  const isScheduleManage = useMemo(() => {
-    const base = `/${props.lang}/dashboard/schedule/manage`;
-    return pathname === base || pathname.startsWith(base + "/");
+  const scheduleMode = useMemo(() => {
+    const manageBase = `/${props.lang}/dashboard/schedule/manage`;
+    const viewBase = `/${props.lang}/dashboard/schedule/view`;
+    const isManage =
+      pathname === manageBase || pathname.startsWith(manageBase + "/");
+    const isView = pathname === viewBase || pathname.startsWith(viewBase + "/");
+    return isManage ? ("manage" as const) : isView ? ("view" as const) : null;
   }, [pathname, props.lang]);
 
-  if (isScheduleManage) {
+  if (scheduleMode) {
     return (
-      <ScheduleBuilderProvider>
+      <ScheduleBuilderProvider
+        readOnly={scheduleMode === "view"}
+        initialMonth={monthParam}
+      >
         <SidebarProvider>
           <ScheduleBuilderSidebar variant="inset" lang={props.lang} />
           <SidebarInset>

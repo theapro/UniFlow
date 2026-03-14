@@ -37,6 +37,146 @@ function isUniqueConstraintError(
   );
 }
 
+function isKnownRequestError(
+  err: any,
+): err is Prisma.PrismaClientKnownRequestError {
+  return (
+    err?.name === "PrismaClientKnownRequestError" &&
+    typeof err?.code === "string"
+  );
+}
+
+function formatForeignKeyMessage(err: Prisma.PrismaClientKnownRequestError) {
+  const field = (err as any)?.meta?.field_name;
+  if (typeof field === "string" && field.trim()) {
+    return `Invalid reference: ${field}`;
+  }
+  return "Invalid reference id";
+}
+
+async function validateScheduleRefs(input: {
+  timeSlotId?: string;
+  groupId?: string;
+  teacherId?: string;
+  subjectId?: string;
+  roomId?: string | null;
+}) {
+  const errors: string[] = [];
+
+  if (input.timeSlotId !== undefined) {
+    const raw = String(input.timeSlotId ?? "").trim();
+    const missing = /^missing:(\d+)$/.exec(raw);
+    if (missing) {
+      errors.push(`TimeSlot is not configured for slot #${missing[1]}`);
+    } else {
+      const ok = await prisma.timeSlot.findUnique({
+        where: { id: raw },
+        select: { id: true },
+      });
+      if (!ok) errors.push("TimeSlot not found");
+    }
+  }
+
+  if (input.groupId !== undefined) {
+    const ok = await prisma.group.findUnique({
+      where: { id: input.groupId },
+      select: { id: true },
+    });
+    if (!ok) errors.push("Group not found");
+  }
+
+  if (input.teacherId !== undefined) {
+    const ok = await prisma.teacher.findUnique({
+      where: { id: input.teacherId },
+      select: { id: true },
+    });
+    if (!ok) errors.push("Teacher not found");
+  }
+
+  if (input.subjectId !== undefined) {
+    const ok = await prisma.subject.findUnique({
+      where: { id: input.subjectId },
+      select: { id: true },
+    });
+    if (!ok) errors.push("Subject not found");
+  }
+
+  if (input.roomId !== undefined) {
+    if (input.roomId !== null) {
+      const ok = await prisma.room.findUnique({
+        where: { id: input.roomId },
+        select: { id: true },
+      });
+      if (!ok) errors.push("Room not found");
+    }
+  }
+
+  return errors;
+}
+
+type ConflictKind = "TEACHER" | "GROUP" | "ROOM";
+type TxClient = Prisma.TransactionClient;
+
+async function detectScheduleConflict(
+  tx: TxClient,
+  input: {
+    calendarDayId: string;
+    timeSlotId: string;
+    groupId: string;
+    teacherId: string;
+    subjectId: string;
+    roomId: string | null;
+    note: string | null;
+  },
+  opts?: { excludeId?: string },
+): Promise<ConflictKind | null> {
+  const excludeId = opts?.excludeId;
+
+  // Group: always strict (a group can't have 2 lessons in the same slot).
+  {
+    const existing = await tx.schedule.findFirst({
+      where: {
+        calendarDayId: input.calendarDayId,
+        timeSlotId: input.timeSlotId,
+        groupId: input.groupId,
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (existing) return "GROUP";
+  }
+
+  // Teacher: strict (a teacher can't have 2 lessons in the same slot).
+  {
+    const existing = await tx.schedule.findFirst({
+      where: {
+        calendarDayId: input.calendarDayId,
+        timeSlotId: input.timeSlotId,
+        teacherId: input.teacherId,
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (existing) return "TEACHER";
+  }
+
+  // Room: strict (a room can't have 2 lessons in the same slot).
+  if (input.roomId) {
+    const existing = await tx.schedule.findFirst({
+      where: {
+        calendarDayId: input.calendarDayId,
+        timeSlotId: input.timeSlotId,
+        roomId: input.roomId,
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (existing) return "ROOM";
+  }
+
+  return null;
+}
+
 function classifyScheduleConflict(
   err: any,
 ): "TEACHER" | "GROUP" | "ROOM" | null {
@@ -81,6 +221,9 @@ export type CreateMonthlyScheduleInput = {
 };
 
 export type UpdateMonthlyScheduleInput = {
+  date?: string; // YYYY-MM-DD
+  timeSlotId?: string;
+  groupId?: string;
   teacherId?: string;
   subjectId?: string;
   roomId?: string | null;
@@ -88,6 +231,27 @@ export type UpdateMonthlyScheduleInput = {
 };
 
 export class AdminMonthlyScheduleService {
+  async listMonths() {
+    const rows = await prisma.calendarDay.groupBy({
+      by: ["year", "month"],
+      where: {
+        schedules: {
+          some: {},
+        },
+      },
+      _count: {
+        _all: true,
+      },
+      orderBy: [{ year: "desc" }, { month: "desc" }],
+    });
+
+    return rows.map((r) => ({
+      year: r.year,
+      month: r.month,
+      days: r._count._all,
+    }));
+  }
+
   async list(params: {
     month: number;
     year: number;
@@ -136,6 +300,22 @@ export class AdminMonthlyScheduleService {
   }
 
   async create(input: CreateMonthlyScheduleInput) {
+    // Validate refs up-front so we return a precise message (not a generic FK error).
+    const refErrors = await validateScheduleRefs({
+      timeSlotId: input.timeSlotId,
+      groupId: input.groupId,
+      teacherId: input.teacherId,
+      subjectId: input.subjectId,
+      roomId: input.roomId ?? null,
+    });
+    if (refErrors.length) {
+      return {
+        ok: false as const,
+        status: 400,
+        message: refErrors.join(", "),
+      };
+    }
+
     const dateUtc = parseISODateOnlyToUTC(input.date);
     if (!dateUtc) {
       return { ok: false as const, status: 400, message: "Invalid date" };
@@ -145,24 +325,24 @@ export class AdminMonthlyScheduleService {
     const year = dateUtc.getUTCFullYear();
     const weekday = getWeekdayUTC(dateUtc);
 
-    const calendarDay = await prisma.calendarDay.upsert({
-      where: { date: dateUtc },
-      create: {
-        date: dateUtc,
-        weekday,
-        month,
-        year,
-      },
-      update: {
-        weekday,
-        month,
-        year,
-      },
-    });
-
     try {
-      const created = await prisma.schedule.create({
-        data: {
+      const created = await prisma.$transaction(async (tx) => {
+        const calendarDay = await tx.calendarDay.upsert({
+          where: { date: dateUtc },
+          create: {
+            date: dateUtc,
+            weekday,
+            month,
+            year,
+          },
+          update: {
+            weekday,
+            month,
+            year,
+          },
+        });
+
+        const conflict = await detectScheduleConflict(tx, {
           calendarDayId: calendarDay.id,
           timeSlotId: input.timeSlotId,
           groupId: input.groupId,
@@ -170,39 +350,40 @@ export class AdminMonthlyScheduleService {
           subjectId: input.subjectId,
           roomId: input.roomId ?? null,
           note: input.note ?? null,
-        },
-        include: {
-          calendarDay: true,
-          timeSlot: true,
-          group: true,
-          teacher: true,
-          subject: true,
-          room: true,
-        },
+        });
+
+        if (conflict) {
+          return { kind: "conflict" as const, conflict };
+        }
+
+        const row = await tx.schedule.create({
+          data: {
+            calendarDayId: calendarDay.id,
+            timeSlotId: input.timeSlotId,
+            groupId: input.groupId,
+            teacherId: input.teacherId,
+            subjectId: input.subjectId,
+            roomId: input.roomId ?? null,
+            note: input.note ?? null,
+          },
+          include: {
+            calendarDay: true,
+            timeSlot: true,
+            group: true,
+            teacher: true,
+            subject: true,
+            room: true,
+          },
+        });
+
+        return { kind: "ok" as const, row };
       });
 
-      return {
-        ok: true as const,
-        data: {
-          ...created,
-          date: toISODateOnlyUTC(created.calendarDay.date),
-          weekday: created.calendarDay.weekday,
-          timeSlot: created.timeSlot
-            ? {
-                ...created.timeSlot,
-                startTime: formatDbTime(created.timeSlot.startTime),
-                endTime: formatDbTime(created.timeSlot.endTime),
-              }
-            : created.timeSlot,
-        },
-      };
-    } catch (err: any) {
-      const conflict = classifyScheduleConflict(err);
-      if (conflict) {
+      if (created.kind === "conflict") {
         const label =
-          conflict === "TEACHER"
+          created.conflict === "TEACHER"
             ? "Teacher"
-            : conflict === "GROUP"
+            : created.conflict === "GROUP"
               ? "Group"
               : "Room";
         return {
@@ -211,56 +392,179 @@ export class AdminMonthlyScheduleService {
           message: `${label} already has a lesson at that time`,
         };
       }
+
+      return {
+        ok: true as const,
+        data: {
+          ...created.row,
+          date: toISODateOnlyUTC(created.row.calendarDay.date),
+          weekday: created.row.calendarDay.weekday,
+          timeSlot: created.row.timeSlot
+            ? {
+                ...created.row.timeSlot,
+                startTime: formatDbTime(created.row.timeSlot.startTime),
+                endTime: formatDbTime(created.row.timeSlot.endTime),
+              }
+            : created.row.timeSlot,
+        },
+      };
+    } catch (err: any) {
+      if (isKnownRequestError(err) && err.code === "P2003") {
+        return {
+          ok: false as const,
+          status: 400,
+          message: formatForeignKeyMessage(err),
+        };
+      }
+
       throw err;
     }
   }
 
   async update(id: string, patch: UpdateMonthlyScheduleInput) {
+    // Validate only the refs that are being changed.
+    const refErrors = await validateScheduleRefs({
+      timeSlotId: patch.timeSlotId,
+      groupId: patch.groupId,
+      teacherId: patch.teacherId,
+      subjectId: patch.subjectId,
+      roomId: patch.roomId,
+    });
+    if (refErrors.length) {
+      return {
+        ok: false as const,
+        status: 400,
+        message: refErrors.join(", "),
+      };
+    }
+
     try {
-      const updated = await prisma.schedule.update({
-        where: { id },
-        data: {
-          ...(patch.teacherId !== undefined
-            ? { teacherId: patch.teacherId }
-            : {}),
-          ...(patch.subjectId !== undefined
-            ? { subjectId: patch.subjectId }
-            : {}),
-          ...(patch.roomId !== undefined ? { roomId: patch.roomId } : {}),
-          ...(patch.note !== undefined ? { note: patch.note } : {}),
-        },
-        include: {
-          calendarDay: true,
-          timeSlot: true,
-          group: true,
-          teacher: true,
-          subject: true,
-          room: true,
-        },
+      const updated = await prisma.$transaction(async (tx) => {
+        const existing = await tx.schedule.findUnique({
+          where: { id },
+          select: {
+            id: true,
+            calendarDayId: true,
+            timeSlotId: true,
+            groupId: true,
+            teacherId: true,
+            subjectId: true,
+            roomId: true,
+            note: true,
+          },
+        });
+
+        if (!existing) {
+          return { kind: "not_found" as const };
+        }
+
+        let nextCalendarDayId = existing.calendarDayId;
+        if (patch.date !== undefined) {
+          const dateUtc = parseISODateOnlyToUTC(patch.date);
+          if (!dateUtc) {
+            return { kind: "bad_request" as const, message: "Invalid date" };
+          }
+
+          const month = dateUtc.getUTCMonth() + 1;
+          const year = dateUtc.getUTCFullYear();
+          const weekday = getWeekdayUTC(dateUtc);
+
+          const calendarDay = await tx.calendarDay.upsert({
+            where: { date: dateUtc },
+            create: {
+              date: dateUtc,
+              weekday,
+              month,
+              year,
+            },
+            update: {
+              weekday,
+              month,
+              year,
+            },
+          });
+          nextCalendarDayId = calendarDay.id;
+        }
+
+        const finalTimeSlotId = patch.timeSlotId ?? existing.timeSlotId;
+        const finalGroupId = patch.groupId ?? existing.groupId;
+        const finalTeacherId = patch.teacherId ?? existing.teacherId;
+        const finalSubjectId = patch.subjectId ?? existing.subjectId;
+        const finalRoomId =
+          patch.roomId !== undefined ? patch.roomId : existing.roomId;
+        const finalNote = patch.note !== undefined ? patch.note : existing.note;
+
+        const conflict = await detectScheduleConflict(
+          tx,
+          {
+            calendarDayId: nextCalendarDayId,
+            timeSlotId: finalTimeSlotId,
+            groupId: finalGroupId,
+            teacherId: finalTeacherId,
+            subjectId: finalSubjectId,
+            roomId: finalRoomId ?? null,
+            note: finalNote ?? null,
+          },
+          { excludeId: id },
+        );
+
+        if (conflict) {
+          return { kind: "conflict" as const, conflict };
+        }
+
+        const row = await tx.schedule.update({
+          where: { id },
+          data: {
+            ...(nextCalendarDayId !== existing.calendarDayId
+              ? { calendarDayId: nextCalendarDayId }
+              : {}),
+            ...(patch.timeSlotId !== undefined
+              ? { timeSlotId: patch.timeSlotId }
+              : {}),
+            ...(patch.groupId !== undefined ? { groupId: patch.groupId } : {}),
+            ...(patch.teacherId !== undefined
+              ? { teacherId: patch.teacherId }
+              : {}),
+            ...(patch.subjectId !== undefined
+              ? { subjectId: patch.subjectId }
+              : {}),
+            ...(patch.roomId !== undefined ? { roomId: patch.roomId } : {}),
+            ...(patch.note !== undefined ? { note: patch.note } : {}),
+          },
+          include: {
+            calendarDay: true,
+            timeSlot: true,
+            group: true,
+            teacher: true,
+            subject: true,
+            room: true,
+          },
+        });
+
+        return { kind: "ok" as const, row };
       });
 
-      return {
-        ok: true as const,
-        data: {
-          ...updated,
-          date: toISODateOnlyUTC(updated.calendarDay.date),
-          weekday: updated.calendarDay.weekday,
-          timeSlot: updated.timeSlot
-            ? {
-                ...updated.timeSlot,
-                startTime: formatDbTime(updated.timeSlot.startTime),
-                endTime: formatDbTime(updated.timeSlot.endTime),
-              }
-            : updated.timeSlot,
-        },
-      };
-    } catch (err: any) {
-      const conflict = classifyScheduleConflict(err);
-      if (conflict) {
+      if (updated.kind === "not_found") {
+        return {
+          ok: false as const,
+          status: 404,
+          message: "Schedule not found",
+        };
+      }
+
+      if (updated.kind === "bad_request") {
+        return {
+          ok: false as const,
+          status: 400,
+          message: updated.message,
+        };
+      }
+
+      if (updated.kind === "conflict") {
         const label =
-          conflict === "TEACHER"
+          updated.conflict === "TEACHER"
             ? "Teacher"
-            : conflict === "GROUP"
+            : updated.conflict === "GROUP"
               ? "Group"
               : "Room";
         return {
@@ -269,12 +573,56 @@ export class AdminMonthlyScheduleService {
           message: `${label} already has a lesson at that time`,
         };
       }
+
+      return {
+        ok: true as const,
+        data: {
+          ...updated.row,
+          date: toISODateOnlyUTC(updated.row.calendarDay.date),
+          weekday: updated.row.calendarDay.weekday,
+          timeSlot: updated.row.timeSlot
+            ? {
+                ...updated.row.timeSlot,
+                startTime: formatDbTime(updated.row.timeSlot.startTime),
+                endTime: formatDbTime(updated.row.timeSlot.endTime),
+              }
+            : updated.row.timeSlot,
+        },
+      };
+    } catch (err: any) {
+      if (isKnownRequestError(err) && err.code === "P2025") {
+        return {
+          ok: false as const,
+          status: 404,
+          message: "Schedule not found",
+        };
+      }
+
+      if (isKnownRequestError(err) && err.code === "P2003") {
+        return {
+          ok: false as const,
+          status: 400,
+          message: formatForeignKeyMessage(err),
+        };
+      }
+
       throw err;
     }
   }
 
   async remove(id: string) {
-    await prisma.schedule.delete({ where: { id } });
-    return true;
+    try {
+      await prisma.schedule.delete({ where: { id } });
+      return { ok: true as const };
+    } catch (err: any) {
+      if (isKnownRequestError(err) && err.code === "P2025") {
+        return {
+          ok: false as const,
+          status: 404,
+          message: "Schedule not found",
+        };
+      }
+      throw err;
+    }
   }
 }

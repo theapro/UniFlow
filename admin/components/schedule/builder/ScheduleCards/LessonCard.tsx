@@ -1,12 +1,28 @@
 "use client";
 
 import { useDraggable } from "@dnd-kit/core";
-import { GripVertical, Trash2, X } from "lucide-react";
-import { memo } from "react";
+import {
+  ChevronDown,
+  GripVertical,
+  Trash2,
+  X,
+  User,
+  MapPin,
+  Users,
+} from "lucide-react";
+import { memo, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import type { LessonCardState } from "../types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+import type { IdName, LessonCardState } from "../types";
+
 import {
   LessonDetailsTooltip,
   type LessonDetailsMeta,
@@ -18,15 +34,28 @@ export const LessonCard = memo(
     dragData?: any;
     draggable?: boolean;
     lesson: LessonCardState;
+
+    groupId?: string;
+    groupName?: string;
+    groupOptions?: IdName[];
+    onChangeGroupId?: (groupId: string) => void;
+    groupDropdownDisabled?: boolean;
+
     subjectName?: string;
     teacherName?: string;
     roomName?: string;
+
     meta?: LessonDetailsMeta;
+
     onDelete?: () => void;
     onClearDraft?: () => void;
+
     isOverlay?: boolean;
+    rightActions?: ReactNode;
   }) {
     const isDraggable = props.draggable ?? true;
+    const isDraft = props.lesson.kind === "draft";
+
     const draggable =
       isDraggable && props.draggableId
         ? useDraggable({
@@ -42,105 +71,162 @@ export const LessonCard = memo(
       : undefined;
 
     const showDelete = props.lesson.kind === "saved" && props.onDelete;
-    const showClear = props.lesson.kind === "draft" && props.onClearDraft;
+    const showClear = isDraft && props.onClearDraft;
 
     return (
-      <>
-        <LessonDetailsTooltip
-          disabled={Boolean(props.isOverlay) || Boolean(draggable?.isDragging)}
-          meta={props.meta}
-          subjectName={props.subjectName}
-          teacherName={props.teacherName}
-          roomName={props.roomName}
-          note={props.lesson.note}
+      <LessonDetailsTooltip
+        disabled={Boolean(props.isOverlay) || Boolean(draggable?.isDragging)}
+        meta={props.meta}
+        groupName={props.groupName}
+        subjectName={props.subjectName}
+        teacherName={props.teacherName}
+        roomName={props.roomName}
+        note={props.lesson.note}
+      >
+        <div
+          ref={draggable?.setNodeRef}
+          style={props.isOverlay ? undefined : style}
+          className={cn(
+            "group relative flex flex-col rounded-lg border p-2",
+            "bg-card text-card-foreground shadow-sm transition-all",
+            "hover:shadow-md hover:border-primary/40",
+            "select-none h-full w-full",
+
+            isDraft &&
+              "border-l-[4px] border-l-amber-500 bg-amber-50 dark:bg-amber-950",
+
+            props.isOverlay && "shadow-2xl ring-2 ring-primary scale-[1.02]",
+            draggable?.isDragging && !props.isOverlay && "opacity-30",
+          )}
         >
-          <div
-            ref={draggable?.setNodeRef}
-            style={props.isOverlay ? undefined : style}
-            className={cn(
-              "relative rounded-md border bg-card",
-              "px-2.5 py-2",
-              "min-h-[72px]",
-              props.isOverlay ? "shadow-lg" : "shadow-sm",
-              draggable?.isDragging && !props.isOverlay ? "opacity-40" : "",
-            )}
-          >
-            <div className="flex items-start gap-2">
-              {isDraggable && draggable ? (
-                <button
-                  type="button"
-                  className={cn(
-                    "mt-0.5 inline-flex h-7 w-7 items-center justify-center",
-                    "rounded-md hover:bg-muted",
-                    "cursor-grab active:cursor-grabbing",
+          {/* HEADER */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <h4
+                className={cn(
+                  "text-[11px] font-semibold leading-tight truncate",
+                  !props.subjectName && "text-muted-foreground italic",
+                )}
+              >
+                {props.subjectName || (isDraft ? "Fan tanlanmagan" : "—")}
+              </h4>
+
+              {/* GROUP */}
+              {props.groupName && (
+                <div className="mt-1">
+                  {props.groupId &&
+                  props.groupOptions &&
+                  !props.groupDropdownDisabled ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="inline-flex items-center gap-1 rounded-md bg-[#ea9d05]/30 px-2 py-[2px] text-[10px] font-medium hover:bg-[#ea9d05]/40">
+                          <Users className="h-3 w-3" />
+                          <span className="truncate max-w-[90px]">
+                            {props.groupName}
+                          </span>
+                          <ChevronDown className="h-3 w-3 opacity-70" />
+                        </button>
+                      </DropdownMenuTrigger>
+
+                      <DropdownMenuContent align="start" className="w-44">
+                        {props.groupOptions.map((g) => (
+                          <DropdownMenuItem
+                            key={g.id}
+                            onSelect={() => props.onChangeGroupId?.(g.id)}
+                          >
+                            {g.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-[2px] text-[10px] text-muted-foreground">
+                      <Users className="h-3 w-3" />
+                      <span className="truncate max-w-[110px]">
+                        {props.groupName}
+                      </span>
+                    </span>
                   )}
+                </div>
+              )}
+            </div>
+
+            {/* DRAG HANDLE */}
+            <div className="flex items-center gap-1">
+              {props.rightActions}
+
+              {isDraggable && draggable && (
+                <div
                   {...draggable.listeners}
                   {...draggable.attributes}
-                  aria-label="Drag lesson"
+                  className="cursor-grab active:cursor-grabbing p-1 text-muted-foreground/40 hover:text-muted-foreground"
                 >
-                  <GripVertical className="h-4 w-4 text-muted-foreground" />
-                </button>
-              ) : (
-                <div className="mt-0.5 h-7 w-7" />
+                  <GripVertical className="h-4 w-4" />
+                </div>
               )}
-
-              <div className="min-w-0 flex-1 space-y-1">
-                <div className="truncate text-sm font-semibold">
-                  {props.subjectName ||
-                    (props.lesson.kind === "draft" ? "Drop subject" : "")}
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  <div className="rounded-md border bg-muted/30 px-2 py-0.5 text-[11px] text-muted-foreground">
-                    {props.teacherName ||
-                      (props.lesson.kind === "draft" ? "Teacher" : "")}
-                  </div>
-                  <div className="rounded-md border bg-muted/30 px-2 py-0.5 text-[11px] text-muted-foreground">
-                    {props.roomName ||
-                      (props.lesson.kind === "draft" ? "Classroom" : "")}
-                  </div>
-                </div>
-              </div>
-
-              {showDelete ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={props.onDelete}
-                  aria-label="Delete lesson"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              ) : null}
-
-              {showClear ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={props.onClearDraft}
-                  aria-label="Clear draft"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              ) : null}
             </div>
           </div>
-        </LessonDetailsTooltip>
-      </>
+
+          {/* META INFO */}
+          <div className="mt-1 space-y-1 text-[10px]">
+            <div className="flex items-center gap-1.5 text-muted-foreground truncate">
+              <User className="h-3.5 w-3.5 opacity-70 shrink-0" />
+              {props.teacherName || (isDraft ? "O‘qituvchi tanlanmagan" : "—")}
+            </div>
+
+            <div className="flex items-center gap-1.5 text-muted-foreground truncate">
+              <MapPin className="h-3.5 w-3.5 opacity-70 shrink-0" />
+              {props.roomName || (isDraft ? "Xona belgilanmagan" : "—")}
+            </div>
+          </div>
+
+          {/* FLOATING ACTIONS */}
+          <div className="absolute -right-2 -top-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-50">
+            {showDelete && (
+              <Button
+                variant="destructive"
+                size="icon"
+                className="h-6 w-6 rounded-full shadow-md border border-background"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  props.onDelete?.();
+                }}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            )}
+
+            {showClear && (
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-6 w-6 rounded-full bg-background border-amber-200 shadow-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  props.onClearDraft?.();
+                }}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </LessonDetailsTooltip>
     );
   },
+
   (prev, next) => {
     return (
       prev.lesson === next.lesson &&
+      prev.groupId === next.groupId &&
+      prev.groupName === next.groupName &&
+      prev.groupOptions === next.groupOptions &&
       prev.subjectName === next.subjectName &&
       prev.teacherName === next.teacherName &&
       prev.roomName === next.roomName &&
       prev.draggableId === next.draggableId &&
-      prev.draggable === next.draggable &&
-      prev.isOverlay === next.isOverlay
+      prev.isOverlay === next.isOverlay &&
+      prev.rightActions === next.rightActions
     );
   },
 );
