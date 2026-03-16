@@ -1,5 +1,5 @@
 import { getDictionary, type Locale } from "@/lib/i18n";
-import { GroupsView } from "@/components/groups/GroupsView";
+import { GroupsTreeView } from "@/components/groups/GroupsTreeView";
 
 export default async function GroupsPage({
   params: { lang },
@@ -8,5 +8,5 @@ export default async function GroupsPage({
 }) {
   const dict = await getDictionary(lang);
 
-  return <GroupsView lang={lang} dict={dict} />;
+  return <GroupsTreeView lang={lang} dict={dict} />;
 }

@@ -109,7 +109,7 @@ export class AdminStudentService {
 
       const group = await tx.group.findUnique({
         where: { id: input.groupId },
-        include: { cohort: { select: { year: true } } },
+        include: { cohort: { select: { code: true, year: true } } },
       });
       if (!group) throw new Error("GROUP_NOT_FOUND");
 
@@ -127,6 +127,7 @@ export class AdminStudentService {
           groupName: group.name,
           cohort:
             input.cohort ||
+            group.cohort?.code ||
             (group.cohort?.year ? String(group.cohort.year) : null),
           updatedAt: new Date(),
         },
@@ -221,7 +222,7 @@ export class AdminStudentService {
       const group = input.groupId
         ? await tx.group.findUnique({
             where: { id: input.groupId },
-            include: { cohort: { select: { year: true } } },
+            include: { cohort: { select: { code: true, year: true } } },
           })
         : null;
       if (input.groupId && !group) throw new Error("GROUP_NOT_FOUND");
@@ -251,8 +252,8 @@ export class AdminStudentService {
                   ? {}
                   : {
                       cohort: group?.cohort?.year
-                        ? String(group.cohort.year)
-                        : null,
+                        ? group?.cohort?.code || String(group.cohort.year)
+                        : group?.cohort?.code || null,
                     }),
               }
             : {}),

@@ -12,14 +12,45 @@ export function GroupCard(props: {
   dragData?: any;
   className?: string;
 }) {
-  const draggable = props.draggableId
-    ? useDraggable({
-        id: props.draggableId,
-        data: props.dragData,
-      })
-    : null;
+  if (!props.draggableId) {
+    return (
+      <div
+        className={cn(
+          "flex items-center gap-2",
+          "rounded-md border bg-card px-3 py-2 text-sm font-semibold shadow-sm",
+          "select-none",
+          "min-h-9",
+          props.className,
+        )}
+      >
+        <Users className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="truncate">{props.name}</span>
+      </div>
+    );
+  }
 
-  const style = draggable?.transform
+  return (
+    <DraggableGroupCard
+      draggableId={props.draggableId}
+      dragData={props.dragData}
+      name={props.name}
+      className={props.className}
+    />
+  );
+}
+
+function DraggableGroupCard(props: {
+  draggableId: string;
+  dragData?: any;
+  name: string;
+  className?: string;
+}) {
+  const draggable = useDraggable({
+    id: props.draggableId,
+    data: props.dragData,
+  });
+
+  const style = draggable.transform
     ? {
         transform: `translate3d(${draggable.transform.x}px, ${draggable.transform.y}px, 0)`,
       }
@@ -27,19 +58,19 @@ export function GroupCard(props: {
 
   return (
     <div
-      ref={draggable?.setNodeRef}
+      ref={draggable.setNodeRef}
       style={style}
       className={cn(
         "flex items-center gap-2",
         "rounded-md border bg-card px-3 py-2 text-sm font-semibold shadow-sm",
         "select-none",
         "min-h-9",
-        draggable ? "cursor-grab active:cursor-grabbing" : "",
-        draggable?.isDragging ? "opacity-60" : "",
+        "cursor-grab active:cursor-grabbing",
+        draggable.isDragging ? "opacity-60" : "",
         props.className,
       )}
-      {...(draggable ? draggable.listeners : {})}
-      {...(draggable ? draggable.attributes : {})}
+      {...draggable.listeners}
+      {...draggable.attributes}
     >
       <Users className="h-3.5 w-3.5 text-muted-foreground" />
       <span className="truncate">{props.name}</span>

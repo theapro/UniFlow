@@ -1,15 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { toast } from "sonner";
 
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -19,30 +13,31 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { aiGroupsApi } from "@/lib/api";
+import { cohortColorHsl } from "./utils/cohortColors";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
-import type { IdName, Teacher } from "./types";
+import type { GroupMeta, IdName, Teacher } from "./types";
 import {
   ClassroomCard,
   GroupCard,
   SubjectCard,
   TeacherCard,
 } from "./ScheduleCards";
+import { useScheduleBuilder } from "./route/ScheduleBuilderContext";
+import { AIScheduleGeneratorModal } from "./AIScheduleGeneratorModal";
 
-type DepartmentGroupCategory =
-  | "it"
-  | "japanese"
-  | "partner_university"
-  | "language_university";
-
-const DEPARTMENT_GROUP_CATEGORIES: Array<{
-  key: DepartmentGroupCategory;
-  label: string;
-}> = [
-  { key: "it", label: "IT" },
-  { key: "japanese", label: "Japanese" },
-  { key: "partner_university", label: "Partner university" },
-  { key: "language_university", label: "Language university" },
-];
+const FIXED_DEPARTMENT_ORDER = [
+  "IT",
+  "Japanese",
+  "Partner University",
+  "Employability/Cowork",
+  "Language University",
+] as const;
 
 function SidebarSection(props: {
   title: string;
@@ -61,17 +56,23 @@ function SidebarSection(props: {
 }
 
 export function ScheduleSidebar(props: {
-  groups: IdName[];
+  groups: GroupMeta[];
   subjects: IdName[];
   teachers: Teacher[];
   classrooms: IdName[];
   className?: string;
 }) {
-  const groupsById = useMemo(() => {
-    const map = new Map<string, IdName>();
-    for (const g of props.groups) map.set(g.id, g);
-    return map;
-  }, [props.groups]);
+  const {
+    month,
+    year,
+    reloadGrid,
+    readOnly,
+    setPageBusy,
+    maxPositionCount,
+    setDepartmentGroupAssignments,
+    setGroupOrder,
+  } = useScheduleBuilder();
+  const [aiModalOpen, setAiModalOpen] = useState(false);
 
   const subjectsById = useMemo(() => {
     const map = new Map<string, IdName>();
@@ -90,15 +91,6 @@ export function ScheduleSidebar(props: {
     for (const r of props.classrooms) map.set(r.id, r);
     return map;
   }, [props.classrooms]);
-
-  const [selectedGroupIdsByCategory, setSelectedGroupIdsByCategory] = useState<
-    Record<DepartmentGroupCategory, string[]>
-  >({
-    it: [],
-    japanese: [],
-    partner_university: [],
-    language_university: [],
-  });
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
   const [selectedTeacherIds, setSelectedTeacherIds] = useState<string[]>([]);
   const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([]);
@@ -107,109 +99,335 @@ export function ScheduleSidebar(props: {
   const [resetTeacherSelectKey, setResetTeacherSelectKey] = useState(0);
   const [resetRoomSelectKey, setResetRoomSelectKey] = useState(0);
 
-  const sortedGroups = useMemo(
-    () => [...props.groups].sort((a, b) => a.name.localeCompare(b.name)),
-    [props.groups],
-  );
+  const groupsByDepartment = useMemo(() => {
+    const out = new Map<string, GroupMeta[]>();
+    for (const g of props.groups) {
+      const deptName = g.parentGroup?.name
+        ? String(g.parentGroup.name)
+        : "(No department)";
+      const list = out.get(deptName) ?? [];
+      list.push(g);
+      out.set(deptName, list);
+    }
+    return out;
+  }, [props.groups]);
 
-  function toggleGroupInDepartment(
-    category: DepartmentGroupCategory,
-    id: string,
-  ) {
-    setSelectedGroupIdsByCategory((prev) => {
-      const isSelected = prev[category].includes(id);
+  const autoArrangeGroups = async () => {
+    if (readOnly) return;
 
-      const next: Record<DepartmentGroupCategory, string[]> = {
-        it: prev.it.filter((x) => x !== id),
-        japanese: prev.japanese.filter((x) => x !== id),
-        partner_university: prev.partner_university.filter((x) => x !== id),
-        language_university: prev.language_university.filter((x) => x !== id),
-      };
+    setPageBusy({ label: "Arranging groups…" });
+    try {
+      const res = await aiGroupsApi.arrange({ maxColumns: maxPositionCount });
+      const payload = res.data?.data;
+      if (!payload?.assignments || !payload?.groupOrder) {
+        toast.error("Invalid response from server");
+        return;
+      }
 
-      if (!isSelected) next[category] = [...next[category], id];
-
-      return next;
-    });
-  }
+      setDepartmentGroupAssignments(payload.assignments as any);
+      setGroupOrder(payload.groupOrder as Array<string | null>);
+      toast.success(
+        payload?.meta?.mode === "ai"
+          ? "Groups arranged (AI)"
+          : "Groups arranged",
+      );
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? e?.message ?? "Failed");
+    } finally {
+      setPageBusy(null);
+    }
+  };
 
   return (
     <div className={cn("h-full", props.className)}>
       <div className="space-y-6 pb-4">
         <SidebarSection
-          title="Category Groups"
-          hint="Select and drag into rows"
+          title="Generate with AI"
+          hint="Plan requirements in a modal"
         >
-          <div className="space-y-5">
-            {DEPARTMENT_GROUP_CATEGORIES.map((cat) => {
-              const options = sortedGroups;
-              const selectedIds = selectedGroupIdsByCategory[cat.key];
+          <Button
+            type="button"
+            className="w-full"
+            onClick={() => setAiModalOpen(true)}
+          >
+            Generate with AI
+          </Button>
+
+          <AIScheduleGeneratorModal
+            open={aiModalOpen}
+            onOpenChange={setAiModalOpen}
+            defaultMonth={month}
+            defaultYear={year}
+            groups={props.groups}
+            subjects={props.subjects}
+            teachers={props.teachers}
+            classrooms={props.classrooms}
+            onGenerated={reloadGrid}
+          />
+        </SidebarSection>
+
+        <SidebarSection title="Groups" hint="Drag groups into department rows">
+          <div className="space-y-4">
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              onClick={autoArrangeGroups}
+              disabled={readOnly}
+            >
+              Auto add groups
+            </Button>
+
+            {FIXED_DEPARTMENT_ORDER.map((deptName) => {
+              const deptGroups = (groupsByDepartment.get(deptName) ?? [])
+                .slice()
+                .sort((a, b) => a.name.localeCompare(b.name));
+
+              if (!deptGroups.length) return null;
+
+              if (deptName === "Japanese") {
+                return (
+                  <Collapsible key={deptName} defaultOpen={false}>
+                    <CollapsibleTrigger asChild>
+                      <button
+                        type="button"
+                        className={cn(
+                          "w-full flex items-center justify-between",
+                          "rounded-md border bg-card px-3 py-2",
+                          "text-xs font-medium text-foreground",
+                        )}
+                      >
+                        <span>{deptName}</span>
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-2">
+                      <div className="grid gap-2">
+                        {deptGroups.map((g) => (
+                          <GroupCard
+                            key={g.id}
+                            id={g.id}
+                            name={g.name}
+                            className="w-full justify-start"
+                            draggableId={`sidebar:group:${g.id}`}
+                            dragData={{ type: "group", groupId: g.id }}
+                          />
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
+              }
+
+              const byCohort = new Map<
+                string,
+                { sortOrder: number; groups: GroupMeta[] }
+              >();
+              for (const g of deptGroups) {
+                const code = g.cohort?.code
+                  ? String(g.cohort.code)
+                  : "(No cohort)";
+                const sortOrder = Number(g.cohort?.sortOrder ?? 999);
+                const entry = byCohort.get(code) ?? { sortOrder, groups: [] };
+                entry.groups.push(g);
+                entry.sortOrder = Math.min(entry.sortOrder, sortOrder);
+                byCohort.set(code, entry);
+              }
+
+              const cohortKeys = Array.from(byCohort.entries())
+                .map(([code, v]) => ({ code, sortOrder: v.sortOrder }))
+                .sort((a, b) => {
+                  const r = a.sortOrder - b.sortOrder;
+                  if (r !== 0) return r;
+                  return a.code.localeCompare(b.code);
+                });
 
               return (
-                <div key={cat.key} className="space-y-2">
-                  <div className="text-xs font-medium text-muted-foreground">
-                    {cat.label}
-                  </div>
+                <Collapsible
+                  key={deptName}
+                  defaultOpen={deptName === "IT"}
+                  className="space-y-2"
+                >
+                  <CollapsibleTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        "w-full flex items-center justify-between",
+                        "rounded-md border bg-card px-3 py-2",
+                        "text-xs font-medium text-foreground",
+                      )}
+                    >
+                      <span>{deptName}</span>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-2 pt-2">
+                    {cohortKeys.map((c, idx) => {
+                      const groupsForCohort = (
+                        byCohort.get(c.code)?.groups ?? []
+                      )
+                        .slice()
+                        .sort((a, b) => a.name.localeCompare(b.name));
 
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full justify-start"
-                      >
-                        Select groups
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-72" align="start">
-                      <DropdownMenuLabel>{cat.label}</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <div className="max-h-64 overflow-auto">
-                        {options.length ? (
-                          options.map((g) => (
-                            <DropdownMenuCheckboxItem
-                              key={g.id}
-                              checked={selectedIds.includes(g.id)}
-                              onCheckedChange={() =>
-                                toggleGroupInDepartment(cat.key, g.id)
-                              }
-                              onSelect={(e) => e.preventDefault()}
+                      return (
+                        <Collapsible
+                          key={`${deptName}:${c.code}`}
+                          defaultOpen={deptName === "IT" && idx === 0}
+                          className="space-y-2"
+                        >
+                          <CollapsibleTrigger asChild>
+                            <button
+                              type="button"
+                              className={cn(
+                                "w-full flex items-center justify-between",
+                                "rounded-md bg-muted/30 px-3 py-2",
+                                "text-[11px] font-semibold text-foreground",
+                              )}
                             >
-                              {g.name}
-                            </DropdownMenuCheckboxItem>
-                          ))
-                        ) : (
-                          <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                            No groups
-                          </div>
-                        )}
-                      </div>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-
-                  <div className="mt-2 grid gap-2">
-                    {selectedIds
-                      .map((id) => groupsById.get(id))
-                      .filter(Boolean)
-                      .map((g) => (
-                        <GroupCard
-                          key={g!.id}
-                          id={g!.id}
-                          name={g!.name}
-                          className="w-full justify-start"
-                          draggableId={`sidebar:group:${g!.id}`}
-                          dragData={{ type: "group", groupId: g!.id }}
-                        />
-                      ))}
-
-                    {!selectedIds.length ? (
-                      <div className="text-xs text-muted-foreground">
-                        No groups selected
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
+                              <span className="flex items-center gap-2">
+                                {deptName === "IT" ? (
+                                  <span
+                                    className="h-2 w-2 shrink-0 rounded-full"
+                                    style={{
+                                      backgroundColor:
+                                        cohortColorHsl({
+                                          code: c.code,
+                                          sortOrder: byCohort.get(c.code)
+                                            ?.sortOrder,
+                                        }) ?? undefined,
+                                    }}
+                                    aria-hidden="true"
+                                  />
+                                ) : null}
+                                <span>{c.code}</span>
+                              </span>
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            </button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="grid gap-2">
+                              {groupsForCohort.map((g) => (
+                                <GroupCard
+                                  key={g.id}
+                                  id={g.id}
+                                  name={g.name}
+                                  className="w-full justify-start"
+                                  draggableId={`sidebar:group:${g.id}`}
+                                  dragData={{ type: "group", groupId: g.id }}
+                                />
+                              ))}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      );
+                    })}
+                  </CollapsibleContent>
+                </Collapsible>
               );
             })}
+
+            {Array.from(groupsByDepartment.keys())
+              .filter(
+                (name) =>
+                  !FIXED_DEPARTMENT_ORDER.includes(name as any) &&
+                  (groupsByDepartment.get(name)?.length ?? 0) > 0,
+              )
+              .sort((a, b) => a.localeCompare(b))
+              .map((deptName) => {
+                const deptGroups = (groupsByDepartment.get(deptName) ?? [])
+                  .slice()
+                  .sort((a, b) => a.name.localeCompare(b.name));
+
+                const byCohort = new Map<
+                  string,
+                  { sortOrder: number; groups: GroupMeta[] }
+                >();
+                for (const g of deptGroups) {
+                  const code = g.cohort?.code
+                    ? String(g.cohort.code)
+                    : "(No cohort)";
+                  const sortOrder = Number(g.cohort?.sortOrder ?? 999);
+                  const entry = byCohort.get(code) ?? { sortOrder, groups: [] };
+                  entry.groups.push(g);
+                  entry.sortOrder = Math.min(entry.sortOrder, sortOrder);
+                  byCohort.set(code, entry);
+                }
+
+                const cohortKeys = Array.from(byCohort.entries())
+                  .map(([code, v]) => ({ code, sortOrder: v.sortOrder }))
+                  .sort((a, b) => {
+                    const r = a.sortOrder - b.sortOrder;
+                    if (r !== 0) return r;
+                    return a.code.localeCompare(b.code);
+                  });
+
+                return (
+                  <Collapsible key={deptName} defaultOpen={false}>
+                    <CollapsibleTrigger asChild>
+                      <button
+                        type="button"
+                        className={cn(
+                          "w-full flex items-center justify-between",
+                          "rounded-md border bg-card px-3 py-2",
+                          "text-xs font-medium text-foreground",
+                        )}
+                      >
+                        <span>{deptName}</span>
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-2 pt-2">
+                      {cohortKeys.map((c) => {
+                        const groupsForCohort = (
+                          byCohort.get(c.code)?.groups ?? []
+                        )
+                          .slice()
+                          .sort((a, b) => a.name.localeCompare(b.name));
+
+                        return (
+                          <Collapsible
+                            key={`${deptName}:${c.code}`}
+                            defaultOpen={false}
+                            className="space-y-2"
+                          >
+                            <CollapsibleTrigger asChild>
+                              <button
+                                type="button"
+                                className={cn(
+                                  "w-full flex items-center justify-between",
+                                  "rounded-md bg-muted/30 px-3 py-2",
+                                  "text-[11px] font-semibold text-foreground",
+                                )}
+                              >
+                                <span>{c.code}</span>
+                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              </button>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <div className="grid gap-2">
+                                {groupsForCohort.map((g) => (
+                                  <GroupCard
+                                    key={g.id}
+                                    id={g.id}
+                                    name={g.name}
+                                    className="w-full justify-start"
+                                    draggableId={`sidebar:group:${g.id}`}
+                                    dragData={{ type: "group", groupId: g.id }}
+                                  />
+                                ))}
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        );
+                      })}
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
+              })}
+
+            {!props.groups.length ? (
+              <div className="text-xs text-muted-foreground">No groups</div>
+            ) : null}
           </div>
         </SidebarSection>
 

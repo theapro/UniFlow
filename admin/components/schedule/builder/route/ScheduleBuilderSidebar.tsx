@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Eye, Pencil } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 
 import {
   Sidebar,
@@ -14,7 +13,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarGroup,
-  SidebarGroupLabel,
 } from "@/components/ui/sidebar";
 
 import { cn } from "@/lib/utils";
@@ -46,6 +44,7 @@ export function ScheduleBuilderSidebar({
     year,
     loadingMeta,
     loadingGrid,
+    setPageBusy,
   } = useScheduleBuilder();
 
   const rightLabel =
@@ -57,55 +56,67 @@ export function ScheduleBuilderSidebar({
     <Sidebar collapsible="offcanvas" className={cn(className)} {...props}>
       <SidebarHeader>
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              className="data-[slot=sidebar-menu-button]:!p-1.5"
-            >
-              <Link href={`/${lang}/dashboard/schedule`}>
-                <ArrowLeft className="h-4 w-4" />
-                <span className="text-base font-semibold">Schedule</span>
-              </Link>
-            </SidebarMenuButton>
+          <SidebarMenuItem className="w-full">
+            <div className="flex items-center gap-1">
+              <SidebarMenuButton
+                asChild
+                className="data-[slot=sidebar-menu-button]:!p-1.5 flex-1"
+              >
+                <Link href={`/${lang}/dashboard/schedule`}>
+                  <ArrowLeft className="h-4 w-4" />
+                  <span className="text-base font-semibold">Schedule</span>
+                </Link>
+              </SidebarMenuButton>
+
+              <SidebarMenuButton
+                asChild
+                tooltip={readOnly ? "Back to manage" : "Open read-only view"}
+                className="data-[slot=sidebar-menu-button]:!p-1.5 w-9 justify-center"
+              >
+                <Link
+                  href={
+                    readOnly
+                      ? `/${lang}/dashboard/schedule/manage?month=${encodeURIComponent(monthValue)}`
+                      : `/${lang}/dashboard/schedule/view?month=${encodeURIComponent(monthValue)}`
+                  }
+                  onClick={() =>
+                    setPageBusy({
+                      label: readOnly
+                        ? "Opening manage mode…"
+                        : "Opening read-only view…",
+                    })
+                  }
+                  aria-label={
+                    readOnly ? "Back to manage" : "Open read-only view"
+                  }
+                >
+                  {readOnly ? (
+                    <Pencil className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                  <span className="sr-only">
+                    {readOnly ? "Back to manage" : "Open read-only view"}
+                  </span>
+                </Link>
+              </SidebarMenuButton>
+            </div>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
 
       <SidebarContent className="scrollbar-thin">
         <SidebarGroup>
-          <SidebarGroupLabel>Start Date</SidebarGroupLabel>
-          <div className="px-2 pb-2">
+          <div className="px-2 pb-2 space-y-2">
+            <div className="text-sm font-semibold text-foreground">
+              Start Date
+            </div>
+            <div className="text-xs text-muted-foreground">{rightLabel}</div>
             <Input
               type="date"
               value={firstLessonDate}
               onChange={(e) => setFirstLessonDate(e.target.value)}
             />
-            <div className="mt-2 text-xs text-muted-foreground">
-              {rightLabel}
-            </div>
-          </div>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Mode</SidebarGroupLabel>
-          <div className="px-2 pb-2 space-y-2">
-            {!readOnly ? (
-              <Button asChild variant="outline" className="w-full">
-                <Link
-                  href={`/${lang}/dashboard/schedule/view?month=${encodeURIComponent(monthValue)}`}
-                >
-                  Open read-only view
-                </Link>
-              </Button>
-            ) : (
-              <Button asChild variant="outline" className="w-full">
-                <Link
-                  href={`/${lang}/dashboard/schedule/manage?month=${encodeURIComponent(monthValue)}`}
-                >
-                  Back to manage
-                </Link>
-              </Button>
-            )}
           </div>
         </SidebarGroup>
 

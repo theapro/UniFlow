@@ -5,6 +5,7 @@ import { createContext, useContext } from "react";
 import type {
   DragItem,
   DepartmentGroupAssignment,
+  GroupMeta,
   IdName,
   ScheduleGridState,
   Teacher,
@@ -25,7 +26,11 @@ export type ScheduleBuilderCtx = {
   loadingMeta: boolean;
   loadingGrid: boolean;
 
-  groups: IdName[];
+  // UI-only: show a full-page loading overlay for long actions.
+  pageBusy: { label?: string } | null;
+  setPageBusy: Dispatch<SetStateAction<{ label?: string } | null>>;
+
+  groups: GroupMeta[];
   teachers: Teacher[];
   subjects: IdName[];
   classrooms: IdName[];
@@ -40,7 +45,7 @@ export type ScheduleBuilderCtx = {
   setPositionCount: Dispatch<SetStateAction<number>>;
   maxPositionCount: number;
 
-  groupsInOrder: IdName[];
+  groupsInOrder: GroupMeta[];
 
   grid: ScheduleGridState;
   setGrid: Dispatch<SetStateAction<ScheduleGridState>>;
@@ -61,6 +66,8 @@ export type ScheduleBuilderCtx = {
   // Key: `${date}@@${timeSlotId}@@${primaryGroupId}`; Value: groupIds covered (including primary).
   lessonGroupSpans: Record<string, string[]>;
   setLessonGroupSpans: Dispatch<SetStateAction<Record<string, string[]>>>;
+
+  reloadGrid: () => Promise<void>;
 };
 
 const Ctx = createContext<ScheduleBuilderCtx | null>(null);

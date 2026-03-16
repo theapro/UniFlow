@@ -32,7 +32,7 @@ export const ScheduleRow = memo(function ScheduleRow(props: {
         <div
           className={cn(
             "border-r border-b p-2 text-xs text-muted-foreground",
-            "bg-background sticky left-0 z-10",
+            "bg-background sticky left-0 z-20",
           )}
         >
           {props.showDateLabel ? (
@@ -47,7 +47,7 @@ export const ScheduleRow = memo(function ScheduleRow(props: {
         <div
           className={cn(
             "border-r border-b p-2 text-xs text-muted-foreground",
-            "bg-background sticky left-[160px] z-10",
+            "bg-background sticky left-[160px] z-20",
           )}
         >
           —
@@ -55,7 +55,7 @@ export const ScheduleRow = memo(function ScheduleRow(props: {
         <div
           className={cn(
             "border-r border-b p-2 text-xs text-muted-foreground",
-            "bg-background sticky left-[250px] z-10",
+            "bg-background sticky left-[250px] z-20",
           )}
         >
           —
@@ -88,7 +88,7 @@ export const ScheduleRow = memo(function ScheduleRow(props: {
       <div
         className={cn(
           "border-r border-b p-2 text-xs text-muted-foreground",
-          "bg-background sticky left-0 z-10",
+          "bg-background sticky left-0 z-20",
         )}
       >
         {props.showDateLabel ? (
@@ -103,7 +103,7 @@ export const ScheduleRow = memo(function ScheduleRow(props: {
       <div
         className={cn(
           "border-r border-b p-2 text-xl font-bold text-muted-foreground flex flex-col",
-          "bg-background sticky left-[160px] z-10",
+          "bg-background sticky left-[160px] z-20",
         )}
       >
         {props.row.slotNumber}
@@ -111,7 +111,7 @@ export const ScheduleRow = memo(function ScheduleRow(props: {
       <div
         className={cn(
           "border-r border-b p-2 text-xs text-muted-foreground",
-          "bg-background sticky left-[250px] z-10",
+          "bg-background sticky left-[250px] z-20",
         )}
       >
         {timeRange}

@@ -63,6 +63,11 @@ export function UniFlowSidebar({
 
   const academicItems = [
     {
+      name: dict?.nav?.cohorts ?? "Cohorts",
+      url: `${dashboardBase}/cohorts`,
+      icon: LayersIcon,
+    },
+    {
       name: dict?.nav?.students ?? "Students",
       url: `${dashboardBase}/students`,
       icon: UsersIcon,
@@ -75,11 +80,6 @@ export function UniFlowSidebar({
     {
       name: dict?.nav?.groups ?? "Groups",
       url: `${dashboardBase}/groups`,
-      icon: LayersIcon,
-    },
-    {
-      name: dict?.nav?.parentGroups ?? "Department Groups",
-      url: `${dashboardBase}/parent-groups`,
       icon: LayersIcon,
     },
   ];

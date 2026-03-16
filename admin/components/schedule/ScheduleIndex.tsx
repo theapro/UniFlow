@@ -87,7 +87,7 @@ export function ScheduleIndex(props: { lang: string }) {
         <CardContent className="space-y-2">
           {!loading && !rows.length ? (
             <div className="text-sm text-muted-foreground">
-              No created schedules found. Use "Create new schedule" to start.
+              No created schedules found. Use “Create new schedule” to start.
             </div>
           ) : null}
 

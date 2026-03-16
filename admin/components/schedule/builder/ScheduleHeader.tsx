@@ -26,7 +26,7 @@ export function ScheduleHeader(props: {
           type="date"
           value={props.firstLessonDate}
           onChange={(e) => props.onFirstLessonDateChange(e.target.value)}
-          className="w-[220px]"
+          className="w-[180px]"
         />
       </div>
 

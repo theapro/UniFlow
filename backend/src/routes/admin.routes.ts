@@ -16,6 +16,8 @@ import { AdminGroupController } from "../controllers/admin/AdminGroupController"
 import { AdminGroupService } from "../services/admin/AdminGroupService";
 import { AdminLessonController } from "../controllers/admin/AdminLessonController";
 import { AdminLessonService } from "../services/admin/AdminLessonService";
+import { AdminCohortController } from "../controllers/admin/AdminCohortController";
+import { AdminCohortService } from "../services/admin/AdminCohortService";
 import { AdminParentGroupController } from "../controllers/admin/AdminParentGroupController";
 import { AdminParentGroupService } from "../services/admin/AdminParentGroupService";
 import { AdminAiModelController } from "../controllers/admin/AdminAiModelController";
@@ -34,6 +36,10 @@ import { AdminGradesSheetsController } from "../controllers/admin/AdminGradesShe
 import { AdminPurgeController } from "../controllers/admin/AdminPurgeController";
 import { AdminMonthlyScheduleController } from "../controllers/admin/AdminMonthlyScheduleController";
 import { AdminMonthlyScheduleService } from "../services/admin/AdminMonthlyScheduleService";
+import { AdminAiScheduleController } from "../controllers/admin/AdminAiScheduleController";
+import { AIScheduleGeneratorService } from "../services/scheduling/AIScheduleGeneratorService";
+import { AdminAiGroupsController } from "../controllers/admin/AdminAiGroupsController";
+import { AiGroupLayoutService } from "../services/scheduling/AiGroupLayoutService";
 import { AdminRoomsController } from "../controllers/admin/AdminRoomsController";
 import { AdminRoomsService } from "../services/admin/AdminRoomsService";
 import { AdminTimeSlotsController } from "../controllers/admin/AdminTimeSlotsController";
@@ -71,6 +77,9 @@ const adminSubjectController = new AdminSubjectController(
   new AdminSubjectService(),
 );
 const adminGroupController = new AdminGroupController(new AdminGroupService());
+const adminCohortController = new AdminCohortController(
+  new AdminCohortService(),
+);
 const adminLessonController = new AdminLessonController(
   new AdminLessonService(),
 );
@@ -93,8 +102,16 @@ const adminTeachersSheetsController = new AdminTeachersSheetsController();
 const adminAttendanceSheetsController = new AdminAttendanceSheetsController();
 const adminGradesSheetsController = new AdminGradesSheetsController();
 const adminPurgeController = new AdminPurgeController();
+const adminMonthlyScheduleService = new AdminMonthlyScheduleService();
 const adminMonthlyScheduleController = new AdminMonthlyScheduleController(
-  new AdminMonthlyScheduleService(),
+  adminMonthlyScheduleService,
+);
+const adminAiScheduleController = new AdminAiScheduleController(
+  new AIScheduleGeneratorService(),
+  adminMonthlyScheduleService,
+);
+const adminAiGroupsController = new AdminAiGroupsController(
+  new AiGroupLayoutService(),
 );
 const adminRoomsController = new AdminRoomsController(new AdminRoomsService());
 const adminTimeSlotsController = new AdminTimeSlotsController(
@@ -145,6 +162,12 @@ router.post("/monthly-schedule", adminMonthlyScheduleController.create);
 router.put("/monthly-schedule/:id", adminMonthlyScheduleController.update);
 router.delete("/monthly-schedule/:id", adminMonthlyScheduleController.remove);
 
+// AI Automatic Schedule Generator
+router.post("/ai-schedule/generate", adminAiScheduleController.generate);
+
+// AI Helpers
+router.post("/ai-groups/arrange", adminAiGroupsController.arrange);
+
 // Rooms / TimeSlots
 router.get("/rooms", adminRoomsController.list);
 router.get("/rooms/:id", adminRoomsController.getById);
@@ -179,6 +202,13 @@ router.get("/groups/:id", adminGroupController.getById);
 router.post("/groups", adminGroupController.create);
 router.put("/groups/:id", adminGroupController.update);
 router.delete("/groups/:id", adminGroupController.remove);
+
+// Cohorts
+router.get("/cohorts", adminCohortController.list);
+router.get("/cohorts/:id", adminCohortController.getById);
+router.post("/cohorts", adminCohortController.create);
+router.put("/cohorts/:id", adminCohortController.update);
+router.delete("/cohorts/:id", adminCohortController.remove);
 
 // Parent Groups
 router.get("/parent-groups", adminParentGroupController.list);

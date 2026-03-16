@@ -572,12 +572,20 @@ export class StudentsSheetsSyncService {
 
       const { cohortYear } = parseGroupTab(groupTabName);
 
-      const cohortId = cohortYear
+      const cohortCode = cohortYear ? String(cohortYear).slice(-2) : null;
+
+      const cohortId = cohortCode
         ? (
             await this.prisma.cohort.upsert({
-              where: { year: cohortYear },
-              update: {},
-              create: { year: cohortYear },
+              where: { code: cohortCode },
+              update: {
+                year: cohortYear ?? null,
+              },
+              create: {
+                code: cohortCode,
+                year: cohortYear ?? null,
+                sortOrder: cohortYear ?? 0,
+              },
               select: { id: true },
             })
           ).id

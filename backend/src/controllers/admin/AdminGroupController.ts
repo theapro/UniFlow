@@ -37,12 +37,32 @@ export class AdminGroupController {
 
   create = async (req: Request, res: Response) => {
     try {
-      const { name } = req.body ?? {};
+      const { name, cohortId, parentGroupId } = req.body ?? {};
       if (!name || typeof name !== "string") {
         return fail(res, 400, "name is required");
       }
 
-      const group = await this.groupService.create({ name });
+      if (
+        cohortId !== undefined &&
+        cohortId !== null &&
+        typeof cohortId !== "string"
+      ) {
+        return fail(res, 400, "cohortId must be a string or null");
+      }
+
+      if (
+        parentGroupId !== undefined &&
+        parentGroupId !== null &&
+        typeof parentGroupId !== "string"
+      ) {
+        return fail(res, 400, "parentGroupId must be a string or null");
+      }
+
+      const group = await this.groupService.create({
+        name,
+        cohortId: cohortId === "" ? null : (cohortId as any),
+        parentGroupId: parentGroupId === "" ? null : (parentGroupId as any),
+      });
 
       // Best-effort: create a matching Google Sheets tab.
       if (env.studentsSheetsEnabled) {
@@ -64,7 +84,7 @@ export class AdminGroupController {
 
   update = async (req: Request, res: Response) => {
     try {
-      const { name, parentGroupId } = req.body ?? {};
+      const { name, parentGroupId, cohortId } = req.body ?? {};
 
       if (
         parentGroupId !== undefined &&
@@ -79,6 +99,17 @@ export class AdminGroupController {
           ? null
           : (parentGroupId as string | null | undefined);
 
+      if (
+        cohortId !== undefined &&
+        cohortId !== null &&
+        typeof cohortId !== "string"
+      ) {
+        return fail(res, 400, "cohortId must be a string or null");
+      }
+
+      const normalizedCohortId =
+        cohortId === "" ? null : (cohortId as string | null | undefined);
+
       const prev =
         typeof name === "string"
           ? await this.groupService.getById(req.params.id)
@@ -86,6 +117,9 @@ export class AdminGroupController {
 
       const group = await this.groupService.update(req.params.id, {
         ...(name !== undefined ? { name } : {}),
+        ...(normalizedCohortId !== undefined
+          ? { cohortId: normalizedCohortId }
+          : {}),
         ...(normalizedParentGroupId !== undefined
           ? { parentGroupId: normalizedParentGroupId }
           : {}),

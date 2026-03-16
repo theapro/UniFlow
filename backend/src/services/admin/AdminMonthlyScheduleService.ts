@@ -230,6 +230,89 @@ export type UpdateMonthlyScheduleInput = {
   note?: string | null;
 };
 
+type BulkCreateMode = "all_or_nothing" | "partial";
+
+async function validateScheduleRefsBulk(inputs: CreateMonthlyScheduleInput[]) {
+  const errors: string[] = [];
+
+  const timeSlotIds = new Set<string>();
+  const groupIds = new Set<string>();
+  const teacherIds = new Set<string>();
+  const subjectIds = new Set<string>();
+  const roomIds = new Set<string>();
+
+  for (const input of inputs) {
+    const rawTs = String(input.timeSlotId ?? "").trim();
+    const missing = /^missing:(\d+)$/.exec(rawTs);
+    if (missing) {
+      errors.push(`TimeSlot is not configured for slot #${missing[1]}`);
+    } else if (rawTs) {
+      timeSlotIds.add(rawTs);
+    }
+
+    if (input.groupId) groupIds.add(input.groupId);
+    if (input.teacherId) teacherIds.add(input.teacherId);
+    if (input.subjectId) subjectIds.add(input.subjectId);
+    if (input.roomId) roomIds.add(input.roomId);
+  }
+
+  const [ts, groups, teachers, subjects, rooms] = await Promise.all([
+    timeSlotIds.size
+      ? prisma.timeSlot.findMany({
+          where: { id: { in: Array.from(timeSlotIds) } },
+          select: { id: true },
+          take: 1000,
+        })
+      : Promise.resolve([] as Array<{ id: string }>),
+    groupIds.size
+      ? prisma.group.findMany({
+          where: { id: { in: Array.from(groupIds) } },
+          select: { id: true },
+          take: 2000,
+        })
+      : Promise.resolve([] as Array<{ id: string }>),
+    teacherIds.size
+      ? prisma.teacher.findMany({
+          where: { id: { in: Array.from(teacherIds) } },
+          select: { id: true },
+          take: 2000,
+        })
+      : Promise.resolve([] as Array<{ id: string }>),
+    subjectIds.size
+      ? prisma.subject.findMany({
+          where: { id: { in: Array.from(subjectIds) } },
+          select: { id: true },
+          take: 2000,
+        })
+      : Promise.resolve([] as Array<{ id: string }>),
+    roomIds.size
+      ? prisma.room.findMany({
+          where: { id: { in: Array.from(roomIds) } },
+          select: { id: true },
+          take: 2000,
+        })
+      : Promise.resolve([] as Array<{ id: string }>),
+  ]);
+
+  const tsSet = new Set(ts.map((x) => x.id));
+  const groupSet = new Set(groups.map((x) => x.id));
+  const teacherSet = new Set(teachers.map((x) => x.id));
+  const subjectSet = new Set(subjects.map((x) => x.id));
+  const roomSet = new Set(rooms.map((x) => x.id));
+
+  for (const id of timeSlotIds)
+    if (!tsSet.has(id)) errors.push("TimeSlot not found");
+  for (const id of groupIds)
+    if (!groupSet.has(id)) errors.push("Group not found");
+  for (const id of teacherIds)
+    if (!teacherSet.has(id)) errors.push("Teacher not found");
+  for (const id of subjectIds)
+    if (!subjectSet.has(id)) errors.push("Subject not found");
+  for (const id of roomIds) if (!roomSet.has(id)) errors.push("Room not found");
+
+  return errors;
+}
+
 export class AdminMonthlyScheduleService {
   async listMonths() {
     const rows = await prisma.calendarDay.groupBy({
@@ -624,5 +707,117 @@ export class AdminMonthlyScheduleService {
       }
       throw err;
     }
+  }
+
+  async bulkCreate(
+    inputs: CreateMonthlyScheduleInput[],
+    opts?: { mode?: BulkCreateMode },
+  ) {
+    const mode: BulkCreateMode = opts?.mode ?? "all_or_nothing";
+
+    const list = Array.isArray(inputs) ? inputs : [];
+    if (!list.length) {
+      return {
+        ok: false as const,
+        status: 400,
+        message: "No schedules to create",
+      };
+    }
+
+    // Bulk validate refs for clearer errors and fewer DB roundtrips.
+    const refErrors = await validateScheduleRefsBulk(list);
+    if (refErrors.length) {
+      return {
+        ok: false as const,
+        status: 400,
+        message: Array.from(new Set(refErrors)).join(", "),
+      };
+    }
+
+    // Basic date validation up-front.
+    for (const [i, input] of list.entries()) {
+      const dateUtc = parseISODateOnlyToUTC(input.date);
+      if (!dateUtc) {
+        return {
+          ok: false as const,
+          status: 400,
+          message: `Invalid date at index ${i}`,
+        };
+      }
+    }
+
+    const created = await prisma.$transaction(async (tx) => {
+      let createdCount = 0;
+
+      for (const input of list) {
+        const dateUtc = parseISODateOnlyToUTC(input.date)!;
+        const month = dateUtc.getUTCMonth() + 1;
+        const year = dateUtc.getUTCFullYear();
+        const weekday = getWeekdayUTC(dateUtc);
+
+        const calendarDay = await tx.calendarDay.upsert({
+          where: { date: dateUtc },
+          create: { date: dateUtc, weekday, month, year },
+          update: { weekday, month, year },
+        });
+
+        const conflict = await detectScheduleConflict(tx, {
+          calendarDayId: calendarDay.id,
+          timeSlotId: input.timeSlotId,
+          groupId: input.groupId,
+          teacherId: input.teacherId,
+          subjectId: input.subjectId,
+          roomId: input.roomId ?? null,
+          note: input.note ?? null,
+        });
+
+        if (conflict) {
+          if (mode === "partial") {
+            continue;
+          }
+
+          const label =
+            conflict === "TEACHER"
+              ? "Teacher"
+              : conflict === "GROUP"
+                ? "Group"
+                : "Room";
+          return {
+            kind: "conflict" as const,
+            status: 409,
+            message: `${label} already has a lesson at that time`,
+          };
+        }
+
+        await tx.schedule.create({
+          data: {
+            calendarDayId: calendarDay.id,
+            timeSlotId: input.timeSlotId,
+            groupId: input.groupId,
+            teacherId: input.teacherId,
+            subjectId: input.subjectId,
+            roomId: input.roomId ?? null,
+            note: input.note ?? null,
+          },
+        });
+
+        createdCount += 1;
+      }
+
+      return { kind: "ok" as const, created: createdCount };
+    });
+
+    if (created.kind === "conflict") {
+      return {
+        ok: false as const,
+        status: created.status,
+        message: created.message,
+      };
+    }
+
+    return {
+      ok: true as const,
+      data: { created: created.created },
+    };
   }
 }

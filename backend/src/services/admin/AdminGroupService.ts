@@ -3,10 +3,13 @@ import { prisma } from "../../config/prisma";
 
 export type CreateGroupInput = {
   name: string;
+  cohortId?: string | null;
+  parentGroupId?: string | null;
 };
 
 export type UpdateGroupInput = {
   name?: string;
+  cohortId?: string | null;
   parentGroupId?: string | null;
 };
 
@@ -21,6 +24,7 @@ export class AdminGroupService {
       orderBy: { name: "asc" },
       include: {
         parentGroup: { select: { id: true, name: true } },
+        cohort: { select: { id: true, code: true, sortOrder: true } },
         _count: { select: { students: true } },
       },
       take: params?.take ?? 100,
@@ -33,6 +37,7 @@ export class AdminGroupService {
       where: { id },
       include: {
         parentGroup: { select: { id: true, name: true } },
+        cohort: { select: { id: true, code: true, sortOrder: true } },
         students: { take: 5 },
         _count: { select: { students: true } },
       },
@@ -40,7 +45,13 @@ export class AdminGroupService {
   }
 
   async create(input: CreateGroupInput) {
-    return prisma.group.create({ data: { name: input.name } });
+    return prisma.group.create({
+      data: {
+        name: input.name,
+        cohortId: input.cohortId ?? null,
+        parentGroupId: input.parentGroupId ?? null,
+      },
+    });
   }
 
   async update(id: string, input: UpdateGroupInput) {
@@ -48,6 +59,7 @@ export class AdminGroupService {
       where: { id },
       data: {
         ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.cohortId !== undefined ? { cohortId: input.cohortId } : {}),
         ...(input.parentGroupId !== undefined
           ? { parentGroupId: input.parentGroupId }
           : {}),

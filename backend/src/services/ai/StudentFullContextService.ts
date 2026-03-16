@@ -18,7 +18,7 @@ export type StudentFullContext = {
   group: {
     id: string;
     name: string;
-    cohort: { id: string; year: number } | null;
+    cohort: { id: string; code: string; year: number | null } | null;
   } | null;
   subject: { id: string; name: string } | null;
   teacher: { id: string; name: string } | null;
@@ -156,7 +156,7 @@ export class StudentFullContextService {
       include: {
         group: {
           include: {
-            cohort: { select: { id: true, year: true } },
+            cohort: { select: { id: true, code: true, year: true } },
             gradeBooks: {
               select: {
                 id: true,
@@ -454,7 +454,11 @@ export class StudentFullContextService {
             id: row.group.id,
             name: row.group.name,
             cohort: row.group.cohort
-              ? { id: row.group.cohort.id, year: row.group.cohort.year }
+              ? {
+                  id: row.group.cohort.id,
+                  code: row.group.cohort.code,
+                  year: row.group.cohort.year ?? null,
+                }
               : null,
           }
         : null,

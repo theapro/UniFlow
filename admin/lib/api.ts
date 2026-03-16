@@ -120,6 +120,26 @@ export const groupsApi = {
   remove: (id: string) => axios.delete(`/api/admin/groups/${id}`),
 };
 
+export const cohortsApi = {
+  list: (params?: { q?: string; take?: number; skip?: number }) =>
+    axios.get("/api/admin/cohorts", { params }),
+
+  getById: (id: string) => axios.get(`/api/admin/cohorts/${id}`),
+
+  create: (data: {
+    code: string;
+    sortOrder?: number | null;
+    year?: number | null;
+  }) => axios.post("/api/admin/cohorts", data),
+
+  update: (
+    id: string,
+    patch: { code?: string; sortOrder?: number | null; year?: number | null },
+  ) => axios.put(`/api/admin/cohorts/${id}`, patch),
+
+  remove: (id: string) => axios.delete(`/api/admin/cohorts/${id}`),
+};
+
 export const parentGroupsApi = {
   list: (params?: { q?: string; take?: number; skip?: number }) =>
     axios.get("/api/admin/parent-groups", { params }),
@@ -187,6 +207,45 @@ export const monthlyScheduleApi = {
   ) => axios.put(`/api/admin/monthly-schedule/${id}`, patch),
 
   remove: (id: string) => axios.delete(`/api/admin/monthly-schedule/${id}`),
+};
+
+export const aiScheduleApi = {
+  generate: (data: {
+    month: number;
+    year: number;
+    // New structured input
+    requirements?: Array<{
+      groupId: string;
+      subjectId: string;
+      teacherId: string;
+      roomId?: string | null;
+      lessons: number;
+    }>;
+    notes?: string;
+    workingDays?: number[];
+
+    // Legacy input (still accepted by backend)
+    rules?: Array<{
+      groupId: string;
+      subjectId: string;
+      teacherId: string;
+      roomId?: string | null;
+      lessons: number;
+      note?: string | null;
+    }>;
+    holidays?: string[];
+    teacherUnavailable?: Array<{
+      teacherId: string;
+      date: string;
+      timeSlotId: string;
+    }>;
+    maxSeconds?: number;
+  }) => axios.post("/api/admin/ai-schedule/generate", data),
+};
+
+export const aiGroupsApi = {
+  arrange: (data?: { maxColumns?: number }) =>
+    axios.post("/api/admin/ai-groups/arrange", data ?? {}),
 };
 
 export const roomsApi = {

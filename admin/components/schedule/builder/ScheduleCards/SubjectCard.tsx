@@ -12,14 +12,45 @@ export function SubjectCard(props: {
   dragData?: any;
   className?: string;
 }) {
-  const draggable = props.draggableId
-    ? useDraggable({
-        id: props.draggableId,
-        data: props.dragData,
-      })
-    : null;
+  if (!props.draggableId) {
+    return (
+      <div
+        className={cn(
+          "select-none",
+          "inline-flex max-w-full items-center gap-2",
+          "rounded-md border bg-card px-3 py-2 text-sm shadow-sm",
+          "min-h-9",
+          props.className,
+        )}
+      >
+        <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="truncate font-semibold">{props.name}</span>
+      </div>
+    );
+  }
 
-  const style = draggable?.transform
+  return (
+    <DraggableSubjectCard
+      draggableId={props.draggableId}
+      dragData={props.dragData}
+      name={props.name}
+      className={props.className}
+    />
+  );
+}
+
+function DraggableSubjectCard(props: {
+  draggableId: string;
+  dragData?: any;
+  name: string;
+  className?: string;
+}) {
+  const draggable = useDraggable({
+    id: props.draggableId,
+    data: props.dragData,
+  });
+
+  const style = draggable.transform
     ? {
         transform: `translate3d(${draggable.transform.x}px, ${draggable.transform.y}px, 0)`,
       }
@@ -27,19 +58,19 @@ export function SubjectCard(props: {
 
   return (
     <div
-      ref={draggable?.setNodeRef}
+      ref={draggable.setNodeRef}
       style={style}
       className={cn(
         "select-none",
         "inline-flex max-w-full items-center gap-2",
         "rounded-md border bg-card px-3 py-2 text-sm shadow-sm",
         "min-h-9",
-        draggable ? "cursor-grab active:cursor-grabbing" : "",
-        draggable?.isDragging ? "opacity-60" : "",
+        "cursor-grab active:cursor-grabbing",
+        draggable.isDragging ? "opacity-60" : "",
         props.className,
       )}
-      {...(draggable ? draggable.listeners : {})}
-      {...(draggable ? draggable.attributes : {})}
+      {...draggable.listeners}
+      {...draggable.attributes}
     >
       <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />
       <span className="truncate font-semibold">{props.name}</span>

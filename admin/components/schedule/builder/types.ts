@@ -1,5 +1,10 @@
 export type IdName = { id: string; name: string };
 
+export type GroupMeta = IdName & {
+  parentGroup?: { id?: string; name?: string } | null;
+  cohort?: { id?: string; code?: string; sortOrder?: number } | null;
+};
+
 export type Teacher = { id: string; fullName: string };
 
 export type TimeSlot = {
@@ -61,12 +66,14 @@ export type DepartmentGroupCategoryKey =
   | "it"
   | "japanese"
   | "partner_university"
+  | "employability_cowork"
   | "language_university";
 
 export type DepartmentGroupDepartment =
   | "IT"
   | "Japanese"
   | "Partner University"
+  | "Employability/Cowork"
   | "Language University";
 
 export const DEPARTMENT_GROUP_ROWS: Array<{
@@ -76,6 +83,7 @@ export const DEPARTMENT_GROUP_ROWS: Array<{
   { key: "it", label: "IT" },
   { key: "japanese", label: "Japanese" },
   { key: "partner_university", label: "Partner University" },
+  { key: "employability_cowork", label: "Employability/Cowork" },
   { key: "language_university", label: "Language University" },
 ];
 

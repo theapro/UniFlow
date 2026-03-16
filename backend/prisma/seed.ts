@@ -60,7 +60,225 @@ async function seedReferenceData() {
     });
   }
 
-  console.log("Skipping subjects, teachers, and groups as requested.");
+  console.log("Skipping subjects and teachers.");
+}
+
+type AcademicDepartmentName =
+  | "IT"
+  | "Japanese"
+  | "Partner University"
+  | "Employability/Cowork"
+  | "Language University";
+
+const ACADEMIC_DEPARTMENTS: AcademicDepartmentName[] = [
+  "IT",
+  "Japanese",
+  "Partner University",
+  "Employability/Cowork",
+  "Language University",
+];
+
+const COHORTS: Array<{
+  code: string;
+  sortOrder: number;
+  year?: number | null;
+}> = [
+  { code: "19/20/21", sortOrder: 10, year: 2021 },
+  { code: "22", sortOrder: 20, year: 2022 },
+  { code: "23", sortOrder: 30, year: 2023 },
+  { code: "24", sortOrder: 40, year: 2024 },
+  { code: "25", sortOrder: 50, year: 2025 },
+];
+
+function jpName(name: string) {
+  // Keep global uniqueness in DB (Group.name is unique).
+  // If Japanese list contains numeric-style names that collide with IT, prefix them.
+  if (/^[0-9]{2}[A-Z]$/.test(name)) return `JP-${name}`;
+  return name;
+}
+
+async function seedAcademicStructure() {
+  console.log("Setting up academic departments (ParentGroup)...");
+
+  const deptByName = new Map<string, { id: string; name: string }>();
+  for (const name of ACADEMIC_DEPARTMENTS) {
+    const row = await prisma.parentGroup.upsert({
+      where: { name },
+      update: {},
+      create: { name },
+      select: { id: true, name: true },
+    });
+    deptByName.set(row.name, row);
+  }
+
+  console.log("Setting up cohorts...");
+  const cohortByCode = new Map<string, { id: string; code: string }>();
+  for (const c of COHORTS) {
+    const row = await prisma.cohort.upsert({
+      where: { code: c.code },
+      update: {
+        sortOrder: c.sortOrder,
+        year: c.year ?? null,
+      },
+      create: {
+        code: c.code,
+        sortOrder: c.sortOrder,
+        year: c.year ?? null,
+      },
+      select: { id: true, code: true },
+    });
+    cohortByCode.set(row.code, row);
+  }
+
+  const deptId = (name: AcademicDepartmentName) => {
+    const d = deptByName.get(name);
+    if (!d) throw new Error(`Missing seeded department: ${name}`);
+    return d.id;
+  };
+
+  const cohortId = (code: string | null) => {
+    if (!code) return null;
+    const c = cohortByCode.get(code);
+    if (!c) throw new Error(`Missing seeded cohort: ${code}`);
+    return c.id;
+  };
+
+  console.log("Setting up groups...");
+
+  const groupsToUpsert: Array<{
+    name: string;
+    department: AcademicDepartmentName;
+    cohortCode: string | null;
+  }> = [
+    // IT
+    { name: "19/20/21", department: "IT", cohortCode: "19/20/21" },
+    ...[
+      "22A",
+      "22B",
+      "23A",
+      "23B",
+      "23C",
+      "23D",
+      "23E",
+      "24A",
+      "24B",
+      "24C",
+      "24D",
+      "25A",
+      "25B",
+      "25C",
+      "25D",
+      "25E",
+      "25F",
+    ].map((name) => ({
+      name,
+      department: "IT" as const,
+      cohortCode: name.startsWith("22")
+        ? "22"
+        : name.startsWith("23")
+          ? "23"
+          : name.startsWith("24")
+            ? "24"
+            : name.startsWith("25")
+              ? "25"
+              : null,
+    })),
+
+    // Japanese (not cohort-sorted; keep cohortCode null by default)
+    ...[
+      "N5A",
+      "N5B",
+      "N5C",
+      "N5D",
+      "25E",
+      "25F",
+      "N2A",
+      "N2B",
+      "N2C",
+      "N2D",
+      "N2E",
+      "N3A",
+      "N3B",
+      "N3C",
+      "N3D",
+      "N3E",
+      "N3F",
+      "N3G",
+      "N4",
+    ].map((name) => ({
+      name: jpName(name),
+      department: "Japanese" as const,
+      cohortCode: null,
+    })),
+
+    // Partner University
+    ...["Sanno F", "Sanno K", "Okayama A", "Okayama B"].map((name) => ({
+      name,
+      department: "Partner University" as const,
+      cohortCode: null,
+    })),
+
+    // Employability/Cowork
+    {
+      name: "Employability 19/20/21 / Co-work 19/20/21",
+      department: "Employability/Cowork",
+      cohortCode: "19/20/21",
+    },
+    {
+      name: "Employability 22 / Co-work 22",
+      department: "Employability/Cowork",
+      cohortCode: "22",
+    },
+    {
+      name: "Employability 23 / Co-work 23",
+      department: "Employability/Cowork",
+      cohortCode: "23",
+    },
+    {
+      name: "Employability 24 / Co-work 24",
+      department: "Employability/Cowork",
+      cohortCode: "24",
+    },
+    {
+      name: "Employability 25 A",
+      department: "Employability/Cowork",
+      cohortCode: "25",
+    },
+    {
+      name: "Employability 25 B",
+      department: "Employability/Cowork",
+      cohortCode: "25",
+    },
+
+    // Language University
+    ...[
+      "UZBEK TILI A / Dinshunoslik A",
+      "UZBEK TILI B / Dinshunoslik B",
+      "UZBEK TILI D / Dinshunoslik D",
+      "UZBEK TILI E / Dinshunoslik E",
+      "UZBEK TILI F / Dinshunoslik F",
+    ].map((name) => ({
+      name,
+      department: "Language University" as const,
+      cohortCode: null,
+    })),
+  ];
+
+  for (const g of groupsToUpsert) {
+    await prisma.group.upsert({
+      where: { name: g.name },
+      update: {
+        parentGroupId: deptId(g.department),
+        cohortId: cohortId(g.cohortCode),
+      },
+      create: {
+        name: g.name,
+        parentGroupId: deptId(g.department),
+        cohortId: cohortId(g.cohortCode),
+      },
+      select: { id: true },
+    });
+  }
 }
 
 async function seedAiModels() {
@@ -209,6 +427,7 @@ async function main() {
   console.log("Seeding database...");
   await upsertAdmin();
   await seedReferenceData();
+  await seedAcademicStructure();
   await seedAiModels();
   console.log("✓ Seed complete");
   console.log(

@@ -19,6 +19,7 @@ export const ScheduleCell = memo(function ScheduleCell(props: {
   return (
     <div
       ref={setNodeRef}
+      data-droppable-id={props.droppableId}
       className={cn(
         "relative min-h-[120px] border-r border-b p-2.5",
         "bg-background",

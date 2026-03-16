@@ -1,11 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { monthlyScheduleApi } from "@/lib/api";
-import { Button } from "@/components/ui/button";
 
 import { ScheduleGrid } from "../ScheduleGrid";
 import { ScheduleCell } from "../ScheduleCell";
@@ -32,11 +31,20 @@ function pad2(n: number) {
   return String(n).padStart(2, "0");
 }
 
-const GROUP_COL_WIDTH_PX = 220;
+const GROUP_COL_WIDTH_PX = 180;
 const CELL_EXTRA_PX = 12;
 
 function cellKey(cell: CellRef) {
   return `${cell.date}@@${cell.timeSlotId}@@${cell.groupId}`;
+}
+
+function parseCellDroppableId(id: string): CellRef | null {
+  const raw = String(id ?? "");
+  if (!raw.startsWith("cell:")) return null;
+  const rest = raw.slice("cell:".length);
+  const [date, timeSlotId, groupId] = rest.split("@@");
+  if (!date || !timeSlotId || !groupId) return null;
+  return { date, timeSlotId, groupId };
 }
 
 export function ScheduleWorkspace() {
@@ -109,6 +117,67 @@ export function ScheduleWorkspace() {
 
     return map;
   }, [lessonGroupSpans]);
+
+  const cohortWideEmployabilityByPosition = useMemo(() => {
+    const employabilityByPos = new Map<number, string>();
+    for (const a of departmentGroupAssignments) {
+      if (a.department !== "Employability/Cowork") continue;
+      employabilityByPos.set(a.position, a.groupId);
+    }
+
+    const out: Array<{
+      start: number;
+      end: number;
+      spanCount: number;
+      cohortCode: string;
+      employabilityGroupId: string;
+    } | null> = Array.from({ length: groupsInOrder.length }, () => null);
+
+    let i = 0;
+    while (i < groupsInOrder.length) {
+      const g = groupsInOrder[i];
+      const isIT = String(g.parentGroup?.name ?? "") === "IT";
+      const cohortCode = g.cohort?.code ? String(g.cohort.code) : "";
+      if (!isIT || !cohortCode) {
+        i += 1;
+        continue;
+      }
+
+      let start = i;
+      let end = i;
+      while (end + 1 < groupsInOrder.length) {
+        const next = groupsInOrder[end + 1];
+        const nextIsIT = String(next.parentGroup?.name ?? "") === "IT";
+        const nextCode = next.cohort?.code ? String(next.cohort.code) : "";
+        if (!nextIsIT || nextCode !== cohortCode) break;
+        end += 1;
+      }
+
+      let employabilityGroupId: string | null = null;
+      for (let p = start; p <= end; p += 1) {
+        const gid = employabilityByPos.get(p);
+        if (gid) {
+          employabilityGroupId = gid;
+          break;
+        }
+      }
+
+      if (employabilityGroupId) {
+        const info = {
+          start,
+          end,
+          spanCount: end - start + 1,
+          cohortCode,
+          employabilityGroupId,
+        };
+        for (let p = start; p <= end; p += 1) out[p] = info;
+      }
+
+      i = end + 1;
+    }
+
+    return out;
+  }, [departmentGroupAssignments, groupsInOrder]);
 
   const setSpanGroupIds = (primary: CellRef, groupIds: string[]) => {
     const primaryK = cellKey(primary);
@@ -314,6 +383,103 @@ export function ScheduleWorkspace() {
     setSpanGroupIds(primary, desiredGroupIds);
   };
 
+  const maxSpanFromIndex = (startIndex: number) => {
+    let count = 0;
+    for (let i = startIndex; i < groupsInOrder.length; i += 1) {
+      if (groupsInOrder[i]?.id?.startsWith("__empty__:")) break;
+      count += 1;
+    }
+    return Math.max(1, count);
+  };
+
+  const [resizeDrag, setResizeDrag] = useState<null | {
+    primaryKey: string;
+    primary: CellRef;
+    lesson: LessonCardState;
+    startIndex: number;
+    previewSpan: number;
+  }>(null);
+
+  const beginResize = (
+    e: ReactPointerEvent,
+    params: { primary: CellRef; lesson: LessonCardState; spanCount: number },
+  ) => {
+    if (readOnly) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const startIndex = groupsInOrder.findIndex(
+      (g) => g.id === params.primary.groupId,
+    );
+    if (startIndex < 0) return;
+
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+
+    setResizeDrag({
+      primaryKey: cellKey(params.primary),
+      primary: params.primary,
+      lesson: params.lesson,
+      startIndex,
+      previewSpan: params.spanCount,
+    });
+  };
+
+  const updateResize = (e: ReactPointerEvent) => {
+    if (!resizeDrag) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const elements = document.elementsFromPoint(
+      e.clientX,
+      e.clientY,
+    ) as HTMLElement[];
+
+    const candidateIds: string[] = [];
+    for (const el of elements) {
+      const cellEl = el?.closest?.(
+        '[data-droppable-id^="cell:"]',
+      ) as HTMLElement | null;
+      const id = cellEl?.dataset?.droppableId;
+      if (!id) continue;
+      if (candidateIds[candidateIds.length - 1] === id) continue;
+      candidateIds.push(id);
+    }
+
+    const droppableId = candidateIds[candidateIds.length - 1];
+    if (!droppableId) return;
+    const hovered = parseCellDroppableId(droppableId);
+    if (!hovered) return;
+
+    if (
+      hovered.date !== resizeDrag.primary.date ||
+      hovered.timeSlotId !== resizeDrag.primary.timeSlotId
+    ) {
+      return;
+    }
+
+    const hoveredIndex = groupsInOrder.findIndex(
+      (g) => g.id === hovered.groupId,
+    );
+    if (hoveredIndex < 0) return;
+
+    const desiredSpan = hoveredIndex - resizeDrag.startIndex + 1;
+    const maxSpan = maxSpanFromIndex(resizeDrag.startIndex);
+    const clamped = Math.max(1, Math.min(desiredSpan, maxSpan));
+
+    if (clamped === resizeDrag.previewSpan) return;
+    setResizeDrag((prev) => (prev ? { ...prev, previewSpan: clamped } : prev));
+  };
+
+  const endResize = async (e: ReactPointerEvent) => {
+    if (!resizeDrag) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const current = resizeDrag;
+    setResizeDrag(null);
+    await resizeLesson(current.primary, current.lesson, current.previewSpan);
+  };
+
   const moveLessonToGroup = async (
     from: CellRef,
     lesson: LessonCardState,
@@ -398,13 +564,40 @@ export function ScheduleWorkspace() {
           // have multiple groups assigned in the top department grid. To reduce confusion,
           // we also render lessons for those non-primary groups inside this same column.
 
-          const displayCover = coveredCells.get(cellKey(cell));
-          const isSecondaryCovered =
-            Boolean(displayCover) && displayCover!.index > 0;
-
           const position = groupsInOrder.findIndex(
             (g) => g.id === cell.groupId,
           );
+
+          const cohortWide =
+            position >= 0 ? cohortWideEmployabilityByPosition[position] : null;
+
+          const cohortWideLesson = cohortWide
+            ? getLessonAtCell(grid, {
+                ...cell,
+                groupId: cohortWide.employabilityGroupId,
+              })
+            : null;
+
+          const hasCohortWide = Boolean(cohortWide && cohortWideLesson);
+          const isCohortWideCovered =
+            Boolean(cohortWide && cohortWideLesson) &&
+            position >= 0 &&
+            position !== cohortWide!.start;
+
+          if (isCohortWideCovered) {
+            return (
+              <ScheduleCell
+                key={`${cell.date}:${cell.timeSlotId}:${cell.groupId}`}
+                droppableId={`cell:${cell.date}@@${cell.timeSlotId}@@${cell.groupId}`}
+                isEmpty={false}
+                disabled={readOnly}
+              />
+            );
+          }
+
+          const displayCover = coveredCells.get(cellKey(cell));
+          const isSecondaryCovered =
+            Boolean(displayCover) && displayCover!.index > 0;
           const positionGroupIds =
             position >= 0 ? (groupIdsByPosition.get(position) ?? []) : [];
 
@@ -430,8 +623,19 @@ export function ScheduleWorkspace() {
           };
 
           const picked = pickLessonForVisibleCell();
-          const effectiveCell = picked?.cell ?? cell;
-          const lesson = picked?.lesson;
+
+          const cohortWideEffectiveCell =
+            hasCohortWide && cohortWide
+              ? {
+                  ...cell,
+                  groupId: cohortWide.employabilityGroupId,
+                }
+              : null;
+
+          const effectiveCell = cohortWideEffectiveCell ?? picked?.cell ?? cell;
+          const lesson =
+            (cohortWideLesson as LessonCardState | null | undefined) ??
+            picked?.lesson;
           const isProjected = effectiveCell.groupId !== cell.groupId;
 
           const isEmpty = !lesson && !isSecondaryCovered;
@@ -452,9 +656,23 @@ export function ScheduleWorkspace() {
 
           const primaryKey = cellKey(effectiveCell);
           const spanGroupIds = lessonGroupSpans[primaryKey] ?? null;
-          const spanCount = spanGroupIds?.length ? spanGroupIds.length : 1;
+          const spanCount =
+            hasCohortWide && cohortWide
+              ? cohortWide.spanCount
+              : spanGroupIds?.length
+                ? spanGroupIds.length
+                : 1;
+
+          const liveSpanCount =
+            resizeDrag && resizeDrag.primaryKey === primaryKey
+              ? resizeDrag.previewSpan
+              : spanCount;
 
           const spanLabel = (() => {
+            if (hasCohortWide && cohortWide)
+              return cohortWide.cohortCode
+                ? `${groupName} (${cohortWide.cohortCode})`
+                : groupName;
             if (!spanGroupIds || spanGroupIds.length <= 1) return groupName;
             const names = spanGroupIds
               .map((id) => groupsById.get(id)?.name ?? "")
@@ -471,12 +689,16 @@ export function ScheduleWorkspace() {
               .filter(Boolean) as { id: string; name: string }[];
           })();
 
-          const canGrowRight = (() => {
-            const idx = groupsInOrder.findIndex((g) => g.id === cell.groupId);
+          const canResize = (() => {
+            if (readOnly) return false;
+            if (!lesson) return false;
+            if (isProjected) return false;
+            if (hasCohortWide) return false;
+            const idx = groupsInOrder.findIndex(
+              (g) => g.id === effectiveCell.groupId,
+            );
             if (idx < 0) return false;
-            if (idx + spanCount >= groupsInOrder.length) return false;
-            const next = groupsInOrder[idx + spanCount];
-            return Boolean(next);
+            return maxSpanFromIndex(idx) > 1 || liveSpanCount > 1;
           })();
 
           return (
@@ -489,140 +711,83 @@ export function ScheduleWorkspace() {
               {isSecondaryCovered ? null : lesson ? (
                 <div
                   className={cn(
-                    "absolute inset-0 z-10 p-1.5", // p-2 -> p-1.5 (cell padding bilan bir xil)
+                    "absolute inset-0 z-[5] p-1.5", // keep below sticky headers/side columns
                     "overflow-visible",
                   )}
                   style={
-                    spanCount > 1
+                    liveSpanCount > 1
                       ? {
-                          width: `calc(${spanCount * 100}% + ${(spanCount - 1) * 1}px)`,
+                          width: `calc(${liveSpanCount * 100}% + ${(liveSpanCount - 1) * 1}px)`,
                         }
                       : undefined
                   }
                 >
-                  <LessonCard
-                    draggableId={lessonDraggableId(effectiveCell, lesson)}
-                    dragData={
-                      {
-                        type: "lesson",
-                        from: effectiveCell,
-                        lesson,
-                      } satisfies DragItem
-                    }
-                    draggable={
-                      readOnly ? false : spanCount > 1 ? false : undefined
-                    }
-                    lesson={lesson}
-                    rightActions={
-                      readOnly ? null : (
-                        <div className="flex -mt-2 items-center gap-3">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-4 w-4"
-                            disabled={isProjected || spanCount <= 1}
-                            onClick={() =>
-                              void resizeLesson(cell, lesson, spanCount - 1)
-                            }
-                            aria-label="Shrink lesson width"
-                          >
-                            <ChevronLeft className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-4 w-4"
-                            disabled={isProjected || !canGrowRight}
-                            onClick={() =>
-                              void resizeLesson(cell, lesson, spanCount + 1)
-                            }
-                            aria-label="Expand lesson width"
-                          >
-                            <ChevronRight className="h-4 w-4" />
-                          </Button>
-                          {lesson.kind === "saved" && !isProjected ? (
+                  <div className="relative h-full w-full group/lesson">
+                    <LessonCard
+                      draggableId={lessonDraggableId(effectiveCell, lesson)}
+                      dragData={
+                        {
+                          type: "lesson",
+                          from: effectiveCell,
+                          lesson,
+                        } satisfies DragItem
+                      }
+                      draggable={
+                        readOnly
+                          ? false
+                          : resizeDrag && resizeDrag.primaryKey === primaryKey
+                            ? false
+                            : liveSpanCount > 1
+                              ? false
+                              : undefined
+                      }
+                      lesson={lesson}
+                      rightActions={
+                        readOnly || isProjected ? null : lesson.kind ===
+                          "saved" ? (
+                          <div className="flex -mt-2 items-center gap-3">
                             <LessonExpandGroupsPopover
                               cell={effectiveCell}
                               lesson={lesson}
                             />
-                          ) : null}
-                        </div>
-                      )
-                    }
-                    meta={{
-                      date: effectiveCell.date,
-                      slotNumber: row?.slotNumber,
-                      startTime: row?.startTime,
-                      endTime: row?.endTime,
-                    }}
-                    groupId={effectiveCell.groupId}
-                    groupName={spanLabel}
-                    groupOptions={groupOptions}
-                    groupDropdownDisabled={readOnly || spanCount > 1}
-                    onChangeGroupId={
-                      readOnly
-                        ? undefined
-                        : (gid) =>
-                            void moveLessonToGroup(
-                              effectiveCell,
-                              lesson,
-                              gid,
-                              position,
-                            )
-                    }
-                    subjectName={subjectName}
-                    teacherName={teacherName}
-                    roomName={roomName}
-                    onClearDraft={
-                      readOnly
-                        ? undefined
-                        : lesson.kind === "draft"
-                          ? () => (
-                              setGrid((prev) => {
-                                const ids = spanGroupIds?.length
-                                  ? spanGroupIds
-                                  : [effectiveCell.groupId];
-                                let next = prev;
-                                for (const gid of ids) {
-                                  next = setLessonAtCell(
-                                    next,
-                                    { ...effectiveCell, groupId: gid },
-                                    undefined,
-                                  );
-                                }
-                                return next;
-                              }),
-                              setSpanGroupIds(effectiveCell, [])
-                            )
-                          : undefined
-                    }
-                    onDelete={
-                      readOnly
-                        ? undefined
-                        : lesson.kind === "saved"
-                          ? async () => {
-                              try {
-                                const ids = spanGroupIds?.length
-                                  ? spanGroupIds
-                                  : [effectiveCell.groupId];
-                                const scheduleIds: string[] = [];
-                                ids.forEach((gid) => {
-                                  const l = getLessonAtCell(grid, {
-                                    ...effectiveCell,
-                                    groupId: gid,
-                                  });
-                                  if (l?.kind === "saved")
-                                    scheduleIds.push(l.scheduleId);
-                                });
-
-                                const prevGrid = grid;
-                                const prevSpan = spanGroupIds?.length
-                                  ? [...spanGroupIds]
-                                  : [];
-
+                          </div>
+                        ) : null
+                      }
+                      meta={{
+                        date: effectiveCell.date,
+                        slotNumber: row?.slotNumber,
+                        startTime: row?.startTime,
+                        endTime: row?.endTime,
+                      }}
+                      groupId={effectiveCell.groupId}
+                      groupName={spanLabel}
+                      groupOptions={groupOptions}
+                      groupDropdownDisabled={
+                        readOnly || (!hasCohortWide && liveSpanCount > 1)
+                      }
+                      onChangeGroupId={
+                        readOnly
+                          ? undefined
+                          : (gid) =>
+                              void moveLessonToGroup(
+                                effectiveCell,
+                                lesson,
+                                gid,
+                                position,
+                              )
+                      }
+                      subjectName={subjectName}
+                      teacherName={teacherName}
+                      roomName={roomName}
+                      onClearDraft={
+                        readOnly
+                          ? undefined
+                          : lesson.kind === "draft"
+                            ? () => (
                                 setGrid((prev) => {
+                                  const ids = spanGroupIds?.length
+                                    ? spanGroupIds
+                                    : [effectiveCell.groupId];
                                   let next = prev;
                                   for (const gid of ids) {
                                     next = setLessonAtCell(
@@ -632,39 +797,98 @@ export function ScheduleWorkspace() {
                                     );
                                   }
                                   return next;
-                                });
+                                }),
+                                setSpanGroupIds(effectiveCell, [])
+                              )
+                            : undefined
+                      }
+                      onDelete={
+                        readOnly
+                          ? undefined
+                          : lesson.kind === "saved"
+                            ? async () => {
+                                try {
+                                  const ids = spanGroupIds?.length
+                                    ? spanGroupIds
+                                    : [effectiveCell.groupId];
+                                  const scheduleIds: string[] = [];
+                                  ids.forEach((gid) => {
+                                    const l = getLessonAtCell(grid, {
+                                      ...effectiveCell,
+                                      groupId: gid,
+                                    });
+                                    if (l?.kind === "saved")
+                                      scheduleIds.push(l.scheduleId);
+                                  });
 
-                                if (scheduleIds.length) {
-                                  const results = await Promise.allSettled(
-                                    scheduleIds.map((id) =>
-                                      monthlyScheduleApi.remove(id),
-                                    ),
-                                  );
+                                  const prevGrid = grid;
+                                  const prevSpan = spanGroupIds?.length
+                                    ? [...spanGroupIds]
+                                    : [];
 
-                                  const failed = results.some(
-                                    (r) => r.status === "rejected",
-                                  );
-                                  if (failed) {
-                                    setGrid(prevGrid);
-                                    setSpanGroupIds(effectiveCell, prevSpan);
-                                    toast.error(
-                                      "Some lessons failed to delete",
+                                  setGrid((prev) => {
+                                    let next = prev;
+                                    for (const gid of ids) {
+                                      next = setLessonAtCell(
+                                        next,
+                                        { ...effectiveCell, groupId: gid },
+                                        undefined,
+                                      );
+                                    }
+                                    return next;
+                                  });
+
+                                  if (scheduleIds.length) {
+                                    const results = await Promise.allSettled(
+                                      scheduleIds.map((id) =>
+                                        monthlyScheduleApi.remove(id),
+                                      ),
                                     );
-                                    return;
-                                  }
-                                }
 
-                                setSpanGroupIds(effectiveCell, []);
-                              } catch (err: any) {
-                                toast.error(
-                                  err?.response?.data?.message ??
-                                    "Failed to delete lesson",
-                                );
+                                    const failed = results.some(
+                                      (r) => r.status === "rejected",
+                                    );
+                                    if (failed) {
+                                      setGrid(prevGrid);
+                                      setSpanGroupIds(effectiveCell, prevSpan);
+                                      toast.error(
+                                        "Some lessons failed to delete",
+                                      );
+                                      return;
+                                    }
+                                  }
+
+                                  setSpanGroupIds(effectiveCell, []);
+                                } catch (err: any) {
+                                  toast.error(
+                                    err?.response?.data?.message ??
+                                      "Failed to delete lesson",
+                                  );
+                                }
                               }
-                            }
-                          : undefined
-                    }
-                  />
+                            : undefined
+                      }
+                    />
+
+                    {canResize ? (
+                      <div
+                        className={cn(
+                          "absolute inset-y-0 right-0 w-2",
+                          "cursor-ew-resize",
+                          "opacity-0 group-hover/lesson:opacity-100",
+                        )}
+                        onPointerDown={(e) =>
+                          beginResize(e, {
+                            primary: effectiveCell,
+                            lesson,
+                            spanCount,
+                          })
+                        }
+                        onPointerMove={updateResize}
+                        onPointerUp={(e) => void endResize(e)}
+                      />
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
             </ScheduleCell>

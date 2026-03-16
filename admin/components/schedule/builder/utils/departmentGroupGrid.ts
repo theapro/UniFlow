@@ -29,6 +29,7 @@ export function parseDeptGroupCellDroppableId(id: string): {
     departmentKey !== "it" &&
     departmentKey !== "japanese" &&
     departmentKey !== "partner_university" &&
+    departmentKey !== "employability_cowork" &&
     departmentKey !== "language_university"
   ) {
     return null;
@@ -47,6 +48,8 @@ export function deptKeyToDepartment(
       return "Japanese";
     case "partner_university":
       return "Partner University";
+    case "employability_cowork":
+      return "Employability/Cowork";
     case "language_university":
       return "Language University";
   }

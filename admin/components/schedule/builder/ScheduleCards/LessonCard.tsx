@@ -10,7 +10,7 @@ import {
   MapPin,
   Users,
 } from "lucide-react";
-import { memo, type ReactNode } from "react";
+import { memo, type ReactNode, useId } from "react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -56,13 +56,14 @@ export const LessonCard = memo(
     const isDraggable = props.draggable ?? true;
     const isDraft = props.lesson.kind === "draft";
 
-    const draggable =
-      isDraggable && props.draggableId
-        ? useDraggable({
-            id: props.draggableId,
-            data: props.dragData,
-          })
-        : null;
+    const canDrag = Boolean(isDraggable && props.draggableId);
+    const fallbackId = useId();
+    const dragId = props.draggableId ?? `lesson:${fallbackId}`;
+    const draggable = useDraggable({
+      id: dragId,
+      data: props.dragData,
+      disabled: !canDrag,
+    });
 
     const style = draggable?.transform
       ? {
@@ -75,7 +76,7 @@ export const LessonCard = memo(
 
     return (
       <LessonDetailsTooltip
-        disabled={Boolean(props.isOverlay) || Boolean(draggable?.isDragging)}
+        disabled={Boolean(props.isOverlay) || (canDrag && draggable.isDragging)}
         meta={props.meta}
         groupName={props.groupName}
         subjectName={props.subjectName}
@@ -84,19 +85,18 @@ export const LessonCard = memo(
         note={props.lesson.note}
       >
         <div
-          ref={draggable?.setNodeRef}
+          ref={draggable.setNodeRef}
           style={props.isOverlay ? undefined : style}
           className={cn(
             "group relative flex flex-col rounded-lg border p-2",
-            "bg-card text-card-foreground shadow-sm transition-all",
-            "hover:shadow-md hover:border-primary/40",
+            "bg-muted/40 text-foreground",
+            "hover:bg-muted/50",
             "select-none h-full w-full",
 
-            isDraft &&
-              "border-l-[4px] border-l-amber-500 bg-amber-50 dark:bg-amber-950",
+            isDraft && "border-l-[4px] border-l-amber-500",
 
             props.isOverlay && "shadow-2xl ring-2 ring-primary scale-[1.02]",
-            draggable?.isDragging && !props.isOverlay && "opacity-30",
+            canDrag && draggable.isDragging && !props.isOverlay && "opacity-30",
           )}
         >
           {/* HEADER */}
@@ -119,7 +119,7 @@ export const LessonCard = memo(
                   !props.groupDropdownDisabled ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <button className="inline-flex items-center gap-1 rounded-md bg-[#ea9d05]/30 px-2 py-[2px] text-[10px] font-medium hover:bg-[#ea9d05]/40">
+                        <button className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-[2px] text-[10px] font-medium hover:bg-muted/80">
                           <Users className="h-3 w-3" />
                           <span className="truncate max-w-[90px]">
                             {props.groupName}
@@ -155,7 +155,7 @@ export const LessonCard = memo(
             <div className="flex items-center gap-1">
               {props.rightActions}
 
-              {isDraggable && draggable && (
+              {canDrag && (
                 <div
                   {...draggable.listeners}
                   {...draggable.attributes}

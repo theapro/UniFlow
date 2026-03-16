@@ -1,6 +1,6 @@
 "use client";
 
-import { useDroppable } from "@dnd-kit/core";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { Plus, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -12,18 +12,20 @@ import type {
   DepartmentGroupAssignment,
   DepartmentGroupCategoryKey,
   IdName,
+  GroupMeta,
 } from "./types";
 import { DEPARTMENT_GROUP_ROWS } from "./types";
 import type { TimetableRow } from "./utils/timeSlots";
 import { deptGroupCellDroppableId } from "./utils/departmentGroupGrid";
 import { sortGroupIdsForPosition } from "./utils/department";
 import { ScheduleRow } from "./ScheduleRow";
+import { cohortColorHsl } from "./utils/cohortColors";
 
 export function ScheduleGrid(props: {
   dates: string[];
   timetableRows: TimetableRow[];
   allGroups: IdName[];
-  groupsInOrder: IdName[];
+  groupsInOrder: GroupMeta[];
   groupCols: number;
   gridTemplateColumns: string;
   hasSelectedGroups: boolean;
@@ -53,11 +55,69 @@ export function ScheduleGrid(props: {
     assignmentByCell.set(`${a.department}@@${a.position}`, a);
   }
 
+  const itCohortSpanForPosition = (position: number) => {
+    if (position < 0 || position >= props.groupsInOrder.length) return null;
+    const g = props.groupsInOrder[position];
+    const isIT = String(g.parentGroup?.name ?? "") === "IT";
+    const cohortCode = g.cohort?.code ? String(g.cohort.code) : "";
+    if (!isIT || !cohortCode) return null;
+
+    let start = position;
+    while (start - 1 >= 0) {
+      const prev = props.groupsInOrder[start - 1];
+      const prevIsIT = String(prev.parentGroup?.name ?? "") === "IT";
+      const prevCode = prev.cohort?.code ? String(prev.cohort.code) : "";
+      if (!prevIsIT || prevCode !== cohortCode) break;
+      start -= 1;
+    }
+
+    let end = position;
+    while (end + 1 < props.groupsInOrder.length) {
+      const next = props.groupsInOrder[end + 1];
+      const nextIsIT = String(next.parentGroup?.name ?? "") === "IT";
+      const nextCode = next.cohort?.code ? String(next.cohort.code) : "";
+      if (!nextIsIT || nextCode !== cohortCode) break;
+      end += 1;
+    }
+
+    return { start, end, cohortCode, spanCount: end - start + 1 };
+  };
+
+  const findGroupIdInSpan = (params: {
+    department: DepartmentGroupAssignment["department"];
+    start: number;
+    end: number;
+  }) => {
+    for (let p = params.start; p <= params.end; p += 1) {
+      const a = assignmentByCell.get(`${params.department}@@${p}`);
+      if (a?.groupId) return a.groupId;
+    }
+    return null;
+  };
+
   const clearDeptCell = (
     department: DepartmentGroupAssignment["department"],
     position: number,
   ) => {
     if (props.readOnly) return;
+
+    if (department === "Employability/Cowork") {
+      const span = itCohortSpanForPosition(position);
+      if (span) {
+        props.onChangeDepartmentGroupAssignments(
+          props.departmentGroupAssignments.filter(
+            (a) =>
+              !(
+                a.department === department &&
+                a.position >= span.start &&
+                a.position <= span.end
+              ),
+          ),
+        );
+        return;
+      }
+    }
+
     props.onChangeDepartmentGroupAssignments(
       props.departmentGroupAssignments.filter(
         (a) => !(a.department === department && a.position === position),
@@ -70,6 +130,8 @@ export function ScheduleGrid(props: {
     departmentLabel: DepartmentGroupAssignment["department"];
     position: number;
     isAddColumn: boolean;
+    colSpan?: number;
+    displayGroupId?: string | null;
   }) {
     const droppableId = deptGroupCellDroppableId(
       props2.departmentKey,
@@ -83,10 +145,45 @@ export function ScheduleGrid(props: {
     const a = assignmentByCell.get(
       `${props2.departmentLabel}@@${props2.position}`,
     );
-    const groupName = a?.groupId ? (groupsById.get(a.groupId)?.name ?? "") : "";
+    const effectiveGroupId = props2.displayGroupId ?? a?.groupId ?? "";
+    const groupName = effectiveGroupId
+      ? (groupsById.get(effectiveGroupId)?.name ?? "")
+      : "";
+
+    const itAtPos = props.groupsInOrder[props2.position];
+    const itCohortCode =
+      itAtPos &&
+      String(itAtPos.parentGroup?.name ?? "") === "IT" &&
+      itAtPos.cohort?.code
+        ? String(itAtPos.cohort.code)
+        : "";
+    const itCohortSortOrder =
+      itAtPos &&
+      typeof itAtPos.cohort?.sortOrder === "number" &&
+      Number.isFinite(itAtPos.cohort.sortOrder)
+        ? itAtPos.cohort.sortOrder
+        : null;
+    const itColor = itCohortCode
+      ? cohortColorHsl({ code: itCohortCode, sortOrder: itCohortSortOrder })
+      : null;
+
+    const draggable = useDraggable({
+      id: `deptgrid:${props2.departmentKey}:${props2.position}:${effectiveGroupId || "empty"}`,
+      data: effectiveGroupId
+        ? { type: "group", groupId: effectiveGroupId }
+        : { type: "none" },
+      disabled: !effectiveGroupId || Boolean(props.readOnly),
+    });
 
     return (
-      <div className="border-r border-b p-2">
+      <div
+        className="border-r border-b p-1"
+        style={
+          props2.colSpan
+            ? ({ gridColumn: `span ${props2.colSpan}` } as any)
+            : undefined
+        }
+      >
         <div
           ref={droppable.setNodeRef}
           className={cn(
@@ -99,9 +196,24 @@ export function ScheduleGrid(props: {
           )}
         >
           {groupName ? (
-            <Badge variant="secondary" className="max-w-[140px] truncate">
-              {groupName}
-            </Badge>
+            <span
+              ref={draggable.setNodeRef}
+              {...draggable.attributes}
+              {...draggable.listeners}
+              className={cn(
+                "inline-flex min-w-0",
+                !props.readOnly ? "cursor-grab active:cursor-grabbing" : "",
+                draggable.isDragging ? "opacity-60" : "",
+              )}
+            >
+              <Badge
+                variant="secondary"
+                className={cn("max-w-[140px] truncate border-l-4")}
+                style={{ borderLeftColor: itColor ?? undefined }}
+              >
+                {groupName}
+              </Badge>
+            </span>
           ) : props2.isAddColumn ? (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Plus className="h-4 w-4" />
@@ -152,34 +264,73 @@ export function ScheduleGrid(props: {
                     "border-r border-b p-2 text-xs font-semibold text-foreground",
                     "sticky left-0 z-30 bg-background flex items-center",
                   )}
+                  style={{ gridColumn: "span 3" }}
                 >
                   {row.label}
                 </div>
-                <div
-                  className={cn(
-                    "border-r border-b p-2",
-                    "sticky left-[160px] z-30 bg-background",
-                  )}
-                />
-                <div
-                  className={cn(
-                    "border-r border-b p-2",
-                    "sticky left-[250px] z-30 bg-background",
-                  )}
-                />
 
-                {Array.from({ length: groupCols }).map((_, position) => {
-                  const isAddColumn = position === props.groupsInOrder.length;
-                  return (
-                    <DeptDroppableCell
-                      key={`${row.key}:${position}`}
-                      departmentKey={row.key}
-                      departmentLabel={row.label}
-                      position={position}
-                      isAddColumn={isAddColumn}
-                    />
-                  );
-                })}
+                {row.key === "employability_cowork"
+                  ? (() => {
+                      const cells: React.ReactNode[] = [];
+                      let position = 0;
+                      while (position < groupCols) {
+                        const isAddColumn =
+                          position === props.groupsInOrder.length;
+
+                        const span = itCohortSpanForPosition(position);
+                        if (
+                          span &&
+                          span.start === position &&
+                          span.spanCount > 1
+                        ) {
+                          const gid = findGroupIdInSpan({
+                            department: row.label,
+                            start: span.start,
+                            end: span.end,
+                          });
+
+                          cells.push(
+                            <DeptDroppableCell
+                              key={`${row.key}:${position}`}
+                              departmentKey={row.key}
+                              departmentLabel={row.label}
+                              position={position}
+                              isAddColumn={false}
+                              colSpan={span.spanCount}
+                              displayGroupId={gid}
+                            />,
+                          );
+                          position = span.end + 1;
+                          continue;
+                        }
+
+                        cells.push(
+                          <DeptDroppableCell
+                            key={`${row.key}:${position}`}
+                            departmentKey={row.key}
+                            departmentLabel={row.label}
+                            position={position}
+                            isAddColumn={isAddColumn}
+                          />,
+                        );
+
+                        position += 1;
+                      }
+                      return cells;
+                    })()
+                  : Array.from({ length: groupCols }).map((_, position) => {
+                      const isAddColumn =
+                        position === props.groupsInOrder.length;
+                      return (
+                        <DeptDroppableCell
+                          key={`${row.key}:${position}`}
+                          departmentKey={row.key}
+                          departmentLabel={row.label}
+                          position={position}
+                          isAddColumn={isAddColumn}
+                        />
+                      );
+                    })}
               </div>
             ))}
           </div>
@@ -190,7 +341,7 @@ export function ScheduleGrid(props: {
           >
             <div
               className={cn(
-                "border-r p-2 text-xs font-semibold text-foreground",
+                "border-r p-1 text-xs font-semibold text-foreground",
                 "sticky left-0 z-30 bg-background flex items-center justify-center",
               )}
             >
@@ -198,7 +349,7 @@ export function ScheduleGrid(props: {
             </div>
             <div
               className={cn(
-                "border-r p-2 text-xs font-semibold text-foreground",
+                "border-r p-1 text-xs font-semibold text-foreground",
                 "sticky left-[160px] z-30 bg-background flex items-center justify-center",
               )}
             >
@@ -206,69 +357,104 @@ export function ScheduleGrid(props: {
             </div>
             <div
               className={cn(
-                "border-r p-2 text-xs font-semibold text-foreground",
+                "border-r p-1 text-xs font-semibold text-foreground",
                 "sticky left-[250px] z-30 bg-background flex items-center justify-center",
               )}
             >
               Time
             </div>
 
-            {props.groupsInOrder.map((g) => (
-              <div
-                key={g.id}
-                className={cn(
-                  "border-r border-b p-2",
-                  "bg-muted/30",
-                  "select-none",
-                )}
-              >
-                {(() => {
-                  const pos = g.id.startsWith("__empty__:")
-                    ? Number(g.id.split(":")[1])
-                    : positionByGroupId.get(g.id);
-                  const ids =
-                    typeof pos === "number"
-                      ? (groupsByPosition.get(pos) ?? [])
-                      : [];
-                  const names = ids
-                    .map((id) => ({ id, name: groupsById.get(id)?.name ?? "" }))
-                    .filter((x) => Boolean(x.name));
+            {(() => {
+              const cells: React.ReactNode[] = [];
+              let position = 0;
+              const emptyCount = Math.max(
+                groupCols - props.groupsInOrder.length,
+                0,
+              );
 
-                  return names.length ? (
-                    <div className="flex flex-wrap gap-1">
-                      {names.map((x) => (
-                        <Badge
-                          key={x.id}
-                          variant="secondary"
-                          className="max-w-[170px] truncate"
-                        >
-                          {x.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="h-9" />
+              while (position < groupCols) {
+                const isEmptyCol = position >= props.groupsInOrder.length;
+                if (isEmptyCol) {
+                  const idx = position - props.groupsInOrder.length;
+                  cells.push(
+                    <div
+                      key={`__empty_header__:${idx}`}
+                      className="border-r border-b p-1 bg-muted/20"
+                    >
+                      {idx === 0 && emptyCount > 0 ? (
+                        <div className="flex h-9 items-center justify-center text-muted-foreground">
+                          <Plus className="h-4 w-4" />
+                        </div>
+                      ) : (
+                        <div className="h-9" />
+                      )}
+                    </div>,
                   );
-                })()}
-              </div>
-            ))}
+                  position += 1;
+                  continue;
+                }
 
-            {Array.from({
-              length: Math.max(groupCols - props.groupsInOrder.length, 0),
-            }).map((_, idx) => (
-              <div
-                key={`__empty_header__:${idx}`}
-                className="border-r border-b p-2 bg-muted/20"
-              >
-                {idx === 0 ? (
-                  <div className="flex h-9 items-center justify-center text-muted-foreground">
-                    <Plus className="h-4 w-4" />
-                  </div>
-                ) : (
-                  <div className="h-9" />
-                )}
-              </div>
-            ))}
+                const span = itCohortSpanForPosition(position);
+                if (span && span.start === position) {
+                  const mark =
+                    /\d+/.exec(span.cohortCode)?.[0] ?? span.cohortCode;
+                  const it = props.groupsInOrder[position];
+                  const cohortSortOrder = Number(it?.cohort?.sortOrder ?? NaN);
+                  const color = cohortColorHsl({
+                    code: span.cohortCode,
+                    sortOrder: Number.isFinite(cohortSortOrder)
+                      ? cohortSortOrder
+                      : null,
+                  });
+
+                  cells.push(
+                    <div
+                      key={`cohort:${span.cohortCode}:${position}`}
+                      className={cn(
+                        "border-r border-b p-1",
+                        "bg-muted/30",
+                        "select-none relative",
+                        "flex items-center justify-center",
+                      )}
+                      style={{ gridColumn: `span ${span.spanCount}` } as any}
+                    >
+                      {color ? (
+                        <div
+                          className="absolute left-0 right-0 top-0 h-1"
+                          style={{ backgroundColor: color }}
+                          aria-hidden="true"
+                        />
+                      ) : null}
+                      <Badge
+                        variant="secondary"
+                        className="h-5 px-2 text-[10px] border"
+                        style={{ borderColor: color ?? undefined }}
+                      >
+                        {mark}
+                      </Badge>
+                    </div>,
+                  );
+                  position = span.end + 1;
+                  continue;
+                }
+
+                cells.push(
+                  <div
+                    key={`cohort:blank:${position}`}
+                    className={cn(
+                      "border-r border-b p-1",
+                      "bg-muted/30",
+                      "select-none relative",
+                    )}
+                  >
+                    <div className="h-9" />
+                  </div>,
+                );
+                position += 1;
+              }
+
+              return cells;
+            })()}
           </div>
         </div>
 

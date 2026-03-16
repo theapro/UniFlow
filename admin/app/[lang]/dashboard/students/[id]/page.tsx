@@ -103,7 +103,7 @@ export default function StudentDetailPage({
             <CardHeader className="bg-muted/30 border-b py-4">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-muted-foreground" />
-                Hisob ma'lumotlari
+                Hisob ma&apos;lumotlari
               </CardTitle>
             </CardHeader>
             <CardContent className="p-5 space-y-6">

@@ -9,6 +9,7 @@ const DEPARTMENT_ORDER: DepartmentGroupDepartment[] = [
   "IT",
   "Japanese",
   "Partner University",
+  "Employability/Cowork",
   "Language University",
 ];
 

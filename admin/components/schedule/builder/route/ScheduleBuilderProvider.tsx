@@ -11,7 +11,8 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -33,6 +34,7 @@ import type {
   CellRef,
   DragItem,
   DepartmentGroupAssignment,
+  GroupMeta,
   IdName,
   LessonDraft,
   LessonCardState,
@@ -186,8 +188,9 @@ export function ScheduleBuilderProvider(props: {
 
   const [loadingMeta, setLoadingMeta] = useState(false);
   const [loadingGrid, setLoadingGrid] = useState(false);
+  const [pageBusy, setPageBusy] = useState<{ label?: string } | null>(null);
 
-  const [groups, setGroups] = useState<IdName[]>([]);
+  const [groups, setGroups] = useState<GroupMeta[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [subjects, setSubjects] = useState<IdName[]>([]);
   const [classrooms, setClassrooms] = useState<IdName[]>([]);
@@ -250,13 +253,13 @@ export function ScheduleBuilderProvider(props: {
   }, [classrooms]);
 
   const groupsById = useMemo(() => {
-    const map = new Map<string, IdName>();
+    const map = new Map<string, GroupMeta>();
     for (const g of groups) map.set(g.id, g);
     return map;
   }, [groups]);
 
   const groupsInOrder = useMemo(() => {
-    const out: IdName[] = [];
+    const out: GroupMeta[] = [];
     for (let pos = 0; pos < positionCount; pos += 1) {
       const ids = sortGroupIdsForPosition(departmentGroupAssignments, pos);
       const preferred = groupOrder[pos] ?? null;
@@ -283,7 +286,7 @@ export function ScheduleBuilderProvider(props: {
   const groupCols = positionCount + (positionCount < maxPositionCount ? 1 : 0);
 
   const gridTemplateColumns = useMemo(() => {
-    return `160px 90px 120px repeat(${groupCols}, 220px)`;
+    return `160px 90px 120px repeat(${groupCols}, 180px)`;
   }, [groupCols]);
 
   // Layout (department rows + primary group per column) is UI state and must survive refresh.
@@ -345,7 +348,7 @@ export function ScheduleBuilderProvider(props: {
         ]);
 
         if (!active) return;
-        setGroups((gRes.data?.data ?? []) as IdName[]);
+        setGroups((gRes.data?.data ?? []) as GroupMeta[]);
         setTeachers((tRes.data?.data ?? []) as Teacher[]);
         setSubjects((sRes.data?.data ?? []) as IdName[]);
         setClassrooms((rRes.data?.data ?? []) as IdName[]);
@@ -366,65 +369,69 @@ export function ScheduleBuilderProvider(props: {
     };
   }, []);
 
+  const mountedRef = useRef(true);
   useEffect(() => {
-    let active = true;
-    const run = async () => {
-      setLoadingGrid(true);
-      try {
-        const res = await monthlyScheduleApi.list({ month, year });
-        if (!active) return;
-
-        const rows = (res.data?.data ?? []) as MonthlyScheduleRow[];
-        let nextGrid: ScheduleGridState = {};
-        for (const r of rows) {
-          nextGrid = setLessonAtCell(
-            nextGrid,
-            { date: r.date, timeSlotId: r.timeSlotId, groupId: r.groupId },
-            {
-              kind: "saved",
-              scheduleId: r.id,
-              subjectId: r.subjectId,
-              teacherId: r.teacherId,
-              roomId: r.roomId,
-              note: r.note ?? null,
-            },
-          );
-        }
-
-        // If there is no stored layout yet, derive a reasonable default from saved lessons
-        // (one group per column). IMPORTANT: if a layout exists in storage, do NOT override it.
-        if (!hasStoredLayoutRef.current) {
-          const groupIds = Array.from(new Set(rows.map((r) => r.groupId)));
-          const sortedGroupIds = groupIds
-            .slice()
-            .sort((a, b) => a.localeCompare(b))
-            .slice(0, maxPositionCount);
-
-          setDepartmentGroupAssignments(
-            sortedGroupIds.map((groupId, position) => ({
-              department: "IT",
-              position,
-              groupId,
-            })),
-          );
-          setGroupOrder(sortedGroupIds.map((id) => id));
-        }
-
-        setGrid(nextGrid);
-      } catch (err: any) {
-        if (!active) return;
-        toast.error(err?.response?.data?.message ?? "Failed to load schedule");
-        setGrid({});
-      } finally {
-        if (active) setLoadingGrid(false);
-      }
-    };
-
-    void run();
+    mountedRef.current = true;
     return () => {
-      active = false;
+      mountedRef.current = false;
     };
-  }, [month, year, maxPositionCount]);
+  }, []);
+
+  const reloadGrid = useCallback(async () => {
+    setLoadingGrid(true);
+    try {
+      const res = await monthlyScheduleApi.list({ month, year });
+      if (!mountedRef.current) return;
+
+      const rows = (res.data?.data ?? []) as MonthlyScheduleRow[];
+      let nextGrid: ScheduleGridState = {};
+      for (const r of rows) {
+        nextGrid = setLessonAtCell(
+          nextGrid,
+          { date: r.date, timeSlotId: r.timeSlotId, groupId: r.groupId },
+          {
+            kind: "saved",
+            scheduleId: r.id,
+            subjectId: r.subjectId,
+            teacherId: r.teacherId,
+            roomId: r.roomId,
+            note: r.note ?? null,
+          },
+        );
+      }
+
+      // If there is no stored layout yet, derive a reasonable default from saved lessons
+      // (one group per column). IMPORTANT: if a layout exists in storage, do NOT override it.
+      if (!hasStoredLayoutRef.current) {
+        const groupIds = Array.from(new Set(rows.map((r) => r.groupId)));
+        const sortedGroupIds = groupIds
+          .slice()
+          .sort((a, b) => a.localeCompare(b))
+          .slice(0, maxPositionCount);
+
+        setDepartmentGroupAssignments(
+          sortedGroupIds.map((groupId, position) => ({
+            department: "IT",
+            position,
+            groupId,
+          })),
+        );
+        setGroupOrder(sortedGroupIds.map((id) => id));
+      }
+
+      setGrid(nextGrid);
+    } catch (err: any) {
+      if (!mountedRef.current) return;
+      toast.error(err?.response?.data?.message ?? "Failed to load schedule");
+      setGrid({});
+    } finally {
+      if (mountedRef.current) setLoadingGrid(false);
+    }
+  }, [maxPositionCount, month, year]);
+
+  useEffect(() => {
+    void reloadGrid();
+  }, [reloadGrid]);
 
   // Keep positions compact (no gaps) so we don't render empty columns/cells.
   useEffect(() => {
@@ -505,6 +512,123 @@ export function ScheduleBuilderProvider(props: {
         const department = deptKeyToDepartment(deptCell.departmentKey);
         const position = deptCell.position;
 
+        const group = groupsById.get(activeData.groupId);
+        if (!group) {
+          toast.error("Unknown group. Refresh the page and try again.");
+          setActiveDrag(null);
+          return;
+        }
+        const groupDepartment = group?.parentGroup?.name
+          ? String(group.parentGroup.name)
+          : null;
+        if (!groupDepartment) {
+          toast.error(
+            "This group is missing a department. Refresh the page and try again.",
+          );
+          setActiveDrag(null);
+          return;
+        }
+
+        if (groupDepartment !== department) {
+          toast.error(`This group belongs to ${groupDepartment}`);
+          setActiveDrag(null);
+          return;
+        }
+
+        // Special rule: Employability/Cowork is cohort-wide.
+        // When dropped under a specific IT cohort column, it must match that cohort
+        // and will automatically apply to all IT columns for that cohort.
+        if (department === "Employability/Cowork") {
+          const itAtPos = departmentGroupAssignments.find(
+            (a) => a.department === "IT" && a.position === position,
+          );
+          const itGroup = itAtPos ? groupsById.get(itAtPos.groupId) : null;
+          const itCohortCode = itGroup?.cohort?.code
+            ? String(itGroup.cohort.code)
+            : "";
+
+          if (!itGroup || String(itGroup.parentGroup?.name ?? "") !== "IT") {
+            toast.error("Select an IT group in that column first");
+            setActiveDrag(null);
+            return;
+          }
+
+          if (!itCohortCode) {
+            toast.error("That IT group is missing a cohort");
+            setActiveDrag(null);
+            return;
+          }
+
+          const empCohortCode = group?.cohort?.code
+            ? String(group.cohort.code)
+            : "";
+          if (!empCohortCode) {
+            toast.error("Employability/Cowork group is missing a cohort");
+            setActiveDrag(null);
+            return;
+          }
+
+          if (empCohortCode !== itCohortCode) {
+            toast.error(
+              `Cohort mismatch: expected ${itCohortCode}, got ${empCohortCode}`,
+            );
+            setActiveDrag(null);
+            return;
+          }
+
+          const getItCohortAt = (p: number) => {
+            const it = departmentGroupAssignments.find(
+              (a) => a.department === "IT" && a.position === p,
+            );
+            const g = it ? groupsById.get(it.groupId) : null;
+            if (!g) return null;
+            if (String(g.parentGroup?.name ?? "") !== "IT") return null;
+            const code = g.cohort?.code ? String(g.cohort.code) : "";
+            return code || null;
+          };
+
+          let start = position;
+          while (start - 1 >= 0 && getItCohortAt(start - 1) === itCohortCode) {
+            start -= 1;
+          }
+          let end = position;
+          while (
+            end + 1 < maxPositionCount &&
+            getItCohortAt(end + 1) === itCohortCode
+          ) {
+            end += 1;
+          }
+
+          if (position >= maxPositionCount) {
+            toast.error(`Max columns reached (${maxPositionCount})`);
+            setActiveDrag(null);
+            return;
+          }
+
+          setDepartmentGroupAssignments((prev) => {
+            // A group should appear in only one cell total.
+            const withoutGroup = prev.filter((a) => a.groupId !== group.id);
+
+            // Clear any Employability/Cowork cells in this cohort span.
+            const withoutSpan = withoutGroup.filter(
+              (a) =>
+                !(
+                  a.department === "Employability/Cowork" &&
+                  a.position >= start &&
+                  a.position <= end
+                ),
+            );
+
+            return [
+              ...withoutSpan,
+              { department, position: start, groupId: group.id },
+            ];
+          });
+
+          setActiveDrag(null);
+          return;
+        }
+
         if (position >= maxPositionCount) {
           toast.error(`Max columns reached (${maxPositionCount})`);
           setActiveDrag(null);
@@ -562,6 +686,82 @@ export function ScheduleBuilderProvider(props: {
       );
       setActiveDrag(null);
       return;
+    }
+
+    // Guard: if an Employability/Cowork lesson exists for the IT cohort at this date/slot,
+    // treat that slot as cohort-wide and block overlapping drops.
+    const cohortWideBlocker = (() => {
+      const pos = groupsInOrder.findIndex((g) => g.id === cell.groupId);
+      if (pos < 0) return null;
+
+      const primary = groupsById.get(cell.groupId);
+      const isIT = String(primary?.parentGroup?.name ?? "") === "IT";
+      const cohortCode = primary?.cohort?.code
+        ? String(primary.cohort.code)
+        : "";
+      if (!isIT || !cohortCode) return null;
+
+      let start = pos;
+      while (start - 1 >= 0) {
+        const prev = groupsInOrder[start - 1];
+        const prevMeta = groupsById.get(prev.id);
+        const prevIsIT = String(prevMeta?.parentGroup?.name ?? "") === "IT";
+        const prevCode = prevMeta?.cohort?.code
+          ? String(prevMeta.cohort.code)
+          : "";
+        if (!prevIsIT || prevCode !== cohortCode) break;
+        start -= 1;
+      }
+
+      let end = pos;
+      while (end + 1 < groupsInOrder.length) {
+        const next = groupsInOrder[end + 1];
+        const nextMeta = groupsById.get(next.id);
+        const nextIsIT = String(nextMeta?.parentGroup?.name ?? "") === "IT";
+        const nextCode = nextMeta?.cohort?.code
+          ? String(nextMeta.cohort.code)
+          : "";
+        if (!nextIsIT || nextCode !== cohortCode) break;
+        end += 1;
+      }
+
+      const employability = departmentGroupAssignments
+        .filter(
+          (a) =>
+            a.department === "Employability/Cowork" &&
+            a.position >= start &&
+            a.position <= end,
+        )
+        .slice()
+        .sort((a, b) => a.position - b.position)[0];
+
+      const employabilityGroupId = employability?.groupId ?? null;
+      if (!employabilityGroupId) return null;
+
+      const lesson = getLessonAtCell(grid, {
+        date: cell.date,
+        timeSlotId: cell.timeSlotId,
+        groupId: employabilityGroupId,
+      });
+
+      if (!lesson) return null;
+      return { groupId: employabilityGroupId, lesson };
+    })();
+
+    if (cohortWideBlocker) {
+      const isMovingSameLesson =
+        activeData.type === "lesson" &&
+        activeData.from.date === cell.date &&
+        activeData.from.timeSlotId === cell.timeSlotId &&
+        activeData.from.groupId === cohortWideBlocker.groupId;
+
+      if (!isMovingSameLesson) {
+        toast.error(
+          "This slot is blocked by an Employability/Cowork cohort-wide lesson",
+        );
+        setActiveDrag(null);
+        return;
+      }
     }
 
     // 1) Moving a whole LessonCard between cells
@@ -805,6 +1005,8 @@ export function ScheduleBuilderProvider(props: {
     datesInView,
     loadingMeta,
     loadingGrid,
+    pageBusy,
+    setPageBusy,
     groups,
     teachers,
     subjects,
@@ -827,6 +1029,7 @@ export function ScheduleBuilderProvider(props: {
     setDepartmentGroupAssignments,
     lessonGroupSpans,
     setLessonGroupSpans,
+    reloadGrid,
   };
 
   return (
@@ -838,7 +1041,27 @@ export function ScheduleBuilderProvider(props: {
         onDragCancel={onDragCancel}
         onDragEnd={onDragEnd}
       >
-        {props.children}
+        <div className="relative">
+          {props.children}
+
+          {loadingMeta || loadingGrid || pageBusy ? (
+            <div
+              className={
+                "fixed inset-0 z-[1000] flex items-center justify-center bg-background/60 backdrop-blur-sm"
+              }
+              aria-live="polite"
+              aria-busy="true"
+            >
+              <div className="flex items-center gap-2 rounded-md border bg-background/80 px-3 py-2 text-sm text-muted-foreground shadow-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>
+                  {pageBusy?.label ??
+                    (loadingMeta || loadingGrid ? "Loading…" : "Working…")}
+                </span>
+              </div>
+            </div>
+          ) : null}
+        </div>
 
         <DragOverlay>
           {activeDrag?.type === "mini" ? (
