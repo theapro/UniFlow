@@ -21,7 +21,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 
-import type { GroupMeta, IdName, Teacher } from "./types";
+import type { GroupMeta, IdName, SubjectMeta, Teacher } from "./types";
 import {
   ClassroomCard,
   GroupCard,
@@ -57,7 +57,7 @@ function SidebarSection(props: {
 
 export function ScheduleSidebar(props: {
   groups: GroupMeta[];
-  subjects: IdName[];
+  subjects: SubjectMeta[];
   teachers: Teacher[];
   classrooms: IdName[];
   className?: string;
@@ -74,11 +74,12 @@ export function ScheduleSidebar(props: {
   } = useScheduleBuilder();
   const [aiModalOpen, setAiModalOpen] = useState(false);
 
-  const subjectsById = useMemo(() => {
-    const map = new Map<string, IdName>();
-    for (const s of props.subjects) map.set(s.id, s);
-    return map;
-  }, [props.subjects]);
+  const formatCohortLabel = (c: { code?: string; year?: number | null }) => {
+    const code = String(c.code ?? "").trim();
+    const year = typeof c.year === "number" ? c.year : null;
+    if (!code) return "(No cohort)";
+    return year ? `${code} (${year})` : code;
+  };
 
   const teachersById = useMemo(() => {
     const map = new Map<string, Teacher>();
@@ -91,13 +92,67 @@ export function ScheduleSidebar(props: {
     for (const r of props.classrooms) map.set(r.id, r);
     return map;
   }, [props.classrooms]);
-  const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
   const [selectedTeacherIds, setSelectedTeacherIds] = useState<string[]>([]);
-  const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([]);
 
-  const [resetSubjectSelectKey, setResetSubjectSelectKey] = useState(0);
   const [resetTeacherSelectKey, setResetTeacherSelectKey] = useState(0);
-  const [resetRoomSelectKey, setResetRoomSelectKey] = useState(0);
+
+  const subjectsByDepartment = useMemo(() => {
+    const out = new Map<string, SubjectMeta[]>();
+    for (const s of props.subjects) {
+      const deptName = s.parentGroup?.name
+        ? String(s.parentGroup.name)
+        : "(No department)";
+      const list = out.get(deptName) ?? [];
+      list.push(s);
+      out.set(deptName, list);
+    }
+    return out;
+  }, [props.subjects]);
+
+  const classroomsByFloor = useMemo(() => {
+    const parseFloor = (name: string): number | null => {
+      const raw = String(name ?? "").trim();
+      const m = /(^|\b)(\d{3})(\b|$)/.exec(raw);
+      if (!m) return null;
+      const n = Number(m[2]);
+      if (!Number.isFinite(n) || n < 100 || n > 999) return null;
+      const floor = Math.floor(n / 100);
+      if (floor < 1 || floor > 9) return null;
+      return floor;
+    };
+
+    const out = new Map<string, IdName[]>();
+    for (const r of props.classrooms) {
+      const floor = parseFloor(r.name);
+      const key = floor ? `${floor}-qavat` : "Other";
+      const list = out.get(key) ?? [];
+      list.push(r);
+      out.set(key, list);
+    }
+
+    // Sort: numeric floors first, then Other.
+    const orderedKeys = Array.from(out.keys()).sort((a, b) => {
+      if (a === "Other") return 1;
+      if (b === "Other") return -1;
+      const na = Number(a.split("-")[0]);
+      const nb = Number(b.split("-")[0]);
+      if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+      return a.localeCompare(b);
+    });
+
+    for (const k of orderedKeys) {
+      const list = out.get(k) ?? [];
+      list.sort((a, b) => {
+        const an = Number(a.name);
+        const bn = Number(b.name);
+        if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
+        return a.name.localeCompare(b.name);
+      });
+      out.set(k, list);
+    }
+
+    return { byKey: out, orderedKeys };
+  }, [props.classrooms]);
 
   const groupsByDepartment = useMemo(() => {
     const out = new Map<string, GroupMeta[]>();
@@ -221,21 +276,32 @@ export function ScheduleSidebar(props: {
 
               const byCohort = new Map<
                 string,
-                { sortOrder: number; groups: GroupMeta[] }
+                { sortOrder: number; year: number | null; groups: GroupMeta[] }
               >();
               for (const g of deptGroups) {
                 const code = g.cohort?.code
                   ? String(g.cohort.code)
                   : "(No cohort)";
                 const sortOrder = Number(g.cohort?.sortOrder ?? 999);
-                const entry = byCohort.get(code) ?? { sortOrder, groups: [] };
+                const year =
+                  typeof g.cohort?.year === "number" ? g.cohort.year : null;
+                const entry = byCohort.get(code) ?? {
+                  sortOrder,
+                  year,
+                  groups: [],
+                };
                 entry.groups.push(g);
                 entry.sortOrder = Math.min(entry.sortOrder, sortOrder);
+                entry.year = entry.year ?? year;
                 byCohort.set(code, entry);
               }
 
               const cohortKeys = Array.from(byCohort.entries())
-                .map(([code, v]) => ({ code, sortOrder: v.sortOrder }))
+                .map(([code, v]) => ({
+                  code,
+                  sortOrder: v.sortOrder,
+                  year: v.year,
+                }))
                 .sort((a, b) => {
                   const r = a.sortOrder - b.sortOrder;
                   if (r !== 0) return r;
@@ -299,7 +365,14 @@ export function ScheduleSidebar(props: {
                                     aria-hidden="true"
                                   />
                                 ) : null}
-                                <span>{c.code}</span>
+                                <span>
+                                  {c.code === "(No cohort)"
+                                    ? c.code
+                                    : formatCohortLabel({
+                                        code: c.code,
+                                        year: c.year,
+                                      })}
+                                </span>
                               </span>
                               <ChevronDown className="h-4 w-4 text-muted-foreground" />
                             </button>
@@ -340,21 +413,36 @@ export function ScheduleSidebar(props: {
 
                 const byCohort = new Map<
                   string,
-                  { sortOrder: number; groups: GroupMeta[] }
+                  {
+                    sortOrder: number;
+                    year: number | null;
+                    groups: GroupMeta[];
+                  }
                 >();
                 for (const g of deptGroups) {
                   const code = g.cohort?.code
                     ? String(g.cohort.code)
                     : "(No cohort)";
                   const sortOrder = Number(g.cohort?.sortOrder ?? 999);
-                  const entry = byCohort.get(code) ?? { sortOrder, groups: [] };
+                  const year =
+                    typeof g.cohort?.year === "number" ? g.cohort.year : null;
+                  const entry = byCohort.get(code) ?? {
+                    sortOrder,
+                    year,
+                    groups: [],
+                  };
                   entry.groups.push(g);
                   entry.sortOrder = Math.min(entry.sortOrder, sortOrder);
+                  entry.year = entry.year ?? year;
                   byCohort.set(code, entry);
                 }
 
                 const cohortKeys = Array.from(byCohort.entries())
-                  .map(([code, v]) => ({ code, sortOrder: v.sortOrder }))
+                  .map(([code, v]) => ({
+                    code,
+                    sortOrder: v.sortOrder,
+                    year: v.year,
+                  }))
                   .sort((a, b) => {
                     const r = a.sortOrder - b.sortOrder;
                     if (r !== 0) return r;
@@ -399,7 +487,14 @@ export function ScheduleSidebar(props: {
                                   "text-[11px] font-semibold text-foreground",
                                 )}
                               >
-                                <span>{c.code}</span>
+                                <span>
+                                  {c.code === "(No cohort)"
+                                    ? c.code
+                                    : formatCohortLabel({
+                                        code: c.code,
+                                        year: c.year,
+                                      })}
+                                </span>
                                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
                               </button>
                             </CollapsibleTrigger>
@@ -431,45 +526,229 @@ export function ScheduleSidebar(props: {
           </div>
         </SidebarSection>
 
-        <SidebarSection title="Subjects" hint="Select and drag">
-          <Select
-            key={resetSubjectSelectKey}
-            onValueChange={(id) => {
-              setSelectedSubjectIds((prev) =>
-                prev.includes(id) ? prev : [...prev, id],
-              );
-              setResetSubjectSelectKey((n) => n + 1);
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select a subject" />
-            </SelectTrigger>
-            <SelectContent>
-              {props.subjects.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <SidebarSection title="Subjects" hint="Drag subjects into lessons">
+          <div className="space-y-2">
+            {FIXED_DEPARTMENT_ORDER.map((deptName) => {
+              const deptSubjects = (subjectsByDepartment.get(deptName) ?? [])
+                .slice()
+                .sort((a, b) => a.name.localeCompare(b.name));
+              if (!deptSubjects.length) return null;
 
-          <div className="mt-2 flex flex-wrap gap-2">
-            {selectedSubjectIds
-              .map((id) => subjectsById.get(id))
-              .filter(Boolean)
-              .map((s) => (
-                <SubjectCard
-                  key={s!.id}
-                  id={s!.id}
-                  name={s!.name}
-                  draggableId={`sidebar:subject:${s!.id}`}
-                  dragData={{ type: "mini", kind: "subject", id: s!.id }}
-                />
-              ))}
-            {!selectedSubjectIds.length ? (
-              <div className="text-xs text-muted-foreground">
-                No subjects selected
-              </div>
+              const byCohort = new Map<
+                string,
+                {
+                  sortOrder: number;
+                  year: number | null;
+                  subjects: SubjectMeta[];
+                }
+              >();
+
+              for (const s of deptSubjects) {
+                const code = s.cohort?.code
+                  ? String(s.cohort.code)
+                  : "(No cohort)";
+                const sortOrder = Number(s.cohort?.sortOrder ?? 999);
+                const year =
+                  typeof s.cohort?.year === "number" ? s.cohort.year : null;
+                const entry = byCohort.get(code) ?? {
+                  sortOrder,
+                  year,
+                  subjects: [],
+                };
+                entry.subjects.push(s);
+                entry.sortOrder = Math.min(entry.sortOrder, sortOrder);
+                entry.year = entry.year ?? year;
+                byCohort.set(code, entry);
+              }
+
+              const cohortKeys = Array.from(byCohort.entries())
+                .map(([code, v]) => ({
+                  code,
+                  sortOrder: v.sortOrder,
+                  year: v.year,
+                }))
+                .sort((a, b) => {
+                  const r = a.sortOrder - b.sortOrder;
+                  if (r !== 0) return r;
+                  return a.code.localeCompare(b.code);
+                });
+
+              return (
+                <Collapsible key={deptName} defaultOpen={deptName === "IT"}>
+                  <CollapsibleTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        "w-full flex items-center justify-between",
+                        "rounded-md border bg-card px-3 py-2",
+                        "text-xs font-medium text-foreground",
+                      )}
+                    >
+                      <span>{deptName}</span>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </CollapsibleTrigger>
+
+                  <CollapsibleContent className="space-y-2 pt-2">
+                    {cohortKeys.map((c) => {
+                      const subjectsForCohort = (
+                        byCohort.get(c.code)?.subjects ?? []
+                      )
+                        .slice()
+                        .sort((a, b) => a.name.localeCompare(b.name));
+
+                      const showCohortGrouping = cohortKeys.length > 1;
+                      if (!showCohortGrouping) {
+                        return (
+                          <div
+                            key={`${deptName}:${c.code}`}
+                            className="grid gap-2"
+                          >
+                            {subjectsForCohort.map((s) => (
+                              <SubjectCard
+                                key={s.id}
+                                id={s.id}
+                                name={s.name}
+                                className="w-full justify-start"
+                                draggableId={`sidebar:subject:${s.id}`}
+                                dragData={{
+                                  type: "mini",
+                                  kind: "subject",
+                                  id: s.id,
+                                }}
+                              />
+                            ))}
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <Collapsible
+                          key={`${deptName}:${c.code}`}
+                          defaultOpen={
+                            deptName === "IT" && c.code !== "(No cohort)"
+                          }
+                          className="space-y-2"
+                        >
+                          <CollapsibleTrigger asChild>
+                            <button
+                              type="button"
+                              className={cn(
+                                "w-full flex items-center justify-between",
+                                "rounded-md bg-muted/30 px-3 py-2",
+                                "text-[11px] font-semibold text-foreground",
+                              )}
+                            >
+                              <span className="flex items-center gap-2">
+                                {deptName === "IT" &&
+                                c.code !== "(No cohort)" ? (
+                                  <span
+                                    className="h-2 w-2 shrink-0 rounded-full"
+                                    style={{
+                                      backgroundColor:
+                                        cohortColorHsl({
+                                          code: c.code,
+                                          sortOrder: c.sortOrder,
+                                        }) ?? undefined,
+                                    }}
+                                    aria-hidden="true"
+                                  />
+                                ) : null}
+                                <span>
+                                  {c.code === "(No cohort)"
+                                    ? c.code
+                                    : formatCohortLabel({
+                                        code: c.code,
+                                        year: c.year,
+                                      })}
+                                </span>
+                              </span>
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            </button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="grid gap-2">
+                              {subjectsForCohort.map((s) => (
+                                <SubjectCard
+                                  key={s.id}
+                                  id={s.id}
+                                  name={s.name}
+                                  className="w-full justify-start"
+                                  draggableId={`sidebar:subject:${s.id}`}
+                                  dragData={{
+                                    type: "mini",
+                                    kind: "subject",
+                                    id: s.id,
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      );
+                    })}
+
+                    {!deptSubjects.length ? (
+                      <div className="text-xs text-muted-foreground">
+                        No subjects
+                      </div>
+                    ) : null}
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
+
+            {Array.from(subjectsByDepartment.keys())
+              .filter(
+                (name) =>
+                  !FIXED_DEPARTMENT_ORDER.includes(name as any) &&
+                  (subjectsByDepartment.get(name)?.length ?? 0) > 0,
+              )
+              .sort((a, b) => a.localeCompare(b))
+              .map((deptName) => {
+                const deptSubjects = (subjectsByDepartment.get(deptName) ?? [])
+                  .slice()
+                  .sort((a, b) => a.name.localeCompare(b.name));
+
+                return (
+                  <Collapsible key={deptName} defaultOpen={false}>
+                    <CollapsibleTrigger asChild>
+                      <button
+                        type="button"
+                        className={cn(
+                          "w-full flex items-center justify-between",
+                          "rounded-md border bg-card px-3 py-2",
+                          "text-xs font-medium text-foreground",
+                        )}
+                      >
+                        <span>{deptName}</span>
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-2">
+                      <div className="grid gap-2">
+                        {deptSubjects.map((s) => (
+                          <SubjectCard
+                            key={s.id}
+                            id={s.id}
+                            name={s.name}
+                            className="w-full justify-start"
+                            draggableId={`sidebar:subject:${s.id}`}
+                            dragData={{
+                              type: "mini",
+                              kind: "subject",
+                              id: s.id,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
+              })}
+
+            {!props.subjects.length ? (
+              <div className="text-xs text-muted-foreground">No subjects</div>
             ) : null}
           </div>
         </SidebarSection>
@@ -517,45 +796,50 @@ export function ScheduleSidebar(props: {
           </div>
         </SidebarSection>
 
-        <SidebarSection title="Classrooms" hint="Select and drag">
-          <Select
-            key={resetRoomSelectKey}
-            onValueChange={(id) => {
-              setSelectedRoomIds((prev) =>
-                prev.includes(id) ? prev : [...prev, id],
+        <SidebarSection title="Classrooms" hint="Drag rooms into lessons">
+          <div className="space-y-2">
+            {classroomsByFloor.orderedKeys.map((key) => {
+              const rooms = classroomsByFloor.byKey.get(key) ?? [];
+              if (!rooms.length) return null;
+              return (
+                <Collapsible
+                  key={key}
+                  defaultOpen={key.startsWith("1-") || key.startsWith("2-")}
+                  className="space-y-2"
+                >
+                  <CollapsibleTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        "w-full flex items-center justify-between",
+                        "rounded-md border bg-card px-3 py-2",
+                        "text-xs font-medium text-foreground",
+                      )}
+                    >
+                      <span>{key}</span>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="grid gap-2 pt-2">
+                      {rooms.map((r) => (
+                        <ClassroomCard
+                          key={r.id}
+                          id={r.id}
+                          name={r.name}
+                          className="w-full justify-start"
+                          draggableId={`sidebar:room:${r.id}`}
+                          dragData={{ type: "mini", kind: "room", id: r.id }}
+                        />
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
               );
-              setResetRoomSelectKey((n) => n + 1);
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select a classroom" />
-            </SelectTrigger>
-            <SelectContent>
-              {props.classrooms.map((r) => (
-                <SelectItem key={r.id} value={r.id}>
-                  {r.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            })}
 
-          <div className="mt-2 flex flex-wrap gap-2">
-            {selectedRoomIds
-              .map((id) => classroomsById.get(id))
-              .filter(Boolean)
-              .map((r) => (
-                <ClassroomCard
-                  key={r!.id}
-                  id={r!.id}
-                  name={r!.name}
-                  draggableId={`sidebar:room:${r!.id}`}
-                  dragData={{ type: "mini", kind: "room", id: r!.id }}
-                />
-              ))}
-            {!selectedRoomIds.length ? (
-              <div className="text-xs text-muted-foreground">
-                No classrooms selected
-              </div>
+            {!props.classrooms.length ? (
+              <div className="text-xs text-muted-foreground">No classrooms</div>
             ) : null}
           </div>
         </SidebarSection>

@@ -8,6 +8,7 @@ import type {
   GroupMeta,
   IdName,
   ScheduleGridState,
+  SubjectMeta,
   Teacher,
   TimeSlot,
 } from "../types";
@@ -32,7 +33,7 @@ export type ScheduleBuilderCtx = {
 
   groups: GroupMeta[];
   teachers: Teacher[];
-  subjects: IdName[];
+  subjects: SubjectMeta[];
   classrooms: IdName[];
   timeSlots: TimeSlot[];
 

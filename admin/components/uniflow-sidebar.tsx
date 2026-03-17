@@ -374,11 +374,11 @@ export function UniFlowSidebar({
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
                   <SidebarMenuButton
-                    tooltip={dict?.nav?.aiMonitor ?? "AI Settings"}
+                    tooltip={dict?.nav?.aiSettings ?? "AI Settings"}
                     isActive={isAiActive}
                   >
                     <BrainIcon />
-                    <span>{dict?.nav?.aiMonitor ?? "AI Settings"}</span>
+                    <span>{dict?.nav?.aiSettings ?? "AI Settings"}</span>
                     <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                   </SidebarMenuButton>
                 </CollapsibleTrigger>

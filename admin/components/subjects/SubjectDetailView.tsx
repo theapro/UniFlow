@@ -20,11 +20,20 @@ type Subject = {
   code: string | null;
   createdAt: string;
   updatedAt: string;
+  cohort?: { id: string; code: string; year?: number | null } | null;
+  parentGroup?: { id: string; name: string } | null;
   _count?: {
     teachers: number;
     lessons: number;
   };
 };
+
+function cohortLabel(c?: { code?: string; year?: number | null } | null) {
+  const code = String(c?.code ?? "").trim();
+  if (!code) return "(No cohort)";
+  const year = typeof c?.year === "number" ? c?.year : null;
+  return year ? `${code} (${year})` : code;
+}
 
 export function SubjectDetailView({
   lang,
@@ -102,6 +111,16 @@ export function SubjectDetailView({
                 {dict?.subjects?.noCode ?? "No code"}
               </Badge>
             )}
+
+            {subject.parentGroup?.name ? (
+              <Badge variant="secondary">{subject.parentGroup.name}</Badge>
+            ) : (
+              <Badge variant="outline">(No department)</Badge>
+            )}
+
+            <Badge variant="outline" className="font-mono">
+              {cohortLabel(subject.cohort)}
+            </Badge>
           </div>
         </div>
 

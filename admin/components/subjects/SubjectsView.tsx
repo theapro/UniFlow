@@ -20,8 +20,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DataTable } from "@/components/shared/DataTable";
-import type { ColumnDef } from "@tanstack/react-table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +35,13 @@ type Subject = {
   id: string;
   name: string;
   code: string | null;
+  cohort?: {
+    id: string;
+    code: string;
+    sortOrder: number;
+    year?: number | null;
+  } | null;
+  parentGroup?: { id: string; name: string } | null;
   createdAt: string;
   updatedAt: string;
   _count?: {
@@ -44,6 +49,21 @@ type Subject = {
     lessons: number;
   };
 };
+
+const FIXED_DEPARTMENTS = [
+  "IT",
+  "Japanese",
+  "Partner University",
+  "Employability/Cowork",
+  "Language University",
+] as const;
+
+function cohortLabel(c?: { code?: string; year?: number | null } | null) {
+  const code = String(c?.code ?? "").trim();
+  if (!code) return "(No cohort)";
+  const year = typeof c?.year === "number" ? c?.year : null;
+  return year ? `${code} (${year})` : code;
+}
 
 function fmtDate(value: string | undefined) {
   if (!value) return "-";
@@ -96,111 +116,181 @@ export function SubjectsView({ lang, dict }: { lang: string; dict: any }) {
     },
   });
 
-  const columns: ColumnDef<Subject>[] = [
-    {
-      accessorKey: "name",
-      header: dict?.subjects?.name ?? "Name",
-      cell: ({ row }) => (
-        <div className="flex flex-col">
-          <span className="font-semibold text-primary">
-            {row.getValue("name")}
-          </span>
-          <span className="text-[10px] text-muted-foreground font-mono">
-            {row.original.id}
-          </span>
-        </div>
-      ),
-    },
-    {
-      accessorKey: "code",
-      header: dict?.subjects?.code ?? "Code",
-      cell: ({ row }) =>
-        row.getValue("code") ? (
-          <Badge variant="outline" className="font-mono">
-            {row.getValue("code")}
-          </Badge>
-        ) : (
-          "-"
-        ),
-    },
-    {
-      id: "stats",
-      header: "Stats",
-      cell: ({ row }) => (
-        <div className="flex gap-2 text-xs">
-          <Badge variant="secondary" className="h-5">
-            {row.original._count?.teachers ?? 0} Teachers
-          </Badge>
-        </div>
-      ),
-    },
-    {
-      accessorKey: "updatedAt",
-      header: dict?.common?.updatedAt ?? "Updated",
-      cell: ({ row }) => (
-        <span className="text-xs text-muted-foreground">
-          {fmtDate(row.getValue("updatedAt") as string)}
-        </span>
-      ),
-    },
-    {
-      id: "actions",
-      header: dict?.common?.actions ?? "Actions",
-      cell: ({ row }) => {
-        const subject = row.original;
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreVertical className="h-4 w-4" />
-                <span className="sr-only">Open menu</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
-              <DropdownMenuItem asChild>
-                <Link
-                  href={`/${lang}/dashboard/subjects/${subject.id}/view`}
-                  className="flex items-center gap-2"
-                >
-                  <Eye className="h-3.5 w-3.5" /> View
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link
-                  href={`/${lang}/dashboard/subjects/${subject.id}/edit`}
-                  className="flex items-center gap-2"
-                >
-                  <Pencil className="h-3.5 w-3.5" /> Edit
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  setEditTarget(subject);
-                  setName(subject.name || "");
-                  setCode(subject.code || "");
-                  setEditOpen(true);
-                }}
-                className="flex items-center gap-2"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                Quick Edit
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => setDeleteId(subject.id)}
-                className="text-destructive focus:text-destructive flex items-center gap-2"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      },
-      enableSorting: false,
-      enableHiding: false,
-    },
-  ];
+  const filtered = (subjects ?? []).filter((s: Subject) => {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return true;
+    const hay = [
+      s.name,
+      s.code ?? "",
+      s.parentGroup?.name ?? "",
+      s.cohort?.code ?? "",
+      String(s.cohort?.year ?? ""),
+    ]
+      .join(" ")
+      .toLowerCase();
+    return hay.includes(needle);
+  });
+
+  const subjectsByDept = React.useMemo(() => {
+    const out = new Map<string, Subject[]>();
+    for (const s of filtered) {
+      const deptName = s.parentGroup?.name ?? "(No department)";
+      const list = out.get(deptName) ?? [];
+      list.push(s);
+      out.set(deptName, list);
+    }
+    return out;
+  }, [filtered]);
+
+  const orderedDepts = FIXED_DEPARTMENTS.filter((n) => subjectsByDept.has(n));
+  const otherDepts = Array.from(subjectsByDept.keys())
+    .filter((n) => !orderedDepts.includes(n as any))
+    .sort((a, b) => a.localeCompare(b));
+
+  const renderDept = (deptName: string) => {
+    const deptSubjects = (subjectsByDept.get(deptName) ?? []).slice();
+
+    const byCohort = new Map<
+      string,
+      { sortOrder: number; year: number | null; subjects: Subject[] }
+    >();
+    for (const s of deptSubjects) {
+      const code = s.cohort?.code ? String(s.cohort.code) : "(No cohort)";
+      const sortOrder = Number(s.cohort?.sortOrder ?? 999);
+      const year = typeof s.cohort?.year === "number" ? s.cohort.year : null;
+      const entry = byCohort.get(code) ?? { sortOrder, year, subjects: [] };
+      entry.subjects.push(s);
+      entry.sortOrder = Math.min(entry.sortOrder, sortOrder);
+      entry.year = entry.year ?? year;
+      byCohort.set(code, entry);
+    }
+
+    const cohorts = Array.from(byCohort.entries())
+      .map(([code, v]) => ({ code, sortOrder: v.sortOrder, year: v.year }))
+      .sort((a, b) => {
+        const r = a.sortOrder - b.sortOrder;
+        if (r !== 0) return r;
+        return a.code.localeCompare(b.code);
+      });
+
+    return (
+      <Card key={deptName}>
+        <CardContent className="pt-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="font-semibold">{deptName}</div>
+            <Badge variant="outline" className="text-[10px]">
+              {deptSubjects.length} subjects
+            </Badge>
+          </div>
+
+          <div className="space-y-3">
+            {cohorts.map((c) => {
+              const list = (byCohort.get(c.code)?.subjects ?? [])
+                .slice()
+                .sort((a, b) => a.name.localeCompare(b.name));
+
+              return (
+                <div key={c.code} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="font-mono">
+                      {c.code === "(No cohort)"
+                        ? c.code
+                        : cohortLabel({ code: c.code, year: c.year })}
+                    </Badge>
+                    <div className="text-xs text-muted-foreground">
+                      {list.length} subjects
+                    </div>
+                  </div>
+
+                  <div className="divide-y rounded-md border">
+                    {list.map((subject) => (
+                      <div
+                        key={subject.id}
+                        className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted/50"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">
+                            {subject.name}
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            {subject.code ? (
+                              <Badge variant="outline" className="font-mono">
+                                {subject.code}
+                              </Badge>
+                            ) : null}
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              {subject.id}
+                            </span>
+                            <Badge variant="secondary" className="h-5">
+                              {subject._count?.teachers ?? 0} Teachers
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {fmtDate(subject.updatedAt)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                              <span className="sr-only">Open menu</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem asChild>
+                              <Link
+                                href={`/${lang}/dashboard/subjects/${subject.id}/view`}
+                                className="flex items-center gap-2"
+                              >
+                                <Eye className="h-3.5 w-3.5" /> View
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link
+                                href={`/${lang}/dashboard/subjects/${subject.id}/edit`}
+                                className="flex items-center gap-2"
+                              >
+                                <Pencil className="h-3.5 w-3.5" /> Edit
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditTarget(subject);
+                                setName(subject.name || "");
+                                setCode(subject.code || "");
+                                setEditOpen(true);
+                              }}
+                              className="flex items-center gap-2"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Quick Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => setDeleteId(subject.id)}
+                              className="text-destructive focus:text-destructive flex items-center gap-2"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="container space-y-6 py-4">
@@ -241,23 +331,20 @@ export function SubjectsView({ lang, dict }: { lang: string; dict: any }) {
               />
             </div>
           </div>
-          <DataTable
-            data={(subjects ?? []).filter((s: Subject) => {
-              const needle = q.trim().toLowerCase();
-              if (!needle) return true;
-              return (
-                String(s.name ?? "")
-                  .toLowerCase()
-                  .includes(needle) ||
-                String(s.code ?? "")
-                  .toLowerCase()
-                  .includes(needle)
-              );
-            })}
-            columns={columns}
-            isLoading={isLoading}
-            emptyLabel={dict?.common?.noResults ?? "No results."}
-          />
+          {isLoading ? (
+            <div className="p-6 text-sm text-muted-foreground">
+              {dict?.common?.loading ?? "Loading..."}
+            </div>
+          ) : filtered.length ? (
+            <div className="px-4 pb-4 space-y-4">
+              {orderedDepts.map(renderDept)}
+              {otherDepts.map(renderDept)}
+            </div>
+          ) : (
+            <div className="p-6 text-sm text-muted-foreground">
+              {dict?.common?.noResults ?? "No results."}
+            </div>
+          )}
         </CardContent>
       </Card>
 

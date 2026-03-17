@@ -7,17 +7,57 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Save } from "lucide-react";
 import { toast } from "sonner";
 
-import { subjectsApi } from "@/lib/api";
+import { cohortsApi, parentGroupsApi, subjectsApi } from "@/lib/api";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+type CohortRow = {
+  id: string;
+  code: string;
+  sortOrder: number;
+  year?: number | null;
+};
+
+type ParentGroupRow = {
+  id: string;
+  name: string;
+};
+
+const FIXED_DEPARTMENTS = [
+  "IT",
+  "Japanese",
+  "Partner University",
+  "Employability/Cowork",
+  "Language University",
+] as const;
+
+function cohortLabel(c: CohortRow) {
+  return c.year ? `${c.code} (${c.year})` : c.code;
+}
 
 type Subject = {
   id: string;
   name: string;
   code: string | null;
+  cohortId?: string | null;
+  parentGroupId?: string | null;
+  cohort?: {
+    id: string;
+    code: string;
+    sortOrder: number;
+    year?: number | null;
+  } | null;
+  parentGroup?: { id: string; name: string } | null;
 };
 
 export function SubjectEditView({
@@ -34,6 +74,40 @@ export function SubjectEditView({
 
   const [name, setName] = React.useState("");
   const [code, setCode] = React.useState("");
+  const [parentGroupId, setParentGroupId] = React.useState("");
+  const [cohortId, setCohortId] = React.useState("");
+
+  const { data: cohorts } = useQuery({
+    queryKey: ["cohorts"],
+    queryFn: () => cohortsApi.list({ take: 1000 }).then((r) => r.data.data),
+    staleTime: 60_000,
+  });
+
+  const { data: departments } = useQuery({
+    queryKey: ["parent-groups"],
+    queryFn: () =>
+      parentGroupsApi.list({ take: 1000 }).then((r) => r.data.data),
+    staleTime: 60_000,
+  });
+
+  const sortedCohorts = ((cohorts ?? []) as any as CohortRow[])
+    .slice()
+    .sort((a, b) => {
+      const r = Number(a.sortOrder ?? 999) - Number(b.sortOrder ?? 999);
+      if (r !== 0) return r;
+      return String(a.code ?? "").localeCompare(String(b.code ?? ""));
+    });
+
+  const sortedDepartments = ((departments ?? []) as any as ParentGroupRow[])
+    .slice()
+    .sort((a, b) => {
+      const ai = FIXED_DEPARTMENTS.indexOf(a.name as any);
+      const bi = FIXED_DEPARTMENTS.indexOf(b.name as any);
+      const aRank = ai >= 0 ? ai : 999;
+      const bRank = bi >= 0 ? bi : 999;
+      if (aRank !== bRank) return aRank - bRank;
+      return a.name.localeCompare(b.name);
+    });
 
   const { data: subject, isLoading } = useQuery({
     queryKey: ["subjects", id],
@@ -44,11 +118,17 @@ export function SubjectEditView({
     if (!subject) return;
     setName(subject.name ?? "");
     setCode(subject.code ?? "");
+    setParentGroupId(subject.parentGroup?.id ?? subject.parentGroupId ?? "");
+    setCohortId(subject.cohort?.id ?? subject.cohortId ?? "");
   }, [subject]);
 
   const updateMutation = useMutation({
-    mutationFn: (payload: { name: string; code?: string | null }) =>
-      subjectsApi.update(id, payload),
+    mutationFn: (payload: {
+      name: string;
+      code?: string | null;
+      cohortId: string;
+      parentGroupId: string;
+    }) => subjectsApi.update(id, payload),
     onSuccess: async () => {
       toast.success(dict?.common?.success ?? "Updated successfully");
       await Promise.all([
@@ -62,7 +142,11 @@ export function SubjectEditView({
     },
   });
 
-  const canSubmit = name.trim().length > 0 && !updateMutation.isPending;
+  const canSubmit =
+    name.trim().length > 0 &&
+    Boolean(parentGroupId) &&
+    Boolean(cohortId) &&
+    !updateMutation.isPending;
 
   return (
     <div className="container max-w-2xl mx-auto py-6 space-y-6">
@@ -94,13 +178,53 @@ export function SubjectEditView({
               updateMutation.mutate({
                 name: name.trim(),
                 code: code.trim() ? code.trim() : null,
+                parentGroupId,
+                cohortId,
               });
             }}
             className="space-y-6"
           >
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold">
+                  Department <span className="text-destructive">*</span>
+                </Label>
+                <Select value={parentGroupId} onValueChange={setParentGroupId}>
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sortedDepartments.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold">
+                  Cohort <span className="text-destructive">*</span>
+                </Label>
+                <Select value={cohortId} onValueChange={setCohortId}>
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Select cohort" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sortedCohorts.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {cohortLabel(c)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="name" className="text-sm font-semibold">
-                {dict?.subjects?.name ?? "Subject Name"} {" "}
+                {dict?.subjects?.name ?? "Subject Name"}{" "}
                 <span className="text-destructive">*</span>
               </Label>
               <Input

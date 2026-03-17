@@ -66,7 +66,7 @@ export class AdminSubjectController {
 
   create = async (req: Request, res: Response) => {
     try {
-      const { name, code } = req.body ?? {};
+      const { name, code, cohortId, parentGroupId } = req.body ?? {};
       if (!name || typeof name !== "string") {
         return fail(res, 400, "name is required");
       }
@@ -74,6 +74,11 @@ export class AdminSubjectController {
       const subject = await this.subjectService.create({
         name,
         code: typeof code === "string" ? code : (code ?? null),
+        cohortId: typeof cohortId === "string" ? cohortId : (cohortId ?? null),
+        parentGroupId:
+          typeof parentGroupId === "string"
+            ? parentGroupId
+            : (parentGroupId ?? null),
       });
 
       // Trigger sync to ensure new tab is created in Sheets if needed
@@ -90,7 +95,7 @@ export class AdminSubjectController {
         },
       );
       if (err.code === "P2002") {
-        return fail(res, 400, "Subject with this name already exists");
+        return fail(res, 400, "Subject with this name or code already exists");
       }
       return fail(res, 500, "Failed to create subject");
     }
@@ -98,13 +103,15 @@ export class AdminSubjectController {
 
   update = async (req: Request, res: Response) => {
     try {
-      const { name, code } = req.body ?? {};
+      const { name, code, cohortId, parentGroupId } = req.body ?? {};
 
       const before = await this.subjectService.getById(req.params.id);
 
       const subject = await this.subjectService.update(req.params.id, {
         ...(name !== undefined ? { name } : {}),
         ...(code !== undefined ? { code } : {}),
+        ...(cohortId !== undefined ? { cohortId } : {}),
+        ...(parentGroupId !== undefined ? { parentGroupId } : {}),
       });
 
       // If subject name changed, keep Sheets tab name in sync
@@ -139,7 +146,7 @@ export class AdminSubjectController {
         },
       );
       if (err.code === "P2002") {
-        return fail(res, 400, "Subject with this name already exists");
+        return fail(res, 400, "Subject with this name or code already exists");
       }
       return fail(res, 500, "Failed to update subject");
     }

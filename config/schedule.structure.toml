@@ -1,0 +1,94 @@
+# UniFlow — Schedule structure reference
+# This file is meant to make the schedule layout rules explicit and easy to review.
+# It is not required by runtime code (yet). Keep it in sync with DB seed + UI.
+
+version = 1
+
+[departments]
+# Maps to DB table: ParentGroup.name
+fixedOrder = [
+  "IT",
+  "Japanese",
+  "Partner University",
+  "Employability/Cowork",
+  "Language University",
+]
+
+[cohorts]
+# Maps to DB table: Cohort (code/year/sortOrder)
+items = [
+  { code = "19/20/21", year = 2021, sortOrder = 10 },
+  { code = "22",       year = 2022, sortOrder = 20 },
+  { code = "23",       year = 2023, sortOrder = 30 },
+  { code = "24",       year = 2024, sortOrder = 40 },
+  { code = "25",       year = 2025, sortOrder = 50 },
+]
+
+[groups]
+
+[groups.IT]
+# IT groups are cohort-scoped and should be ordered by cohort (19/20/21, 22, 23, ...)
+items = [
+  "19/20/21",
+  "22A", "22B",
+  "23A", "23B", "23C", "23D", "23E",
+  "24A", "24B", "24C", "24D",
+  "25A", "25B", "25C", "25D", "25E", "25F",
+]
+
+[groups.Japanese]
+# Japanese groups may contain students from multiple cohorts; cohort binding can be nullable.
+# NOTE: If a numeric-style group collides with IT naming, DB seed prefixes it with "JP-".
+items = [
+  "N5A", "N5B", "N5C", "N5D",
+  "25E", "25F",
+  "N2A", "N2B", "N2C", "N2D", "N2E",
+  "N3A", "N3B", "N3C", "N3D", "N3E", "N3F", "N3G",
+  "N4",
+]
+
+[groups.Partner_University]
+items = [
+  "Sanno F", "Sanno K",
+  "Okayama A", "Okayama B",
+]
+
+[groups.Employability_Cowork]
+# Cohort-wide overlay concept in UI: for an IT cohort block (e.g. 23A..23E),
+# a single employability group can span across those columns.
+items = [
+  "Employability 19/20/21 / Co-work 19/20/21",
+  "Employability 22 / Co-work 22",
+  "Employability 23 / Co-work 23",
+  "Employability 24 / Co-work 24",
+  "Employability 25 A",
+  "Employability 25 B",
+]
+
+[groups.Language_University]
+items = [
+  "UZBEK TILI A / Dinshunoslik A",
+  "UZBEK TILI B / Dinshunoslik B",
+  "UZBEK TILI D / Dinshunoslik D",
+  "UZBEK TILI E / Dinshunoslik E",
+  "UZBEK TILI F / Dinshunoslik F",
+]
+
+[schedule]
+# Department rows used in the schedule builder department-grid.
+rows = [
+  "IT",
+  "Japanese",
+  "Partner University",
+  "Employability/Cowork",
+  "Language University",
+]
+
+# Business rule: IT groups can only be placed in IT row/cells in the builder.
+itRowIsStrict = true
+
+[rooms]
+# Floor grouping convention used in Admin UI:
+# - Room names containing a 3-digit number (e.g. 101, 410) are grouped by the first digit.
+# - Non-numeric names ("Faollar zali", "Cowork", ...) stay under "Other".
+floorNumberPattern = "\\b\\d{3}\\b"

@@ -4,11 +4,15 @@ import { prisma } from "../../config/prisma";
 export type CreateSubjectInput = {
   name: string;
   code?: string | null;
+  cohortId?: string | null;
+  parentGroupId?: string | null;
 };
 
 export type UpdateSubjectInput = {
   name?: string;
   code?: string | null;
+  cohortId?: string | null;
+  parentGroupId?: string | null;
 };
 
 export class AdminSubjectService {
@@ -28,6 +32,8 @@ export class AdminSubjectService {
       take: params?.take ?? 100,
       skip: params?.skip ?? 0,
       include: {
+        cohort: true,
+        parentGroup: true,
         _count: {
           select: {
             teachers: true,
@@ -42,6 +48,8 @@ export class AdminSubjectService {
     return prisma.subject.findUnique({
       where: { id },
       include: {
+        cohort: true,
+        parentGroup: true,
         _count: {
           select: {
             teachers: true,
@@ -57,6 +65,12 @@ export class AdminSubjectService {
       data: {
         name: input.name,
         code: input.code ?? null,
+        cohortId: input.cohortId ?? null,
+        parentGroupId: input.parentGroupId ?? null,
+      },
+      include: {
+        cohort: true,
+        parentGroup: true,
       },
     });
   }
@@ -67,6 +81,14 @@ export class AdminSubjectService {
       data: {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.code !== undefined ? { code: input.code } : {}),
+        ...(input.cohortId !== undefined ? { cohortId: input.cohortId } : {}),
+        ...(input.parentGroupId !== undefined
+          ? { parentGroupId: input.parentGroupId }
+          : {}),
+      },
+      include: {
+        cohort: true,
+        parentGroup: true,
       },
     });
   }

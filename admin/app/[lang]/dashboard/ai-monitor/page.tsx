@@ -118,21 +118,6 @@ export default function AIMonitorPage() {
           AI sozlamalari, tool ruxsatlari va usage loglar.
         </p>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Test AI</CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-center justify-between gap-3">
-          <div className="text-sm text-muted-foreground">
-            Student/Teacher rolida AI assistant’ni sinab ko‘ring.
-          </div>
-          <Button asChild>
-            <Link href="../testai">Open /testai</Link>
-          </Button>
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader>
           <CardTitle>Settings</CardTitle>

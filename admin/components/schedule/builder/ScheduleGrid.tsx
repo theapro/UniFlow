@@ -201,14 +201,14 @@ export function ScheduleGrid(props: {
               {...draggable.attributes}
               {...draggable.listeners}
               className={cn(
-                "inline-flex min-w-0",
+                "inline-flex min-w-0 flex-1",
                 !props.readOnly ? "cursor-grab active:cursor-grabbing" : "",
                 draggable.isDragging ? "opacity-60" : "",
               )}
             >
               <Badge
                 variant="secondary"
-                className={cn("max-w-[140px] truncate border-l-4")}
+                className={cn("w-full max-w-none truncate border-l-4")}
                 style={{ borderLeftColor: itColor ?? undefined }}
               >
                 {groupName}
@@ -411,27 +411,41 @@ export function ScheduleGrid(props: {
                     <div
                       key={`cohort:${span.cohortCode}:${position}`}
                       className={cn(
-                        "border-r border-b p-1",
-                        "bg-muted/30",
-                        "select-none relative",
-                        "flex items-center justify-center",
+                        "border-r border-b p-1.5",
+                        "bg-muted/10",
+                        "select-none relative group",
+                        "flex items-center justify-center transition-all duration-200",
                       )}
                       style={{ gridColumn: `span ${span.spanCount}` } as any}
                     >
                       {color ? (
                         <div
-                          className="absolute left-0 right-0 top-0 h-1"
-                          style={{ backgroundColor: color }}
+                          className="absolute left-0 right-0 top-0 h-[3px] opacity-100 group-hover:h-[4px] transition-all"
+                          style={{
+                            backgroundColor: color,
+                            boxShadow: `0 1px 3px ${color}30`,
+                          }}
                           aria-hidden="true"
                         />
                       ) : null}
-                      <Badge
-                        variant="secondary"
-                        className="h-5 px-2 text-[10px] border"
-                        style={{ borderColor: color ?? undefined }}
+
+                      {/* Badge o'rniga toza Text komponenti yoki border-siz Badge */}
+                      <div
+                        className={cn(
+                          "w-full text-center transition-transform group-hover:scale-105",
+                          "font-sans", // Tizimning standart sans-serif fonti
+                        )}
                       >
-                        {mark}
-                      </Badge>
+                        <span
+                          className="text-[14px] font-extrabold tracking-tight block truncate"
+                          style={{
+                            color: color ?? "inherit",
+                            filter: "brightness(0.9)", // Rang juda och bo'lsa, biroz to'qroq ko'rsatadi
+                          }}
+                        >
+                          {mark}
+                        </span>
+                      </div>
                     </div>,
                   );
                   position = span.end + 1;

@@ -12,6 +12,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { Loader2 } from "lucide-react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -39,6 +40,7 @@ import type {
   LessonDraft,
   LessonCardState,
   ScheduleGridState,
+  SubjectMeta,
   Teacher,
   TimeSlot,
 } from "../types";
@@ -176,6 +178,12 @@ export function ScheduleBuilderProvider(props: {
   initialMonth?: string | null;
 }) {
   const readOnly = Boolean(props.readOnly);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchKey = useMemo(
+    () => searchParams?.toString() ?? "",
+    [searchParams],
+  );
   const [firstLessonDate, setFirstLessonDate] = useState(() => {
     return monthToFirstDayISO(props.initialMonth) ?? todayISODateUTC();
   });
@@ -190,9 +198,14 @@ export function ScheduleBuilderProvider(props: {
   const [loadingGrid, setLoadingGrid] = useState(false);
   const [pageBusy, setPageBusy] = useState<{ label?: string } | null>(null);
 
+  // Prevent full-page overlay from getting stuck during mode switches/navigation.
+  useEffect(() => {
+    setPageBusy(null);
+  }, [readOnly, pathname, searchKey]);
+
   const [groups, setGroups] = useState<GroupMeta[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [subjects, setSubjects] = useState<IdName[]>([]);
+  const [subjects, setSubjects] = useState<SubjectMeta[]>([]);
   const [classrooms, setClassrooms] = useState<IdName[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
 
@@ -235,7 +248,7 @@ export function ScheduleBuilderProvider(props: {
   );
 
   const subjectsById = useMemo(() => {
-    const map = new Map<string, IdName>();
+    const map = new Map<string, SubjectMeta>();
     for (const s of subjects) map.set(s.id, s);
     return map;
   }, [subjects]);

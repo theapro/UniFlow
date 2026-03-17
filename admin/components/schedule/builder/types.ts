@@ -1,8 +1,23 @@
 export type IdName = { id: string; name: string };
 
+export type CohortMeta = {
+  id?: string;
+  code?: string;
+  sortOrder?: number;
+  year?: number | null;
+};
+
+export type ParentGroupMeta = { id?: string; name?: string };
+
+export type SubjectMeta = IdName & {
+  code?: string | null;
+  parentGroup?: ParentGroupMeta | null;
+  cohort?: CohortMeta | null;
+};
+
 export type GroupMeta = IdName & {
-  parentGroup?: { id?: string; name?: string } | null;
-  cohort?: { id?: string; code?: string; sortOrder?: number } | null;
+  parentGroup?: ParentGroupMeta | null;
+  cohort?: CohortMeta | null;
 };
 
 export type Teacher = { id: string; fullName: string };

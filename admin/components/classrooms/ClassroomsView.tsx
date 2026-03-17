@@ -32,6 +32,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+function roomFloorLabel(name: string): string | null {
+  const raw = String(name ?? "").trim();
+  const m = /(^|\b)(\d{3})(\b|$)/.exec(raw);
+  if (!m) return null;
+  const n = Number(m[2]);
+  if (!Number.isFinite(n) || n < 100 || n > 999) return null;
+  const floor = Math.floor(n / 100);
+  if (floor < 1 || floor > 9) return null;
+  return `${floor}-qavat`;
+}
+
 type Room = {
   id: string;
   name: string;
@@ -133,6 +144,16 @@ export function ClassroomsView({
           </span>
         </div>
       ),
+    },
+    {
+      id: "floor",
+      header: "Floor",
+      cell: ({ row }) => {
+        const label = roomFloorLabel(row.original.name);
+        return (
+          <span className="text-sm text-muted-foreground">{label ?? "-"}</span>
+        );
+      },
     },
     {
       accessorKey: "capacity",

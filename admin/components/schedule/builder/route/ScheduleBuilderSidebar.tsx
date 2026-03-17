@@ -48,7 +48,7 @@ export function ScheduleBuilderSidebar({
   } = useScheduleBuilder();
 
   const rightLabel =
-    loadingMeta || loadingGrid ? "Loading…" : `Month: ${year}-${pad2(month)}`;
+    loadingMeta || loadingGrid ? "Loading…" : `${year}-${pad2(month)}`;
 
   const monthValue = `${year}-${pad2(month)}`;
 
@@ -107,11 +107,14 @@ export function ScheduleBuilderSidebar({
 
       <SidebarContent className="scrollbar-thin">
         <SidebarGroup>
-          <div className="px-2 pb-2 space-y-2">
+          <div className="pb-2 space-y-2">
+            <div className=" flex items-center justify-between">
+
             <div className="text-sm font-semibold text-foreground">
               Start Date
             </div>
             <div className="text-xs text-muted-foreground">{rightLabel}</div>
+            </div>
             <Input
               type="date"
               value={firstLessonDate}

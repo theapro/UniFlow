@@ -73,6 +73,7 @@ model ParentGroup {
   updatedAt DateTime @updatedAt
 
   groups Group[]
+  subjects Subject[]
 
   @@map("ParentGroup")
 }
@@ -85,6 +86,7 @@ model Cohort {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   groups    Group[]
+  subjects  Subject[]
 
   @@index([sortOrder])
 
@@ -166,12 +168,19 @@ model Subject {
   code            String?         @unique
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
+  cohortId        String?         @db.Char(36)
+  cohort          Cohort?         @relation(fields: [cohortId], references: [id], onDelete: SetNull)
+  parentGroupId   String?         @db.Char(36)
+  parentGroup     ParentGroup?    @relation(fields: [parentGroupId], references: [id], onDelete: SetNull)
   lessons         Lesson[]
   scheduleEntries ScheduleEntry[]
   teachers        Teacher[]       @relation("SubjectToTeacher")
   gradeBooks      GradeBook[]
 
   schedules Schedule[]
+
+  @@index([cohortId])
+  @@index([parentGroupId])
 
   @@map("Subject")
 }
