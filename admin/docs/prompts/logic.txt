@@ -1,0 +1,26 @@
+System Logic o'zgarganligi uchun export to sheets logicni ham fix qilish kerak va guruhlar logic ni ham.
+
+1. Avval avval eski systemda qolgan joylarni fix qilish kerak hozir hamma joyni iloji boricha bir biriga sync qilish kerak 
+
+Cohorts, Students, Groups, Teachers, Subjects, Classrooms, Schedule, Attendanc , Grades va boshqalar
+
+Xullas bunday bo'lishi kerak sytem Logic
+
+Eng avval admin Groups>Students, Subjects>Teachers va Classrooms ni qo'shish kerak bo'ladi
+va bu qo'shilgan ma'lumotlardan foydalanib AI bilan yoki admin o'zi Schedules yarata olishi kerak .
+
+Ho'sh schedule yaratilgandan keyin nima bo'ladi.
+
+Masalan schedule yaratilgandan so'ng qaysi guruhga qaysi subject va qaysi Subject bo'glanganligi aniq bo'ladi. Va buni ichidan ham Studentlarga bog'langan Teacher larni ham aniqlash mumkin shu bilan birga Teacher va Student lar Classroomlari ham aniq bo'ladi.
+
+shunday system logic qilish kerak va Ai ham ma'lumotlarni shu usulda olsin
+Schedule create bo'lgandan keyin Yuqpridagi sync avtomatik bo'lishi kerak
+
+2. SPREADSHEET_ID ni ham admin paneldan qo'shadigan qilgan yaxhsi menimcha adminlarga qular bo'lishi uchun va connect tugmasi bosilishi kerak. Debug uchun errorlar qo'shish kerak bu sheetsda Sizga share qilinmagan yoki sheets id xato degan bular sheets/ pagelarida bo;lishi kerak
+
+
+3. Menga shu yuqoridagilarni tuzib aniq ishlaydigan qilib berishingni hohlayman
+
+4. seed.ts fayliga fake ma'lumotlar qo'sha olasanmi fake email @apro.edu bilan tugashi kerak ismlar turkiy bo'lsin va guruhlar yetarli. Teacherlar ham qo'shish kerak. Classroomlar. Subjectlar IT, Japanese, WLU ga o'xshahs bo'lsin unchalik ko'p subject kerak emas tahminan 20 ta. va Students ham bir Groupga 10 tadan
+
+MUHIM. Report MD. fayli yaratishni unutma

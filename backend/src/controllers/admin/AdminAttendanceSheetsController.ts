@@ -5,12 +5,11 @@ import { created, fail, ok } from "../../utils/responses";
 import { jsonStringArray } from "../../utils/json";
 import { AttendanceSheetsClient } from "../../services/attendance-sheets/AttendanceSheetsClient";
 import { AttendanceSheetsSyncService } from "../../services/attendance-sheets/AttendanceSheetsSyncService";
-
-function maskSpreadsheetId(id: string | undefined | null) {
-  if (!id) return null;
-  if (id.length <= 10) return id;
-  return `${id.slice(0, 6)}…${id.slice(-4)}`;
-}
+import {
+  SheetsSettingsService,
+  maskSpreadsheetId,
+} from "../../services/sheets/SheetsSettingsService";
+import { formatGoogleSheetsConnectionError } from "../../services/sheets/googleSheetsError";
 
 function maskEmail(email: string | undefined | null) {
   if (!email) return null;
@@ -19,12 +18,16 @@ function maskEmail(email: string | undefined | null) {
 
 export class AdminAttendanceSheetsController {
   getHealth = async (_req: Request, res: Response) => {
+    const settings = new SheetsSettingsService();
+    const spreadsheetId =
+      await settings.getEffectiveAttendanceSpreadsheetId(prisma);
+
     const config = {
       enabled: env.attendanceSheetsEnabled,
       workerEnabled: env.attendanceSheetsWorkerEnabled,
       workerIntervalMs: env.attendanceSheetsWorkerIntervalMs,
-      spreadsheetId: env.attendanceSheetsSpreadsheetId ?? null,
-      spreadsheetIdMasked: maskSpreadsheetId(env.attendanceSheetsSpreadsheetId),
+      spreadsheetId: spreadsheetId ?? null,
+      spreadsheetIdMasked: maskSpreadsheetId(spreadsheetId),
       clientEmail: maskEmail(env.googleSheetsClientEmail),
       privateKeyProvided: Boolean(
         env.googleSheetsPrivateKeyBase64 || env.googleSheetsPrivateKey,
@@ -35,7 +38,8 @@ export class AdminAttendanceSheetsController {
     };
 
     const canAttemptConnection = Boolean(
-      env.attendanceSheetsSpreadsheetId &&
+      env.attendanceSheetsEnabled &&
+      spreadsheetId &&
       env.googleSheetsClientEmail &&
       (env.googleSheetsPrivateKeyBase64 || env.googleSheetsPrivateKey),
     );
@@ -52,7 +56,9 @@ export class AdminAttendanceSheetsController {
     }
 
     try {
-      const client = new AttendanceSheetsClient();
+      const client = new AttendanceSheetsClient({
+        spreadsheetId: spreadsheetId ?? undefined,
+      });
       const meta = await client.getSpreadsheetMetadata();
 
       return ok(res, "Attendance Sheets health fetched", {
@@ -68,10 +74,7 @@ export class AdminAttendanceSheetsController {
         },
       });
     } catch (error: any) {
-      const message =
-        typeof error?.message === "string"
-          ? error.message
-          : "SHEETS_HEALTH_FAILED";
+      const message = formatGoogleSheetsConnectionError(error);
 
       return ok(res, "Attendance Sheets health fetched", {
         config,
@@ -84,8 +87,30 @@ export class AdminAttendanceSheetsController {
     }
   };
 
+  patchConfig = async (req: Request, res: Response) => {
+    const spreadsheetIdRaw = req.body?.spreadsheetId;
+    const spreadsheetId =
+      spreadsheetIdRaw === null || spreadsheetIdRaw === undefined
+        ? null
+        : String(spreadsheetIdRaw).trim();
+
+    const settings = new SheetsSettingsService();
+    const updated = await settings.patch(prisma, {
+      attendanceSpreadsheetId: spreadsheetId ? spreadsheetId : null,
+    });
+
+    return ok(res, "Attendance Sheets config updated", {
+      attendanceSpreadsheetId: updated.attendanceSpreadsheetId ?? null,
+      attendanceSpreadsheetIdMasked: maskSpreadsheetId(
+        updated.attendanceSpreadsheetId,
+      ),
+    });
+  };
+
   getStatus = async (_req: Request, res: Response) => {
-    const spreadsheetId = env.attendanceSheetsSpreadsheetId;
+    const settings = new SheetsSettingsService();
+    const spreadsheetId =
+      await settings.getEffectiveAttendanceSpreadsheetId(prisma);
 
     const state = spreadsheetId
       ? await prisma.attendanceSheetsSyncState.findUnique({
@@ -117,8 +142,8 @@ export class AdminAttendanceSheetsController {
     return ok(res, "Attendance Sheets status fetched", {
       enabled: env.attendanceSheetsEnabled,
       dbToSheetsEnabled: env.attendanceSheetsDbToSheetsEnabled,
-      spreadsheetId: env.attendanceSheetsSpreadsheetId ?? null,
-      spreadsheetIdMasked: maskSpreadsheetId(env.attendanceSheetsSpreadsheetId),
+      spreadsheetId: spreadsheetId ?? null,
+      spreadsheetIdMasked: maskSpreadsheetId(spreadsheetId),
       detectedTabs: jsonStringArray(state?.detectedTabs),
       processedTabs: state?.processedTabs ?? 0,
       syncedLessons: state?.syncedLessons ?? 0,
@@ -152,17 +177,31 @@ export class AdminAttendanceSheetsController {
   syncNow = async (_req: Request, res: Response) => {
     const svc = new AttendanceSheetsSyncService(prisma);
     try {
-      const result = await svc.syncOnce({ reason: "admin_force" });
+      const settings = new SheetsSettingsService();
+      const spreadsheetId =
+        await settings.getEffectiveAttendanceSpreadsheetId(prisma);
+      const result = await svc.syncOnce({
+        reason: "admin_force",
+        spreadsheetId: spreadsheetId ?? undefined,
+      });
       return ok(res, "Attendance Sheets sync completed", result);
     } catch (e) {
-      await svc.recordFailure(e);
+      const settings = new SheetsSettingsService();
+      const spreadsheetId =
+        await settings.getEffectiveAttendanceSpreadsheetId(prisma);
+      await svc.recordFailure(e, spreadsheetId ?? undefined);
       throw e;
     }
   };
 
   listTabs = async (_req: Request, res: Response) => {
+    const settings = new SheetsSettingsService();
+    const spreadsheetId =
+      await settings.getEffectiveAttendanceSpreadsheetId(prisma);
     const svc = new AttendanceSheetsSyncService(prisma);
-    const tabs = await svc.listTabs();
+    const tabs = await svc.listTabs({
+      spreadsheetId: spreadsheetId ?? undefined,
+    });
     return ok(res, "Attendance Sheets tabs fetched", { items: tabs });
   };
 
@@ -190,12 +229,16 @@ export class AdminAttendanceSheetsController {
       return fail(res, 400, "At least one date is required");
     }
 
+    const settings = new SheetsSettingsService();
+    const spreadsheetId =
+      await settings.getEffectiveAttendanceSpreadsheetId(prisma);
     const svc = new AttendanceSheetsSyncService(prisma);
     const result = await svc.ensureTabAndDates({
       groupId: String(groupId),
       subjectId: String(subjectId),
       dates: cleanedDates,
       assignmentCount: n,
+      spreadsheetId: spreadsheetId ?? undefined,
     });
 
     return created(res, "Attendance Sheets tab ensured", result);
@@ -207,8 +250,15 @@ export class AdminAttendanceSheetsController {
     const takeRows =
       typeof req.query.takeRows === "string" ? Number(req.query.takeRows) : 25;
 
+    const settings = new SheetsSettingsService();
+    const spreadsheetId =
+      await settings.getEffectiveAttendanceSpreadsheetId(prisma);
     const svc = new AttendanceSheetsSyncService(prisma);
-    const preview = await svc.previewTab({ sheetTitle, takeRows });
+    const preview = await svc.previewTab({
+      sheetTitle,
+      takeRows,
+      spreadsheetId: spreadsheetId ?? undefined,
+    });
     return ok(res, "Attendance Sheets preview fetched", preview);
   };
 }

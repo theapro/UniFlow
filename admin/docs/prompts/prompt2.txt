@@ -1,0 +1,235 @@
+AI ni tuzatish kerak.
+
+1. AI ma'lumotlarni ola olmayapti student uchun scheduleni ko'rsata olmayapti, teacherlarni ham .
+Hullas ai student haqida faqat bularni ola olmayapti
+
+user : men haqimdagi ma'lumotlarni bera olasanmi
+
+AI: 
+Ulanbek SOliyev, sizning ma'lumotlaringiz quyidagicha:
+
+Talaba ID: a69673d0‑a4d2‑4cb4‑880f‑1ef44f23b72b
+Talaba raqami: 1230122311
+Guruh: 23C (ID: a70f283a‑24e0‑430c‑a017‑6134d6badf2a)
+Elektron pochta: 2300129u@jdu.uz
+Agar qo‘shimcha ma'lumot yoki yordam kerak bo‘lsa, bemalol so‘rashingiz mumkin.
+
+hammasi shu 
+
+va alohida qilib . bu oygi schedulim qanday yoki shunga o'xshash savollar bersam FAIled degan yozuv chiqmoqda.
+
+har xil toolar qo'shish kerak va ularni ishlashiga ishonch hosil qilish kerak.
+
+va toollar ko'payib ketgani uchun bo'limlarga bo'lib ol masalan
+Student,Groups,Schedule kabi qilib . Hullas ai studentga kerakli barcha ma'lumotlarni bera olishi kerak
+
+2.TestAi pageda ishlamayapti "
+
+Invalid `prisma.aiSettings.create()` invocation in C:\Users\Apro\Documents\UniFlow\backend\src\services\ai\AiSettingsService.ts:46:45 43 }; 44 } 45 → 46 const created = await prisma.aiSettings.create( The provided value for the column is too long for the column's type. Column: systemPrompt
+
+
+3.AI ni test qilishim va hamma narsani ishlayotganini aniq vizual tekshira olishim uchun yaxhsiroq functionlar qo'sh
+
+4. AI monitor bo'limida ham Tools list kattalashib ketmoqda sectionlarga bo'lish kerak dropdown orqali
+
+AI ni production darajasida yaxhsi ishlaydigan va Databasedan barcha kerakli ma'lumotlarni PErfect oladigan qilib ber
+
+bu terminaldan parcha
+od: 'GET',
+  path: '/ai/logs',
+  status: 304,
+  ms: 20,
+  user: {
+    id: '0e08d5f5-1f82-11f1-89fd-9a6763759d88',
+    email: 'theaynpro@gmail.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] response {
+  requestId: 'c8684282-63fe-4740-8001-240bd6ae3cdb',
+  method: 'GET',
+  path: '/ai/tools',
+  status: 304,
+  ms: 29,
+  user: {
+    id: '0e08d5f5-1f82-11f1-89fd-9a6763759d88',
+    email: 'theaynpro@gmail.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+AdminAiSettingsController.get failed: PrismaClientKnownRequestError: 
+Invalid `prisma.aiSettings.create()` invocation in
+C:\Users\Apro\Documents\UniFlow\backend\src\services\ai\AiSettingsService.ts:46:45
+
+  43   };
+  44 }
+  45
+→ 46 const created = await prisma.aiSettings.create(
+The provided value for the column is too long for the column's type. Column: systemPrompt        
+    at ei.handleRequestError (C:\Users\Apro\Documents\UniFlow\backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:228:13)
+    at ei.handleAndLogRequestError (C:\Users\Apro\Documents\UniFlow\backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:174:12)
+    at ei.request (C:\Users\Apro\Documents\UniFlow\backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:143:12)
+    at async a (C:\Users\Apro\Documents\UniFlow\backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:833:24)
+    at async AiSettingsService.getOrCreate (C:\Users\Apro\Documents\UniFlow\backend\src\services\ai\AiSettingsService.ts:46:21)
+    at async get (C:\Users\Apro\Documents\UniFlow\backend\src\controllers\admin\AdminAiSettingsController.ts:10:24) {
+  code: 'P2000',
+  meta: { modelName: 'AiSettings', column_name: 'systemPrompt' },
+  clientVersion: '6.19.2'
+}
+[HTTP] response {
+  requestId: 'd5485682-a535-40fe-92d1-c1870c0dac2e',
+  method: 'GET',
+  path: '/ai/settings',
+  status: 500,
+  ms: 17,
+  user: {
+    id: '0e08d5f5-1f82-11f1-89fd-9a6763759d88',
+    email: 'theaynpro@gmail.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] request {
+  requestId: 'da89e158-9125-4dbe-b6ac-a66472acb3d9',
+  method: 'POST',
+  path: '/api/ai/llm/chat',
+  query: {},
+  origin: 'undefined',
+  userAgent: 'Next.js Middleware'
+}
+llmChat failed: PrismaClientKnownRequestError: 
+Invalid `prisma.aiSettings.create()` invocation in
+C:\Users\Apro\Documents\UniFlow\backend\src\services\ai\AiSettingsService.ts:46:45
+
+  43   };
+  44 }
+  45
+→ 46 const created = await prisma.aiSettings.create(
+The provided value for the column is too long for the column's type. Column: systemPrompt        
+    at ei.handleRequestError (C:\Users\Apro\Documents\UniFlow\backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:228:13)
+    at ei.handleAndLogRequestError (C:\Users\Apro\Documents\UniFlow\backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:174:12)
+    at ei.request (C:\Users\Apro\Documents\UniFlow\backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:143:12)
+    at async a (C:\Users\Apro\Documents\UniFlow\backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:833:24)
+    at async AiSettingsService.getOrCreate (C:\Users\Apro\Documents\UniFlow\backend\src\services\ai\AiSettingsService.ts:46:21)
+    at async AiAssistantService.chat (C:\Users\Apro\Documents\UniFlow\backend\src\services\ai\AiAssistantService.ts:184:22)
+    at async llmChat (C:\Users\Apro\Documents\UniFlow\backend\src\controllers\ai\AiController.ts:494:24) {
+  code: 'P2000',
+  meta: { modelName: 'AiSettings', column_name: 'systemPrompt' },
+  clientVersion: '6.19.2'
+}
+[AI] chat:error {
+  userId: 'a955e672-abeb-4cec-9a30-978f4243666a',
+  sessionId: '5dce7390-3d27-4bca-a85d-f18b6ccc2891',
+  requestedModel: 'openai/gpt-oss-120b'
+}
+[HTTP] response {
+  requestId: 'da89e158-9125-4dbe-b6ac-a66472acb3d9',
+  method: 'POST',
+  path: '/llm/chat',
+  status: 200,
+  ms: 27,
+  user: {
+    id: 'a955e672-abeb-4cec-9a30-978f4243666a',
+    email: '2300129u@jdu.uz',
+    role: 'STUDENT',
+    studentId: 'a69673d0-a4d2-4cb4-880f-1ef44f23b72b',
+    teacherId: null,
+    fullName: 'Ulanbek SOliyev',
+    studentNo: '1230122311'
+  }
+}
+[TeachersSheetsSyncService] dbToSheets failed: GaxiosError: Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:119100703907'.
+    at Gaxios._request (C:\Users\Apro\Documents\UniFlow\backend\node_modules\gaxios\src\gaxios.ts:146:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async JWT.requestAsync (C:\Users\Apro\Documents\UniFlow\backend\node_modules\google-auth-library\build\src\auth\oauth2client.js:429:18)
+    at async TeachersSheetsClient.getSheetValuesRange (C:\Users\Apro\Documents\UniFlow\backend\src\services\teachers-sheets\TeachersSheetsClient.ts:217:17)
+    at async TeachersSheetsSyncService.syncDbToSheets (C:\Users\Apro\Documents\UniFlow\backend\src\services\teachers-sheets\TeachersSheetsSyncService.ts:612:22)
+    at async TeachersSheetsSyncService.syncOnce (C:\Users\Apro\Documents\UniFlow\backend\src\services\teachers-sheets\TeachersSheetsSyncService.ts:505:11)
+    at async Timeout.runOnce (C:\Users\Apro\Documents\UniFlow\backend\src\services\teachers-sheets\TeachersSheetsWorker.ts:50:9) {
+  config: {
+    url: 'https://sheets.googleapis.com/v4/spreadsheets/1LCxhpHd-tkYPX_WxKa-NH4cu3f8KGr-VC_RcXlOM4Os/values/Career%20Coaching%21A1%3AZ?majorDimension=ROWS',
+    method: 'GET',
+    apiVersion: '',
+    userAgentDirectives: [ [Object] ],
+    paramsSerializer: [Function (anonymous)],
+    headers: {
+      'x-goog-api-client': 'gdcl/7.2.0 gl-node/22.18.0',
+      'Accept-Encoding': 'gzip',
+      'User-Agent': 'google-api-nodejs-client/7.2.0 (gzip)',
+      Authorization: '<<REDACTED> - See `errorRedactor` option in `gaxios` for configuration>.'  
+    },
+    params: { majorDimension: 'ROWS' },
+    validateStatus: [Function (anonymous)],
+    retry: true,
+    responseType: 'unknown',
+    errorRedactor: [Function: defaultErrorRedactor],
+    retryConfig: {
+      currentRetryAttempt: 3,
+      retry: 3,
+      httpMethodsToRetry: [Array],
+      noResponseRetries: 2,
+      retryDelayMultiplier: 2,
+      timeOfFirstRequest: 1773859238101,
+      totalTimeout: 9007199254740991,
+      maxRetryDelay: 9007199254740991,
+      statusCodesToRetry: [Array]
+    }
+  },
+  response: {
+    config: {
+      url: 'https://sheets.googleapis.com/v4/spreadsheets/1LCxhpHd-tkYPX_WxKa-NH4cu3f8KGr-VC_RcXlOM4Os/values/Career%20Coaching%21A1%3AZ?majorDimension=ROWS',
+      method: 'GET',
+      apiVersion: '',
+      userAgentDirectives: [Array],
+      paramsSerializer: [Function (anonymous)],
+      headers: [Object],
+      params: [Object],
+      validateStatus: [Function (anonymous)],
+      retry: true,
+      responseType: 'unknown',
+      errorRedactor: [Function: defaultErrorRedactor],
+      retryConfig: [Object]
+    },
+    data: { error: [Object] },
+    headers: {
+      'alt-svc': 'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000',
+      'content-encoding': 'gzip',
+      'content-type': 'application/json; charset=UTF-8',
+      date: 'Wed, 18 Mar 2026 18:38:02 GMT',
+      server: 'ESF',
+      'transfer-encoding': 'chunked',
+      vary: 'Origin, X-Origin, Referer',
+      'x-content-type-options': 'nosniff',
+      'x-frame-options': 'SAMEORIGIN',
+      'x-xss-protection': '0'
+    },
+    status: 429,
+    statusText: 'Too Many Requests',
+    request: {
+      responseURL: 'https://sheets.googleapis.com/v4/spreadsheets/1LCxhpHd-tkYPX_WxKa-NH4cu3f8KGr-VC_RcXlOM4Os/values/Career%20Coaching%21A1%3AZ?majorDimension=ROWS'
+    }
+  },
+  error: undefined,
+  status: 429,
+  code: 429,
+  errors: [
+    {
+      message: "Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:119100703907'.",    
+      domain: 'global',
+      reason: 'rateLimitExceeded'
+    }
+  ],
+  [Symbol(gaxios-gaxios-error)]: '6.7.1'
+}
+
+
+
+
+
+
+

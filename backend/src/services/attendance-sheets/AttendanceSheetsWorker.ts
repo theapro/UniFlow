@@ -1,5 +1,6 @@
 import type { PrismaClient } from ".prisma/client";
 import { AttendanceSheetsSyncService } from "./AttendanceSheetsSyncService";
+import { SheetsSettingsService } from "../sheets/SheetsSettingsService";
 
 export class AttendanceSheetsWorker {
   private timer: NodeJS.Timeout | null = null;
@@ -39,7 +40,13 @@ export class AttendanceSheetsWorker {
 
       const svc = new AttendanceSheetsSyncService(this.prisma);
       try {
-        await svc.syncOnce({ reason: "worker" });
+        const settings = new SheetsSettingsService();
+        const spreadsheetId =
+          await settings.getEffectiveAttendanceSpreadsheetId(this.prisma);
+        await svc.syncOnce({
+          reason: "worker",
+          spreadsheetId: spreadsheetId ?? undefined,
+        });
         this.failures = 0;
         this.nextAllowedRunAt = 0;
 
@@ -53,7 +60,10 @@ export class AttendanceSheetsWorker {
           },
         });
       } catch (e) {
-        await svc.recordFailure(e);
+        const settings = new SheetsSettingsService();
+        const spreadsheetId =
+          await settings.getEffectiveAttendanceSpreadsheetId(this.prisma);
+        await svc.recordFailure(e, spreadsheetId ?? undefined);
         // eslint-disable-next-line no-console
         console.error("[AttendanceSheetsWorker] sync failed", e);
 

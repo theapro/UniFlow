@@ -1,11 +1,13 @@
 import type { PrismaClient } from "@prisma/client";
 import { StudentsSheetsSyncService } from "./StudentsSheetsSyncService";
+import { SheetsSettingsService } from "../sheets/SheetsSettingsService";
 
 export class StudentsSheetsWorker {
   private timer: NodeJS.Timeout | null = null;
   private running = false;
   private nextAllowedRunAt = 0;
   private failures = 0;
+  private readonly sheetsSettings = new SheetsSettingsService();
 
   constructor(
     private readonly prisma: PrismaClient,
@@ -40,8 +42,15 @@ export class StudentsSheetsWorker {
       });
 
       const svc = new StudentsSheetsSyncService(this.prisma);
+      const spreadsheetId =
+        await this.sheetsSettings.getEffectiveStudentsSpreadsheetId(
+          this.prisma,
+        );
       try {
-        await svc.syncOnce({ reason: "worker" });
+        await svc.syncOnce({
+          reason: "worker",
+          spreadsheetId: spreadsheetId ?? undefined,
+        });
         this.failures = 0;
         this.nextAllowedRunAt = 0;
 
@@ -55,7 +64,7 @@ export class StudentsSheetsWorker {
           },
         });
       } catch (e) {
-        await svc.recordFailure(e);
+        await svc.recordFailure(e, spreadsheetId ?? undefined);
         // eslint-disable-next-line no-console
         console.error("[StudentsSheetsWorker] sync failed", e);
 

@@ -89,6 +89,24 @@ function parseScore(raw: string): { rawValue: string; score: number | null } {
 export class GradesSheetsSyncService {
   constructor(private readonly prisma?: PrismaClient) {}
 
+  private resolveGradesSpreadsheetId(spreadsheetIdOverride?: string): string {
+    const spreadsheetId =
+      spreadsheetIdOverride ?? env.gradesSheetsSpreadsheetId;
+    if (!spreadsheetId) {
+      throw new Error("GRADES_SHEETS_MISSING_SPREADSHEET_ID");
+    }
+    return spreadsheetId;
+  }
+
+  private createGradesClient(
+    spreadsheetIdOverride?: string,
+  ): GradesSheetsClient {
+    const spreadsheetId = this.resolveGradesSpreadsheetId(
+      spreadsheetIdOverride,
+    );
+    return new GradesSheetsClient({ spreadsheetId });
+  }
+
   private async upsertGradesToDb(opts: {
     sheetTitle: string;
     groupName: string;
@@ -222,14 +240,12 @@ export class GradesSheetsSyncService {
     return t.includes("_");
   }
 
-  private assertEnabled() {
+  private assertEnabled(spreadsheetIdOverride?: string) {
     if (!env.gradesSheetsEnabled) {
       throw new Error("GRADES_SHEETS_DISABLED");
     }
 
-    if (!env.gradesSheetsSpreadsheetId) {
-      throw new Error("GRADES_SHEETS_MISSING_SPREADSHEET_ID");
-    }
+    this.resolveGradesSpreadsheetId(spreadsheetIdOverride);
   }
 
   private getPrivateKeyProvided(): boolean {
@@ -307,6 +323,7 @@ export class GradesSheetsSyncService {
     client: GradesSheetsClient;
     sheetTitle: string;
     groupTabTitle: string;
+    studentsSpreadsheetId?: string;
   }): Promise<{
     spreadsheetRows: number;
     rosterAdded: number;
@@ -314,6 +331,7 @@ export class GradesSheetsSyncService {
   }> {
     const roster = await this.readRosterFromStudentsGroupTab({
       groupTabTitle: opts.groupTabTitle,
+      spreadsheetId: opts.studentsSpreadsheetId,
     });
 
     // Only control A-C (do NOT overwrite HW columns)
@@ -369,6 +387,7 @@ export class GradesSheetsSyncService {
 
   private async readRosterFromStudentsGroupTab(opts: {
     groupTabTitle: string;
+    spreadsheetId?: string;
   }): Promise<GradesRosterStudent[]> {
     if (!env.studentsSheetsEnabled) {
       throw new Error("STUDENTS_SHEETS_DISABLED");
@@ -377,7 +396,9 @@ export class GradesSheetsSyncService {
     const groupTabTitle = normalizeTitle(opts.groupTabTitle);
     if (!groupTabTitle) throw new Error("GROUP_TAB_REQUIRED");
 
-    const studentsClient = new StudentsSheetsClient();
+    const studentsClient = new StudentsSheetsClient({
+      spreadsheetId: opts.spreadsheetId ?? undefined,
+    });
     const values = await studentsClient.getSheetValuesRange(
       groupTabTitle,
       "A1:K",
@@ -424,13 +445,15 @@ export class GradesSheetsSyncService {
     sheetTitle: string;
     groupTabTitle: string;
     assignmentCount: number;
+    spreadsheetId?: string;
+    studentsSpreadsheetId?: string;
   }): Promise<{
     sheetTitle: string;
     createdTab: boolean;
     rosterAdded: number;
     rosterUpdated: number;
   }> {
-    this.assertEnabled();
+    this.assertEnabled(opts.spreadsheetId);
 
     const sheetTitle = normalizeTitle(opts.sheetTitle);
     if (!sheetTitle) throw new Error("TAB_REQUIRED");
@@ -445,9 +468,10 @@ export class GradesSheetsSyncService {
 
     const roster = await this.readRosterFromStudentsGroupTab({
       groupTabTitle: opts.groupTabTitle,
+      spreadsheetId: opts.studentsSpreadsheetId,
     });
 
-    const client = new GradesSheetsClient();
+    const client = this.createGradesClient(opts.spreadsheetId);
     const meta = await client.getSpreadsheetMetadata();
 
     let createdTab = false;
@@ -511,14 +535,18 @@ export class GradesSheetsSyncService {
     return { sheetTitle, createdTab, rosterAdded, rosterUpdated };
   }
 
-  async syncOnce(opts?: { reason?: string }): Promise<GradesSheetsSyncResult> {
-    this.assertEnabled();
+  async syncOnce(opts?: {
+    reason?: string;
+    spreadsheetId?: string;
+    studentsSpreadsheetId?: string;
+  }): Promise<GradesSheetsSyncResult> {
+    this.assertEnabled(opts?.spreadsheetId);
     this.assertCredentials();
 
     const runId = randomUUID();
     const startedAt = new Date();
 
-    const client = new GradesSheetsClient();
+    const client = this.createGradesClient(opts?.spreadsheetId);
     const meta = await client.getSpreadsheetMetadata();
 
     const detectedTabs = meta.sheetTitles
@@ -544,6 +572,7 @@ export class GradesSheetsSyncService {
           client,
           sheetTitle,
           groupTabTitle: parsed.groupName,
+          studentsSpreadsheetId: opts?.studentsSpreadsheetId,
         });
 
         // Optional: persist grades to DB when Prisma is provided.
@@ -587,6 +616,7 @@ export class GradesSheetsSyncService {
     assignmentCount?: number;
     gradeValues?: string[][];
     gradeStartRowNumber?: number;
+    spreadsheetId?: string;
   }): Promise<{
     sheetTitle: string;
     assignmentCountPrevious: number | null;
@@ -594,7 +624,7 @@ export class GradesSheetsSyncService {
     assignmentCountIncreasedBy: number;
     updatedGradeCells: number;
   }> {
-    this.assertEnabled();
+    this.assertEnabled(opts.spreadsheetId);
     this.assertCredentials();
 
     const sheetTitle = normalizeTitle(opts.sheetTitle);
@@ -603,7 +633,7 @@ export class GradesSheetsSyncService {
       throw new Error("GRADES_SHEETS_TAB_NOT_ALLOWED");
     }
 
-    const client = new GradesSheetsClient();
+    const client = this.createGradesClient(opts.spreadsheetId);
 
     let assignmentCountPrevious: number | null = null;
     let assignmentCountEnsured: number | null = null;
@@ -656,12 +686,14 @@ export class GradesSheetsSyncService {
     };
   }
 
-  async listTabs(): Promise<
+  async listTabs(opts?: {
+    spreadsheetId?: string;
+  }): Promise<
     Array<{ sheetTitle: string; groupName: string; subjectName: string }>
   > {
-    this.assertEnabled();
+    this.assertEnabled(opts?.spreadsheetId);
 
-    const client = new GradesSheetsClient();
+    const client = this.createGradesClient(opts?.spreadsheetId);
     const meta = await client.getSpreadsheetMetadata();
 
     const tabs = meta.sheetTitles
@@ -688,13 +720,17 @@ export class GradesSheetsSyncService {
     return result;
   }
 
-  async previewTab(opts: { sheetTitle: string; takeRows?: number }) {
-    this.assertEnabled();
+  async previewTab(opts: {
+    sheetTitle: string;
+    takeRows?: number;
+    spreadsheetId?: string;
+  }) {
+    this.assertEnabled(opts.spreadsheetId);
 
     const sheetTitle = normalizeTitle(opts.sheetTitle);
     if (!sheetTitle) throw new Error("TAB_REQUIRED");
 
-    const client = new GradesSheetsClient();
+    const client = this.createGradesClient(opts.spreadsheetId);
     const values = await client.getSheetValuesRange(sheetTitle, "A1:ZZ");
 
     const take = Math.min(Math.max(opts.takeRows ?? 25, 1), 200);

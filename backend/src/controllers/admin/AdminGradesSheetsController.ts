@@ -4,12 +4,11 @@ import { env } from "../../config/env";
 import { fail, ok } from "../../utils/responses";
 import { GradesSheetsClient } from "../../services/grades-sheets/GradesSheetsClient";
 import { GradesSheetsSyncService } from "../../services/grades-sheets/GradesSheetsSyncService";
-
-function maskSpreadsheetId(id: string | undefined | null) {
-  if (!id) return null;
-  if (id.length <= 8) return "****";
-  return id.slice(0, 4) + "…" + id.slice(-4);
-}
+import {
+  SheetsSettingsService,
+  maskSpreadsheetId,
+} from "../../services/sheets/SheetsSettingsService";
+import { formatGoogleSheetsConnectionError } from "../../services/sheets/googleSheetsError";
 
 function maskEmail(email: string | undefined | null) {
   if (!email) return null;
@@ -27,10 +26,14 @@ export class AdminGradesSheetsController {
     | null = null;
 
   getHealth = async (_req: Request, res: Response) => {
+    const settings = new SheetsSettingsService();
+    const spreadsheetId =
+      await settings.getEffectiveGradesSpreadsheetId(prisma);
+
     const config = {
       enabled: env.gradesSheetsEnabled,
-      spreadsheetId: env.gradesSheetsSpreadsheetId ?? null,
-      spreadsheetIdMasked: maskSpreadsheetId(env.gradesSheetsSpreadsheetId),
+      spreadsheetId: spreadsheetId ?? null,
+      spreadsheetIdMasked: maskSpreadsheetId(spreadsheetId),
       clientEmail: maskEmail(env.googleSheetsClientEmail),
       privateKeyProvided: Boolean(
         env.googleSheetsPrivateKeyBase64 || env.googleSheetsPrivateKey,
@@ -41,7 +44,7 @@ export class AdminGradesSheetsController {
 
     const canAttemptConnection = Boolean(
       env.gradesSheetsEnabled &&
-      env.gradesSheetsSpreadsheetId &&
+      spreadsheetId &&
       env.googleSheetsClientEmail &&
       (env.googleSheetsPrivateKeyBase64 || env.googleSheetsPrivateKey),
     );
@@ -58,7 +61,9 @@ export class AdminGradesSheetsController {
     }
 
     try {
-      const client = new GradesSheetsClient();
+      const client = new GradesSheetsClient({
+        spreadsheetId: spreadsheetId ?? undefined,
+      });
       const meta = await client.getSpreadsheetMetadata();
 
       return ok(res, "Grades Sheets health fetched", {
@@ -74,10 +79,7 @@ export class AdminGradesSheetsController {
         },
       });
     } catch (error: any) {
-      const message =
-        typeof error?.message === "string"
-          ? error.message
-          : "SHEETS_HEALTH_FAILED";
+      const message = formatGoogleSheetsConnectionError(error);
 
       return ok(res, "Grades Sheets health fetched", {
         config,
@@ -90,11 +92,32 @@ export class AdminGradesSheetsController {
     }
   };
 
+  patchConfig = async (req: Request, res: Response) => {
+    const spreadsheetIdRaw = req.body?.spreadsheetId;
+    const spreadsheetId =
+      spreadsheetIdRaw === null || spreadsheetIdRaw === undefined
+        ? null
+        : String(spreadsheetIdRaw).trim();
+
+    const settings = new SheetsSettingsService();
+    const updated = await settings.patch(prisma, {
+      gradesSpreadsheetId: spreadsheetId ? spreadsheetId : null,
+    });
+
+    return ok(res, "Grades Sheets config updated", {
+      gradesSpreadsheetId: updated.gradesSpreadsheetId ?? null,
+      gradesSpreadsheetIdMasked: maskSpreadsheetId(updated.gradesSpreadsheetId),
+    });
+  };
+
   getStatus = async (_req: Request, res: Response) => {
+    const settings = new SheetsSettingsService();
+    const spreadsheetId =
+      await settings.getEffectiveGradesSpreadsheetId(prisma);
     return ok(res, "Grades Sheets status fetched", {
       enabled: env.gradesSheetsEnabled,
-      spreadsheetId: env.gradesSheetsSpreadsheetId ?? null,
-      spreadsheetIdMasked: maskSpreadsheetId(env.gradesSheetsSpreadsheetId),
+      spreadsheetId: spreadsheetId ?? null,
+      spreadsheetIdMasked: maskSpreadsheetId(spreadsheetId),
       detectedTabs: this.lastRun?.detectedTabs ?? [],
       processedTabs: this.lastRun?.processedTabs ?? 0,
       spreadsheetRows: this.lastRun?.spreadsheetRows ?? 0,
@@ -111,7 +134,17 @@ export class AdminGradesSheetsController {
   syncNow = async (_req: Request, res: Response) => {
     const svc = new GradesSheetsSyncService(prisma);
     try {
-      const result = await svc.syncOnce({ reason: "admin_sync" });
+      const settings = new SheetsSettingsService();
+      const [gradesSpreadsheetId, studentsSpreadsheetId] = await Promise.all([
+        settings.getEffectiveGradesSpreadsheetId(prisma),
+        settings.getEffectiveStudentsSpreadsheetId(prisma),
+      ]);
+
+      const result = await svc.syncOnce({
+        reason: "admin_sync",
+        spreadsheetId: gradesSpreadsheetId ?? undefined,
+        studentsSpreadsheetId: studentsSpreadsheetId ?? undefined,
+      });
       this.lastRun = {
         ...result,
         lastStatus: result.hadErrors ? "FAILED" : "SUCCESS",
@@ -122,7 +155,7 @@ export class AdminGradesSheetsController {
       const msg = typeof e?.message === "string" ? e.message : String(e);
       this.lastRun = {
         runId: this.lastRun?.runId ?? "unknown",
-        spreadsheetId: env.gradesSheetsSpreadsheetId ?? "unknown",
+        spreadsheetId: this.lastRun?.spreadsheetId ?? "unknown",
         detectedTabs: this.lastRun?.detectedTabs ?? [],
         processedTabs: this.lastRun?.processedTabs ?? 0,
         spreadsheetRows: this.lastRun?.spreadsheetRows ?? 0,
@@ -146,8 +179,13 @@ export class AdminGradesSheetsController {
 
   listTabs = async (_req: Request, res: Response) => {
     try {
+      const settings = new SheetsSettingsService();
+      const spreadsheetId =
+        await settings.getEffectiveGradesSpreadsheetId(prisma);
       const svc = new GradesSheetsSyncService(prisma);
-      const tabs = await svc.listTabs();
+      const tabs = await svc.listTabs({
+        spreadsheetId: spreadsheetId ?? undefined,
+      });
       return ok(res, "Grades Sheets tabs fetched", { items: tabs });
     } catch (err: any) {
       const msg = err?.message ?? "Failed to list grades tabs";
@@ -170,8 +208,15 @@ export class AdminGradesSheetsController {
       typeof req.query.takeRows === "string" ? Number(req.query.takeRows) : 60;
 
     try {
+      const settings = new SheetsSettingsService();
+      const spreadsheetId =
+        await settings.getEffectiveGradesSpreadsheetId(prisma);
       const svc = new GradesSheetsSyncService(prisma);
-      const preview = await svc.previewTab({ sheetTitle, takeRows });
+      const preview = await svc.previewTab({
+        sheetTitle,
+        takeRows,
+        spreadsheetId: spreadsheetId ?? undefined,
+      });
       return ok(res, "Grades Sheets preview fetched", preview);
     } catch (err: any) {
       const msg = err?.message ?? "Failed to preview grades tab";
@@ -196,6 +241,9 @@ export class AdminGradesSheetsController {
     const gradeStartRowNumber = req.body?.gradeStartRowNumber;
 
     try {
+      const settings = new SheetsSettingsService();
+      const spreadsheetId =
+        await settings.getEffectiveGradesSpreadsheetId(prisma);
       const svc = new GradesSheetsSyncService(prisma);
       const result = await svc.updateTab({
         sheetTitle,
@@ -207,6 +255,7 @@ export class AdminGradesSheetsController {
           gradeStartRowNumber !== undefined
             ? Number(gradeStartRowNumber)
             : undefined,
+        spreadsheetId: spreadsheetId ?? undefined,
       });
       return ok(res, "Grades tab updated", result);
     } catch (err: any) {

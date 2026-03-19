@@ -1,6 +1,6 @@
 import { prisma } from "../../config/prisma";
 import { StudentFullContextService } from "../ai/StudentFullContextService";
-import { formatDbTime } from "../../utils/time";
+import { formatDbTime, formatTimeRange } from "../../utils/time";
 
 const fullContextService = new StudentFullContextService();
 
@@ -156,6 +156,119 @@ export async function getStudentSchedule(studentId: string) {
   return {
     group: student.group,
     week,
+  };
+}
+
+export async function getStudentMonthlySchedule(params: {
+  studentId: string;
+  month?: number;
+  year?: number;
+}) {
+  const student = await prisma.student.findUnique({
+    where: { id: params.studentId },
+    select: {
+      id: true,
+      groupId: true,
+      group: { select: { id: true, name: true, cohortId: true } },
+    },
+  });
+
+  const now = new Date();
+  const year = Number.isFinite(params.year)
+    ? Number(params.year)
+    : now.getFullYear();
+  const month = Number.isFinite(params.month)
+    ? Math.min(12, Math.max(1, Number(params.month)))
+    : now.getMonth() + 1;
+
+  if (!student?.groupId) {
+    return {
+      group: student?.group ?? null,
+      year,
+      month,
+      days: [] as any[],
+    };
+  }
+
+  const rows = await prisma.schedule.findMany({
+    where: {
+      groupId: student.groupId,
+      calendarDay: {
+        year,
+        month,
+      },
+    },
+    include: {
+      calendarDay: {
+        select: { date: true, weekday: true, month: true, year: true },
+      },
+      timeSlot: {
+        select: { id: true, slotNumber: true, startTime: true, endTime: true },
+      },
+      subject: { select: { id: true, name: true } },
+      teacher: { select: { id: true, fullName: true } },
+      room: { select: { id: true, name: true } },
+    },
+    orderBy: [
+      { calendarDay: { date: "asc" } },
+      { timeSlot: { slotNumber: "asc" } },
+    ],
+    take: 2000,
+  });
+
+  const byDate = new Map<
+    string,
+    {
+      date: string;
+      weekday: string;
+      items: Array<{
+        timeSlot: {
+          slotNumber: number;
+          startTime: string | null;
+          endTime: string | null;
+          time: string | null;
+        } | null;
+        subject: { id: string; name: string } | null;
+        teacher: { id: string; name: string } | null;
+        room: { id: string; name: string } | null;
+        note: string | null;
+      }>;
+    }
+  >();
+
+  for (const r of rows) {
+    const isoDate = r.calendarDay.date.toISOString().slice(0, 10);
+    const day = byDate.get(isoDate) ?? {
+      date: isoDate,
+      weekday: String(r.calendarDay.weekday),
+      items: [],
+    };
+
+    day.items.push({
+      timeSlot: r.timeSlot
+        ? {
+            slotNumber: r.timeSlot.slotNumber,
+            startTime: formatDbTime(r.timeSlot.startTime),
+            endTime: formatDbTime(r.timeSlot.endTime),
+            time: formatTimeRange(r.timeSlot.startTime, r.timeSlot.endTime),
+          }
+        : null,
+      subject: r.subject ? { id: r.subject.id, name: r.subject.name } : null,
+      teacher: r.teacher
+        ? { id: r.teacher.id, name: r.teacher.fullName }
+        : null,
+      room: r.room ? { id: r.room.id, name: r.room.name } : null,
+      note: r.note ?? null,
+    });
+
+    byDate.set(isoDate, day);
+  }
+
+  return {
+    group: student.group,
+    year,
+    month,
+    days: Array.from(byDate.values()),
   };
 }
 

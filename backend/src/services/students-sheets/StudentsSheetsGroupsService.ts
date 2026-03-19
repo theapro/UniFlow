@@ -57,7 +57,12 @@ export class StudentsSheetsGroupsService {
   );
   private readonly denyRe = compileRegex(env.studentsSheetsGroupTabsDenyRegex);
 
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly opts?: {
+      spreadsheetId?: string;
+    },
+  ) {}
 
   private isCandidateTab(title: string): boolean {
     if (this.allowRe && !this.allowRe.test(title)) return false;
@@ -69,7 +74,8 @@ export class StudentsSheetsGroupsService {
     if (!env.studentsSheetsEnabled) {
       return {
         enabled: false,
-        spreadsheetId: env.studentsSheetsSpreadsheetId ?? null,
+        spreadsheetId:
+          this.opts?.spreadsheetId ?? env.studentsSheetsSpreadsheetId ?? null,
         allTabs: [],
         validGroupTabs: [],
         ignoredTabs: [],
@@ -83,7 +89,9 @@ export class StudentsSheetsGroupsService {
       };
     }
 
-    const client = new StudentsSheetsClient();
+    const client = new StudentsSheetsClient({
+      spreadsheetId: this.opts?.spreadsheetId,
+    });
     const meta = await client.getSpreadsheetMetadata();
     const allTabs = meta.sheetTitles;
 
@@ -151,7 +159,9 @@ export class StudentsSheetsGroupsService {
   async ensureGroupTabExists(groupName: string): Promise<{ created: boolean }> {
     if (!env.studentsSheetsEnabled) return { created: false };
 
-    const client = new StudentsSheetsClient();
+    const client = new StudentsSheetsClient({
+      spreadsheetId: this.opts?.spreadsheetId,
+    });
     const meta = await client.getSpreadsheetMetadata();
     if (meta.sheetTitles.includes(groupName)) return { created: false };
 
@@ -173,7 +183,9 @@ export class StudentsSheetsGroupsService {
     if (!env.studentsSheetsEnabled) return;
     if (opts.fromName === opts.toName) return;
 
-    const client = new StudentsSheetsClient();
+    const client = new StudentsSheetsClient({
+      spreadsheetId: this.opts?.spreadsheetId,
+    });
     const meta = await client.getSpreadsheetMetadata();
     const hasFrom = meta.sheetTitles.includes(opts.fromName);
     const hasTo = meta.sheetTitles.includes(opts.toName);
@@ -197,7 +209,9 @@ export class StudentsSheetsGroupsService {
 
   async deleteGroupTab(groupName: string): Promise<void> {
     if (!env.studentsSheetsEnabled) return;
-    const client = new StudentsSheetsClient();
+    const client = new StudentsSheetsClient({
+      spreadsheetId: this.opts?.spreadsheetId,
+    });
     const meta = await client.getSpreadsheetMetadata();
     if (!meta.sheetTitles.includes(groupName)) return;
     await client.deleteSheetTab({ title: groupName });

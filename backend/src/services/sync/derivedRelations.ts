@@ -29,6 +29,14 @@ export async function syncGroupSubjectDerivedLinks(
     ? teacherIds
     : uniqStrings([
         ...(
+          await prisma.schedule.findMany({
+            where: { groupId: params.groupId, subjectId: params.subjectId },
+            select: { teacherId: true },
+            distinct: ["teacherId"],
+            take: 50,
+          })
+        ).map((r) => r.teacherId),
+        ...(
           await prisma.scheduleEntry.findMany({
             where: { groupId: params.groupId, subjectId: params.subjectId },
             select: { teacherId: true },

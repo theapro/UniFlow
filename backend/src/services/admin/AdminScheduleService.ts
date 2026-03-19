@@ -1,6 +1,7 @@
 import type { Prisma, Weekday } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { formatDbTime } from "../../utils/time";
+import { syncGroupSubjectDerivedLinks } from "../sync/derivedRelations";
 
 export type CreateScheduleEntryInput = {
   weekday: Weekday;
@@ -93,7 +94,7 @@ export class AdminScheduleService {
   }
 
   async create(input: CreateScheduleEntryInput) {
-    return prisma.scheduleEntry
+    const created = await prisma.scheduleEntry
       .create({
         data: {
           weekday: input.weekday,
@@ -123,10 +124,27 @@ export class AdminScheduleService {
             }
           : r.timeSlot,
       }));
+
+    try {
+      await syncGroupSubjectDerivedLinks(prisma, {
+        groupId: created.groupId,
+        subjectId: created.subjectId,
+        teacherIdsHint: [created.teacherId],
+      });
+    } catch {
+      // Non-fatal
+    }
+
+    return created;
   }
 
   async update(id: string, input: UpdateScheduleEntryInput) {
-    return prisma.scheduleEntry
+    const prev = await prisma.scheduleEntry.findUnique({
+      where: { id },
+      select: { groupId: true, subjectId: true },
+    });
+
+    const updated = await prisma.scheduleEntry
       .update({
         where: { id },
         data: {
@@ -167,10 +185,47 @@ export class AdminScheduleService {
             }
           : r.timeSlot,
       }));
+
+    try {
+      const targets = new Set<string>([
+        `${updated.groupId}:${updated.subjectId}`,
+        prev?.groupId && prev?.subjectId
+          ? `${prev.groupId}:${prev.subjectId}`
+          : "",
+      ]);
+      for (const key of targets) {
+        const [groupId, subjectId] = key.split(":");
+        if (!groupId || !subjectId) continue;
+        await syncGroupSubjectDerivedLinks(prisma, {
+          groupId,
+          subjectId,
+          teacherIdsHint: [updated.teacherId],
+        });
+      }
+    } catch {
+      // Non-fatal
+    }
+
+    return updated;
   }
 
   async remove(id: string) {
+    const prev = await prisma.scheduleEntry.findUnique({
+      where: { id },
+      select: { groupId: true, subjectId: true },
+    });
     await prisma.scheduleEntry.delete({ where: { id } });
+
+    if (prev?.groupId && prev?.subjectId) {
+      try {
+        await syncGroupSubjectDerivedLinks(prisma, {
+          groupId: prev.groupId,
+          subjectId: prev.subjectId,
+        });
+      } catch {
+        // Non-fatal
+      }
+    }
     return true;
   }
 }

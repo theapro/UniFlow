@@ -15,6 +15,20 @@ type ProviderConfig = {
   apiKey: string;
 };
 
+function isMonthScheduleQuery(message: string): boolean {
+  const s = String(message ?? "").toLowerCase();
+
+  const mentionsSchedule =
+    /(schedule|timetable|lesson|classes|raspisan|расписан)/.test(s) ||
+    /(jadval|dars|dars jadval)/.test(s);
+
+  const mentionsMonth =
+    /(this month|current month|monthly)/.test(s) ||
+    /(bu oy|shu oy|oygi|oylik|oyning)/.test(s);
+
+  return mentionsSchedule && mentionsMonth;
+}
+
 function extractFirstJsonObject(text: string): any {
   const s = String(text ?? "");
   // Fast path: if the whole response is valid JSON.
@@ -65,6 +79,19 @@ function pickFallbackTool(params: {
     .trim()
     .toLowerCase();
   const allowed = new Set(params.allowedToolNames);
+
+  if (
+    allowed.has("getStudentMonthlySchedule") &&
+    (params.role === UserRole.STUDENT || params.role === UserRole.TEACHER) &&
+    isMonthScheduleQuery(params.message)
+  ) {
+    return {
+      tool: "getStudentMonthlySchedule",
+      args: {},
+      needsClarification: false,
+      clarifyingQuestion: "",
+    };
+  }
 
   const preferFull =
     /(teacher|my teacher|who.*teacher|attendance|absent|present|grades?|score|mark|schedule|timetable|lesson|classes|group|subject)/.test(
@@ -146,6 +173,10 @@ export class AiAssistantService {
 
   private shouldPreferStudentFullContext(message: string): boolean {
     const s = message.trim().toLowerCase();
+
+    // Month-specific schedule requests are better served by the calendar schedule tool.
+    if (isMonthScheduleQuery(s)) return false;
+
     // English
     if (
       /(teacher|my teacher|who.*teacher|attendance|absent|present|grades?|score|mark|schedule|timetable|lesson days|group|subject)/.test(
@@ -268,6 +299,7 @@ export class AiAssistantService {
             ) +
             "\n\nRules:\n" +
             "- Choose exactly one tool when possible\n" +
+            "- If user asks for THIS MONTH (bu oy/oylik) schedule, prefer getStudentMonthlySchedule\n" +
             "- If user asks about teacher(s), attendance, grades, schedule/timetable, group, or subjects, prefer getStudentFullContext\n" +
             "- If required identifiers are missing, set needsClarification=true and ask a single short question\n" +
             "- Do not invent studentId/groupId; if unknown ask for it\n" +
@@ -357,6 +389,15 @@ export class AiAssistantService {
 
       const args =
         typeof planJson.args === "object" && planJson.args ? planJson.args : {};
+
+      // Deterministic override: month schedule queries should use the calendar-based tool.
+      if (
+        allowedToolNames.includes("getStudentMonthlySchedule") &&
+        tool.startsWith("getStudent") &&
+        isMonthScheduleQuery(params.message)
+      ) {
+        tool = "getStudentMonthlySchedule";
+      }
 
       // Deterministic override: for relational student questions, prefer full context.
       if (

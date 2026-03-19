@@ -250,9 +250,12 @@ export class StudentsSheetsSyncService {
 
   async syncOnce(opts?: {
     reason?: string;
+    spreadsheetId?: string;
   }): Promise<StudentsSheetsSyncResult> {
     const runId = randomUUID();
-    const client = new StudentsSheetsClient();
+    const client = new StudentsSheetsClient({
+      spreadsheetId: opts?.spreadsheetId,
+    });
     const meta = await client.getSpreadsheetMetadata();
 
     const spreadsheetId = meta.spreadsheetId;
@@ -1593,8 +1596,11 @@ export class StudentsSheetsSyncService {
     };
   }
 
-  async recordFailure(error: unknown) {
-    const spreadsheetId = env.studentsSheetsSpreadsheetId ?? "unknown";
+  async recordFailure(error: unknown, spreadsheetIdOverride?: string) {
+    const spreadsheetId =
+      String(spreadsheetIdOverride ?? "").trim() ||
+      env.studentsSheetsSpreadsheetId ||
+      "unknown";
 
     const lastSyncAt = new Date();
     const message =

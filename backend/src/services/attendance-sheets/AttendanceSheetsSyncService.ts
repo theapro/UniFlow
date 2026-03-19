@@ -4,6 +4,7 @@ import { env } from "../../config/env";
 import { AttendanceSheetsClient } from "./AttendanceSheetsClient";
 import { GradesSheetsSyncService } from "../grades-sheets/GradesSheetsSyncService";
 import { syncGroupSubjectDerivedLinks } from "../sync/derivedRelations";
+import { SheetsSettingsService } from "../sheets/SheetsSettingsService";
 import {
   formatAttendanceCell,
   parseAttendanceCell,
@@ -198,11 +199,26 @@ export type AttendanceSheetsSyncResult = {
 export class AttendanceSheetsSyncService {
   constructor(private readonly prisma: PrismaClient) {}
 
+  private resolveSpreadsheetId(spreadsheetIdOverride?: string): string {
+    const spreadsheetId =
+      spreadsheetIdOverride ?? env.attendanceSheetsSpreadsheetId;
+    if (!spreadsheetId) {
+      throw new Error("ATTENDANCE_SHEETS_MISSING_SPREADSHEET_ID");
+    }
+    return spreadsheetId;
+  }
+
+  private createClient(spreadsheetIdOverride?: string): AttendanceSheetsClient {
+    const spreadsheetId = this.resolveSpreadsheetId(spreadsheetIdOverride);
+    return new AttendanceSheetsClient({ spreadsheetId });
+  }
+
   async ensureTabAndDates(opts: {
     groupId: string;
     subjectId: string;
     dates: string[];
     assignmentCount?: number;
+    spreadsheetId?: string;
   }): Promise<{
     sheetTitle: string;
     createdTab: boolean;
@@ -212,10 +228,7 @@ export class AttendanceSheetsSyncService {
       throw new Error("ATTENDANCE_SHEETS_DISABLED");
     }
 
-    const spreadsheetId = env.attendanceSheetsSpreadsheetId;
-    if (!spreadsheetId) {
-      throw new Error("ATTENDANCE_SHEETS_MISSING_SPREADSHEET_ID");
-    }
+    const spreadsheetId = this.resolveSpreadsheetId(opts.spreadsheetId);
 
     const [group, subject] = await Promise.all([
       this.prisma.group.findUnique({
@@ -250,7 +263,7 @@ export class AttendanceSheetsSyncService {
       meta: { dates: opts.dates },
     });
 
-    const client = new AttendanceSheetsClient();
+    const client = this.createClient(spreadsheetId);
     const meta = await client.getSpreadsheetMetadata();
 
     let createdTab = false;
@@ -332,10 +345,19 @@ export class AttendanceSheetsSyncService {
     // Requirement: on Attendance creation, also create the Grades tab with HW columns.
     if (opts.assignmentCount !== undefined && opts.assignmentCount !== null) {
       const gradesSvc = new GradesSheetsSyncService(this.prisma);
+
+      const settings = new SheetsSettingsService();
+      const [gradesSpreadsheetId, studentsSpreadsheetId] = await Promise.all([
+        settings.getEffectiveGradesSpreadsheetId(this.prisma),
+        settings.getEffectiveStudentsSpreadsheetId(this.prisma),
+      ]);
+
       await gradesSvc.ensureTabAndHwColumns({
         sheetTitle,
         groupTabTitle: group.name,
         assignmentCount: Number(opts.assignmentCount),
+        spreadsheetId: gradesSpreadsheetId ?? undefined,
+        studentsSpreadsheetId: studentsSpreadsheetId ?? undefined,
       });
     }
 
@@ -544,15 +566,13 @@ export class AttendanceSheetsSyncService {
 
   async syncOnce(opts?: {
     reason?: string;
+    spreadsheetId?: string;
   }): Promise<AttendanceSheetsSyncResult> {
     if (!env.attendanceSheetsEnabled) {
       throw new Error("ATTENDANCE_SHEETS_DISABLED");
     }
 
-    const spreadsheetId = env.attendanceSheetsSpreadsheetId;
-    if (!spreadsheetId) {
-      throw new Error("ATTENDANCE_SHEETS_MISSING_SPREADSHEET_ID");
-    }
+    const spreadsheetId = this.resolveSpreadsheetId(opts?.spreadsheetId);
 
     const runId = randomUUID();
     const startedAt = new Date();
@@ -567,7 +587,7 @@ export class AttendanceSheetsSyncService {
       meta: { reason: opts?.reason ?? "manual" },
     });
 
-    const client = new AttendanceSheetsClient();
+    const client = this.createClient(spreadsheetId);
     const meta = await client.getSpreadsheetMetadata();
 
     const detectedTabs = meta.sheetTitles
@@ -875,15 +895,13 @@ export class AttendanceSheetsSyncService {
     groupId: string;
     subjectId: string;
     date: string;
+    spreadsheetId?: string;
   }): Promise<{ sheetTitle: string; updatedCells: number }> {
     if (!env.attendanceSheetsEnabled) {
       throw new Error("ATTENDANCE_SHEETS_DISABLED");
     }
 
-    const spreadsheetId = env.attendanceSheetsSpreadsheetId;
-    if (!spreadsheetId) {
-      throw new Error("ATTENDANCE_SHEETS_MISSING_SPREADSHEET_ID");
-    }
+    const spreadsheetId = this.resolveSpreadsheetId(opts.spreadsheetId);
 
     if (!env.attendanceSheetsDbToSheetsEnabled) {
       // Keep behavior explicit; controller can decide to ignore this error.
@@ -927,7 +945,7 @@ export class AttendanceSheetsSyncService {
       meta: { date: dayStart.toISOString().slice(0, 10) },
     });
 
-    const client = new AttendanceSheetsClient();
+    const client = this.createClient(spreadsheetId);
     const meta = await client.getSpreadsheetMetadata();
 
     if (!meta.sheetTitles.includes(sheetTitle)) {
@@ -1066,8 +1084,9 @@ export class AttendanceSheetsSyncService {
     return { sheetTitle, updatedCells };
   }
 
-  async recordFailure(error: unknown) {
-    const spreadsheetId = env.attendanceSheetsSpreadsheetId ?? "unknown";
+  async recordFailure(error: unknown, spreadsheetIdOverride?: string) {
+    const spreadsheetId =
+      spreadsheetIdOverride ?? env.attendanceSheetsSpreadsheetId ?? "unknown";
 
     const lastSyncAt = new Date();
     const message =
@@ -1092,7 +1111,7 @@ export class AttendanceSheetsSyncService {
     });
   }
 
-  async listTabs(): Promise<
+  async listTabs(opts?: { spreadsheetId?: string }): Promise<
     Array<{
       sheetTitle: string;
       groupName: string;
@@ -1105,7 +1124,7 @@ export class AttendanceSheetsSyncService {
       throw new Error("ATTENDANCE_SHEETS_DISABLED");
     }
 
-    const client = new AttendanceSheetsClient();
+    const client = this.createClient(opts?.spreadsheetId);
     const meta = await client.getSpreadsheetMetadata();
     const tabs = meta.sheetTitles
       .map((t) => normalizeTitle(t))
@@ -1147,11 +1166,15 @@ export class AttendanceSheetsSyncService {
     return result;
   }
 
-  async previewTab(opts: { sheetTitle: string; takeRows?: number }) {
+  async previewTab(opts: {
+    sheetTitle: string;
+    takeRows?: number;
+    spreadsheetId?: string;
+  }) {
     const sheetTitle = normalizeTitle(opts.sheetTitle);
     if (!sheetTitle) throw new Error("TAB_REQUIRED");
 
-    const client = new AttendanceSheetsClient();
+    const client = this.createClient(opts.spreadsheetId);
     const values = await client.getSheetValuesRange(sheetTitle, "A1:ZZ");
 
     const take = Math.min(Math.max(opts.takeRows ?? 25, 1), 200);

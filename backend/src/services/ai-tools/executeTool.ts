@@ -18,6 +18,7 @@ import {
   getStudentGroup,
   getStudentProfile,
   getStudentSchedule,
+  getStudentMonthlySchedule,
 } from "./student.tools";
 import {
   getGroupAttendance,
@@ -155,6 +156,27 @@ export async function executeAiTool(
       }
 
       return getStudentSchedule(studentId);
+    }
+
+    case "getStudentMonthlySchedule": {
+      const studentId =
+        asString(call.args.studentId) || assertStudentLinked(ctx.user);
+
+      assertStudentSelf(ctx.user, studentId);
+
+      if (ctx.user.role === UserRole.TEACHER) {
+        const teacherId = assertTeacherLinked(ctx.user);
+        await assertTeacherStudentAccess({ teacherId, studentId });
+      }
+
+      const month = asNumber(call.args.month);
+      const year = asNumber(call.args.year);
+
+      return getStudentMonthlySchedule({
+        studentId,
+        month: Number.isFinite(month) ? month : undefined,
+        year: Number.isFinite(year) ? year : undefined,
+      });
     }
 
     case "getGroupStudents": {

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -122,6 +123,7 @@ export function AttendanceSheetsView({
 }) {
   const queryClient = useQueryClient();
   const [selectedTab, setSelectedTab] = React.useState<string>("");
+  const [spreadsheetIdDraft, setSpreadsheetIdDraft] = React.useState("");
 
   const syncMutation = useMutation({
     mutationFn: () => attendanceSheetsApi.syncNow().then((r) => r.data.data),
@@ -166,6 +168,33 @@ export function AttendanceSheetsView({
     queryFn: () =>
       attendanceSheetsApi.tabs().then((r) => r.data.data as TabsResponse),
     refetchInterval: 60_000,
+  });
+
+  React.useEffect(() => {
+    if (spreadsheetIdDraft.trim()) return;
+    const initial =
+      status?.spreadsheetId ?? health?.config?.spreadsheetId ?? "";
+    if (initial) setSpreadsheetIdDraft(initial);
+  }, [
+    status?.spreadsheetId,
+    health?.config?.spreadsheetId,
+    spreadsheetIdDraft,
+  ]);
+
+  const connectMutation = useMutation({
+    mutationFn: (data: { spreadsheetId: string | null }) =>
+      attendanceSheetsApi.patchConfig(data).then((r) => r.data.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["attendance-sheets", "status"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["attendance-sheets", "health"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["attendance-sheets", "tabs"],
+      });
+    },
   });
 
   React.useEffect(() => {
@@ -272,6 +301,41 @@ export function AttendanceSheetsView({
                   <div>{dict?.common?.loading ?? "Loading..."}</div>
                 ) : health ? (
                   <>
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">
+                        {dict?.sheets?.spreadsheetIdLabel ?? "Spreadsheet ID"}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={spreadsheetIdDraft}
+                          onChange={(e) =>
+                            setSpreadsheetIdDraft(e.target.value)
+                          }
+                          placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+                          className="font-mono text-xs"
+                        />
+                        <Button
+                          onClick={() =>
+                            connectMutation.mutate({
+                              spreadsheetId: spreadsheetIdDraft.trim()
+                                ? spreadsheetIdDraft.trim()
+                                : null,
+                            })
+                          }
+                          disabled={connectMutation.isPending}
+                        >
+                          {connectMutation.isPending
+                            ? "Connecting..."
+                            : (dict?.common?.connect ?? "Connect")}
+                        </Button>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {health.config?.clientEmail
+                          ? `Share the spreadsheet with ${health.config.clientEmail}`
+                          : ""}
+                      </div>
+                    </div>
+
                     <div className="flex flex-wrap gap-2">
                       <Badge
                         variant={health.config?.enabled ? "default" : "outline"}

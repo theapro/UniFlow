@@ -1,11 +1,13 @@
 import type { PrismaClient } from "@prisma/client";
 import { TeachersSheetsSyncService } from "./TeachersSheetsSyncService";
+import { SheetsSettingsService } from "../sheets/SheetsSettingsService";
 
 export class TeachersSheetsWorker {
   private timer: NodeJS.Timeout | null = null;
   private running = false;
   private nextAllowedRunAt = 0;
   private failures = 0;
+  private readonly sheetsSettings = new SheetsSettingsService();
 
   constructor(
     private readonly prisma: PrismaClient,
@@ -40,8 +42,15 @@ export class TeachersSheetsWorker {
       });
 
       const svc = new TeachersSheetsSyncService(this.prisma);
+      const spreadsheetId =
+        await this.sheetsSettings.getEffectiveTeachersSpreadsheetId(
+          this.prisma,
+        );
       try {
-        await svc.syncOnce({ reason: "worker" });
+        await svc.syncOnce({
+          reason: "worker",
+          spreadsheetId: spreadsheetId ?? undefined,
+        });
         this.failures = 0;
         this.nextAllowedRunAt = 0;
 
@@ -55,6 +64,11 @@ export class TeachersSheetsWorker {
           },
         });
       } catch (e) {
+        try {
+          await svc.recordFailure(e, spreadsheetId ?? undefined);
+        } catch {
+          // ignore
+        }
         // svc.recordFailure already updates sync state, but we also want to record in worker state
         // eslint-disable-next-line no-console
         console.error("[TeachersSheetsWorker] sync failed", e);

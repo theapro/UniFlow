@@ -7,12 +7,11 @@ import { StudentsSheetsClient } from "../../services/students-sheets/StudentsShe
 import { StudentsSheetsSyncService } from "../../services/students-sheets/StudentsSheetsSyncService";
 import { StudentsSheetsConflictService } from "../../services/students-sheets/StudentsSheetsConflictService";
 import { StudentsSheetsGroupsService } from "../../services/students-sheets/StudentsSheetsGroupsService";
-
-function maskSpreadsheetId(id: string | undefined | null) {
-  if (!id) return null;
-  if (id.length <= 10) return id;
-  return `${id.slice(0, 6)}…${id.slice(-4)}`;
-}
+import {
+  SheetsSettingsService,
+  maskSpreadsheetId,
+} from "../../services/sheets/SheetsSettingsService";
+import { formatGoogleSheetsConnectionError } from "../../services/sheets/googleSheetsError";
 
 function maskEmail(email: string | undefined | null) {
   if (!email) return null;
@@ -20,13 +19,33 @@ function maskEmail(email: string | undefined | null) {
 }
 
 export class AdminStudentsSheetsController {
+  private readonly sheetsSettings = new SheetsSettingsService();
+
+  patchConfig = async (req: Request, res: Response) => {
+    const { spreadsheetId } = req.body ?? {};
+
+    const settings = await this.sheetsSettings.patch(prisma, {
+      studentsSpreadsheetId: spreadsheetId,
+    });
+
+    return ok(res, "Students Sheets config updated", {
+      spreadsheetId: settings.effective.studentsSpreadsheetId,
+      spreadsheetIdMasked: maskSpreadsheetId(
+        settings.effective.studentsSpreadsheetId,
+      ),
+    });
+  };
+
   getHealth = async (_req: Request, res: Response) => {
+    const settings = await this.sheetsSettings.getOrCreate(prisma);
+    const effectiveSpreadsheetId = settings.effective.studentsSpreadsheetId;
+
     const config = {
       enabled: env.studentsSheetsEnabled,
       workerEnabled: env.studentsSheetsWorkerEnabled,
       workerIntervalMs: env.studentsSheetsWorkerIntervalMs,
-      spreadsheetId: env.studentsSheetsSpreadsheetId ?? null,
-      spreadsheetIdMasked: maskSpreadsheetId(env.studentsSheetsSpreadsheetId),
+      spreadsheetId: effectiveSpreadsheetId,
+      spreadsheetIdMasked: maskSpreadsheetId(effectiveSpreadsheetId),
       clientEmail: maskEmail(env.googleSheetsClientEmail),
       privateKeyProvided: Boolean(
         env.googleSheetsPrivateKeyBase64 || env.googleSheetsPrivateKey,
@@ -34,7 +53,7 @@ export class AdminStudentsSheetsController {
     };
 
     const canAttemptConnection = Boolean(
-      env.studentsSheetsSpreadsheetId &&
+      effectiveSpreadsheetId &&
       env.googleSheetsClientEmail &&
       (env.googleSheetsPrivateKeyBase64 || env.googleSheetsPrivateKey),
     );
@@ -51,7 +70,9 @@ export class AdminStudentsSheetsController {
     }
 
     try {
-      const client = new StudentsSheetsClient();
+      const client = new StudentsSheetsClient({
+        spreadsheetId: effectiveSpreadsheetId ?? undefined,
+      });
       const meta = await client.getSpreadsheetMetadata();
 
       return ok(res, "Students Sheets health fetched", {
@@ -67,10 +88,7 @@ export class AdminStudentsSheetsController {
         },
       });
     } catch (error: any) {
-      const message =
-        typeof error?.message === "string"
-          ? error.message
-          : "SHEETS_HEALTH_FAILED";
+      const message = formatGoogleSheetsConnectionError(error);
 
       return ok(res, "Students Sheets health fetched", {
         config,
@@ -84,7 +102,8 @@ export class AdminStudentsSheetsController {
   };
 
   getStatus = async (_req: Request, res: Response) => {
-    const spreadsheetId = env.studentsSheetsSpreadsheetId;
+    const spreadsheetId =
+      await this.sheetsSettings.getEffectiveStudentsSpreadsheetId(prisma);
 
     const state = spreadsheetId
       ? await prisma.studentsSheetsSyncState.findUnique({
@@ -121,8 +140,8 @@ export class AdminStudentsSheetsController {
       enabled: env.studentsSheetsEnabled,
       dbToSheetsEnabled: env.studentsSheetsDbToSheetsEnabled,
       detectDeletes: env.studentsSheetsDetectDeletes,
-      spreadsheetId: env.studentsSheetsSpreadsheetId ?? null,
-      spreadsheetIdMasked: maskSpreadsheetId(env.studentsSheetsSpreadsheetId),
+      spreadsheetId,
+      spreadsheetIdMasked: maskSpreadsheetId(spreadsheetId),
       syncedStudents: state?.syncedStudents ?? 0,
       spreadsheetRows: state?.spreadsheetRows ?? 0,
       detectedGroups: jsonStringArray(state?.detectedGroups),
@@ -153,23 +172,36 @@ export class AdminStudentsSheetsController {
 
   syncNow = async (_req: Request, res: Response) => {
     const svc = new StudentsSheetsSyncService(prisma);
+    const spreadsheetId =
+      await this.sheetsSettings.getEffectiveStudentsSpreadsheetId(prisma);
     try {
-      const result = await svc.syncOnce({ reason: "admin_force" });
+      const result = await svc.syncOnce({
+        reason: "admin_force",
+        spreadsheetId: spreadsheetId ?? undefined,
+      });
       return ok(res, "Students Sheets sync completed", result);
     } catch (e) {
-      await svc.recordFailure(e);
+      await svc.recordFailure(e, spreadsheetId ?? undefined);
       throw e;
     }
   };
 
   getGroupsStatus = async (_req: Request, res: Response) => {
-    const svc = new StudentsSheetsGroupsService(prisma);
+    const spreadsheetId =
+      await this.sheetsSettings.getEffectiveStudentsSpreadsheetId(prisma);
+    const svc = new StudentsSheetsGroupsService(prisma, {
+      spreadsheetId: spreadsheetId ?? undefined,
+    });
     const data = await svc.getGroupsStatus();
     return ok(res, "Students Sheets groups status fetched", data);
   };
 
   syncGroupsNow = async (_req: Request, res: Response) => {
-    const svc = new StudentsSheetsGroupsService(prisma);
+    const spreadsheetId =
+      await this.sheetsSettings.getEffectiveStudentsSpreadsheetId(prisma);
+    const svc = new StudentsSheetsGroupsService(prisma, {
+      spreadsheetId: spreadsheetId ?? undefined,
+    });
     const result = await svc.syncGroupsNow();
     return ok(res, "Students Sheets groups sync completed", result);
   };
@@ -182,8 +214,16 @@ export class AdminStudentsSheetsController {
     const take = req.query.take ? Number(req.query.take) : 50;
     const skip = req.query.skip ? Number(req.query.skip) : 0;
 
+    const spreadsheetId =
+      await this.sheetsSettings.getEffectiveStudentsSpreadsheetId(prisma);
+
     const svc = new StudentsSheetsConflictService(prisma);
-    const conflicts = await svc.list({ status, take, skip });
+    const conflicts = await svc.list({
+      status,
+      take,
+      skip,
+      spreadsheetId: spreadsheetId ?? undefined,
+    });
 
     return ok(res, "Students Sheets conflicts fetched", {
       status,

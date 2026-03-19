@@ -242,6 +242,10 @@ router.post("/ai/test-chat", adminAiTestController.chat);
 
 // Students Spreadsheet (Google Sheets) Sync
 router.get("/students-sheets/health", adminStudentsSheetsController.getHealth);
+router.patch(
+  "/students-sheets/config",
+  adminStudentsSheetsController.patchConfig,
+);
 router.get("/students-sheets/status", adminStudentsSheetsController.getStatus);
 router.post("/students-sheets/sync", adminStudentsSheetsController.syncNow);
 router.get(
@@ -267,6 +271,10 @@ router.post(
 
 // Teachers Spreadsheet (Google Sheets) Sync
 router.get("/teachers-sheets/health", adminTeachersSheetsController.getHealth);
+router.patch(
+  "/teachers-sheets/config",
+  adminTeachersSheetsController.patchConfig,
+);
 router.get("/teachers-sheets/status", adminTeachersSheetsController.getStatus);
 router.post("/teachers-sheets/sync", adminTeachersSheetsController.syncNow);
 router.post(
@@ -278,6 +286,10 @@ router.post(
 router.get(
   "/attendance-sheets/health",
   adminAttendanceSheetsController.getHealth,
+);
+router.patch(
+  "/attendance-sheets/config",
+  adminAttendanceSheetsController.patchConfig,
 );
 router.get(
   "/attendance-sheets/status",
@@ -296,6 +308,7 @@ router.get(
 
 // Grades Spreadsheet (Google Sheets)
 router.get("/grades-sheets/health", adminGradesSheetsController.getHealth);
+router.patch("/grades-sheets/config", adminGradesSheetsController.patchConfig);
 router.get("/grades-sheets/status", adminGradesSheetsController.getStatus);
 router.post("/grades-sheets/sync", adminGradesSheetsController.syncNow);
 router.post(

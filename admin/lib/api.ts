@@ -349,6 +349,8 @@ export const maintenanceApi = {
 
 export const sheetsApi = {
   health: () => axios.get("/api/admin/students-sheets/health"),
+  patchConfig: (data: { spreadsheetId: string | null }) =>
+    axios.patch("/api/admin/students-sheets/config", data),
   status: () => axios.get("/api/admin/students-sheets/status"),
   syncNow: () => axios.post("/api/admin/students-sheets/sync"),
   groups: {
@@ -370,12 +372,16 @@ export const sheetsApi = {
 
 export const teachersSheetsApi = {
   health: () => axios.get("/api/admin/teachers-sheets/health"),
+  patchConfig: (data: { spreadsheetId: string | null }) =>
+    axios.patch("/api/admin/teachers-sheets/config", data),
   status: () => axios.get("/api/admin/teachers-sheets/status"),
   syncNow: () => axios.post("/api/admin/teachers-sheets/sync"),
 };
 
 export const attendanceSheetsApi = {
   health: () => axios.get("/api/admin/attendance-sheets/health"),
+  patchConfig: (data: { spreadsheetId: string | null }) =>
+    axios.patch("/api/admin/attendance-sheets/config", data),
   status: () => axios.get("/api/admin/attendance-sheets/status"),
   syncNow: () => axios.post("/api/admin/attendance-sheets/sync"),
   tabs: () => axios.get("/api/admin/attendance-sheets/tabs"),
@@ -391,6 +397,8 @@ export const attendanceSheetsApi = {
 
 export const gradesSheetsApi = {
   health: () => axios.get("/api/admin/grades-sheets/health"),
+  patchConfig: (data: { spreadsheetId: string | null }) =>
+    axios.patch("/api/admin/grades-sheets/config", data),
   status: () => axios.get("/api/admin/grades-sheets/status"),
   syncNow: () => axios.post("/api/admin/grades-sheets/sync"),
   forceSyncNow: () => axios.post("/api/admin/grades-sheets/force-sync"),

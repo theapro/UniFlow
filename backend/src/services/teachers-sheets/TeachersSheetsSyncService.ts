@@ -116,12 +116,13 @@ export class TeachersSheetsSyncService {
     });
   }
 
-  async syncOnce(opts?: { reason?: string }) {
+  async syncOnce(opts?: { reason?: string; spreadsheetId?: string }) {
     if (!env.teachersSheetsEnabled) {
       throw new Error("TEACHERS_SHEETS_DISABLED");
     }
 
-    const spreadsheetId = env.teachersSheetsSpreadsheetId;
+    const spreadsheetId =
+      opts?.spreadsheetId ?? env.teachersSheetsSpreadsheetId;
     if (!spreadsheetId) {
       throw new Error("TEACHERS_SHEETS_MISSING_SPREADSHEET_ID");
     }
@@ -144,7 +145,7 @@ export class TeachersSheetsSyncService {
       );
       const deny = compileOptionalRegex(env.teachersSheetsSubjectTabsDenyRegex);
 
-      const client = new TeachersSheetsClient();
+      const client = new TeachersSheetsClient({ spreadsheetId });
       const meta = await client.getSpreadsheetMetadata();
 
       const detectedSubjects = meta.sheetTitles
@@ -501,7 +502,7 @@ export class TeachersSheetsSyncService {
 
       if (env.teachersSheetsDbToSheetsEnabled) {
         try {
-          await this.syncDbToSheets();
+          await this.syncDbToSheets({ spreadsheetId });
         } catch (e: any) {
           console.error("[TeachersSheetsSyncService] dbToSheets failed:", e);
         }
@@ -528,12 +529,18 @@ export class TeachersSheetsSyncService {
     }
   }
 
-  async renameSubjectTab(opts: { fromTitle: string; toTitle: string }) {
+  async renameSubjectTab(opts: {
+    fromTitle: string;
+    toTitle: string;
+    spreadsheetId?: string;
+  }) {
     if (!env.teachersSheetsEnabled) return;
-    if (!env.teachersSheetsSpreadsheetId) return;
+    const spreadsheetId =
+      opts.spreadsheetId ?? env.teachersSheetsSpreadsheetId ?? null;
+    if (!spreadsheetId) return;
     if (!this.isAllowedSubjectTab(opts.toTitle)) return;
 
-    const client = new TeachersSheetsClient();
+    const client = new TeachersSheetsClient({ spreadsheetId });
     const meta = await client.getSpreadsheetMetadata();
     if (!meta.sheetTitles.includes(opts.fromTitle)) return;
     if (meta.sheetTitles.includes(opts.toTitle)) return;
@@ -551,15 +558,16 @@ export class TeachersSheetsSyncService {
     });
   }
 
-  async syncDbToSheets() {
+  async syncDbToSheets(opts?: { spreadsheetId?: string }) {
     if (!env.teachersSheetsEnabled || !env.teachersSheetsDbToSheetsEnabled) {
       return;
     }
 
-    const spreadsheetId = env.teachersSheetsSpreadsheetId;
+    const spreadsheetId =
+      opts?.spreadsheetId ?? env.teachersSheetsSpreadsheetId;
     if (!spreadsheetId) return;
 
-    const client = new TeachersSheetsClient();
+    const client = new TeachersSheetsClient({ spreadsheetId });
     const meta = await client.getSpreadsheetMetadata();
 
     const subjects = await this.prisma.subject.findMany({
@@ -707,8 +715,11 @@ export class TeachersSheetsSyncService {
     }
   }
 
-  async recordFailure(error: unknown) {
-    const spreadsheetId = env.teachersSheetsSpreadsheetId ?? "unknown";
+  async recordFailure(error: unknown, spreadsheetIdOverride?: string) {
+    const spreadsheetId =
+      String(spreadsheetIdOverride ?? "").trim() ||
+      env.teachersSheetsSpreadsheetId ||
+      "unknown";
 
     const lastSyncAt = new Date();
     const message =

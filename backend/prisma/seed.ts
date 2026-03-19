@@ -59,8 +59,76 @@ async function seedReferenceData() {
       },
     });
   }
+}
 
-  console.log("Skipping subjects and teachers.");
+function slugEmailPart(value: string): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/['`’]/g, "")
+    .replace(/[^a-z0-9]+/g, ".")
+    .replace(/^\.+|\.+$/g, "")
+    .slice(0, 40);
+}
+
+function pad(n: number, width = 2) {
+  return String(n).padStart(width, "0");
+}
+
+function pick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)]!;
+}
+
+const TR_FIRST = [
+  "Ahmet",
+  "Mehmet",
+  "Mustafa",
+  "Ali",
+  "Ayşe",
+  "Fatma",
+  "Elif",
+  "Zeynep",
+  "Merve",
+  "Emre",
+  "Can",
+  "Ece",
+  "Hakan",
+  "Kemal",
+  "Yusuf",
+  "Ömer",
+  "Seda",
+  "Sıla",
+  "Cem",
+  "Deniz",
+];
+
+const TR_LAST = [
+  "Yılmaz",
+  "Kaya",
+  "Demir",
+  "Şahin",
+  "Çelik",
+  "Yıldız",
+  "Aydın",
+  "Öztürk",
+  "Arslan",
+  "Doğan",
+  "Koç",
+  "Kurt",
+  "Özdemir",
+  "Aslan",
+  "Acar",
+  "Aksoy",
+  "Güneş",
+  "Polat",
+  "Eren",
+  "Kaplan",
+];
+
+function makeTurkishFullName() {
+  const first = pick(TR_FIRST);
+  const last = pick(TR_LAST);
+  return { first, last, fullName: `${first} ${last}` };
 }
 
 type AcademicDepartmentName =
@@ -281,6 +349,222 @@ async function seedAcademicStructure() {
   }
 }
 
+async function seedRooms() {
+  console.log("Setting up rooms...");
+
+  const rooms = [
+    { name: "A101", capacity: 30 },
+    { name: "A102", capacity: 30 },
+    { name: "A201", capacity: 40 },
+    { name: "B101", capacity: 25 },
+    { name: "B201", capacity: 35 },
+    { name: "Lab-1", capacity: 24 },
+    { name: "Lab-2", capacity: 24 },
+    { name: "C301", capacity: 50 },
+    { name: "D101", capacity: 20 },
+    { name: "Conference", capacity: 60 },
+  ];
+
+  for (const r of rooms) {
+    await prisma.room.upsert({
+      where: { name: r.name },
+      update: { capacity: r.capacity },
+      create: { name: r.name, capacity: r.capacity },
+      select: { id: true },
+    });
+  }
+}
+
+async function seedDepartments() {
+  console.log("Setting up departments...");
+  for (const name of ACADEMIC_DEPARTMENTS) {
+    await prisma.department.upsert({
+      where: { name },
+      update: {},
+      create: { name },
+      select: { id: true },
+    });
+  }
+}
+
+type SeedSubject = {
+  name: string;
+  parentGroup: AcademicDepartmentName;
+  code?: string;
+};
+
+async function seedSubjectsAndTeachers() {
+  console.log("Setting up subjects and teachers...");
+
+  const parentGroups = await prisma.parentGroup.findMany({
+    select: { id: true, name: true },
+  });
+  const parentGroupIdByName = new Map(parentGroups.map((p) => [p.name, p.id]));
+
+  const subjects: SeedSubject[] = [
+    // IT
+    { name: "Algorithms", parentGroup: "IT", code: "IT-ALG" },
+    { name: "Databases", parentGroup: "IT", code: "IT-DB" },
+    { name: "Web Development", parentGroup: "IT", code: "IT-WEB" },
+    { name: "Backend Engineering", parentGroup: "IT", code: "IT-BE" },
+    { name: "Frontend Engineering", parentGroup: "IT", code: "IT-FE" },
+    { name: "Data Structures", parentGroup: "IT", code: "IT-DS" },
+    { name: "DevOps Basics", parentGroup: "IT", code: "IT-DEVOPS" },
+
+    // Japanese
+    { name: "Japanese Grammar", parentGroup: "Japanese", code: "JP-G" },
+    { name: "Kanji", parentGroup: "Japanese", code: "JP-KAN" },
+    { name: "Japanese Conversation", parentGroup: "Japanese", code: "JP-CONV" },
+    { name: "JLPT N5 Prep", parentGroup: "Japanese", code: "JP-N5" },
+
+    // Employability/Cowork
+    {
+      name: "Employability Skills",
+      parentGroup: "Employability/Cowork",
+      code: "EMP-SK",
+    },
+    {
+      name: "Career Coaching",
+      parentGroup: "Employability/Cowork",
+      code: "EMP-CC",
+    },
+
+    // Partner University / Language
+    {
+      name: "Academic Writing",
+      parentGroup: "Partner University",
+      code: "UNI-AW",
+    },
+    {
+      name: "Presentation Skills",
+      parentGroup: "Partner University",
+      code: "UNI-PS",
+    },
+    {
+      name: "Critical Thinking",
+      parentGroup: "Partner University",
+      code: "UNI-CT",
+    },
+    { name: "English", parentGroup: "Language University", code: "LANG-EN" },
+    {
+      name: "Uzbek Language",
+      parentGroup: "Language University",
+      code: "LANG-UZ",
+    },
+    { name: "History", parentGroup: "Partner University", code: "UNI-HIS" },
+    {
+      name: "Mathematics",
+      parentGroup: "Partner University",
+      code: "UNI-MATH",
+    },
+  ];
+
+  const subjectRows = [] as Array<{ id: string; name: string }>;
+
+  for (const s of subjects) {
+    const parentGroupId = parentGroupIdByName.get(s.parentGroup) ?? null;
+
+    const row = await prisma.subject.upsert({
+      where: { name: s.name },
+      update: {
+        code: s.code ?? null,
+        parentGroupId,
+      },
+      create: {
+        name: s.name,
+        code: s.code ?? null,
+        parentGroupId,
+      },
+      select: { id: true, name: true },
+    });
+    subjectRows.push(row);
+  }
+
+  const departments = await prisma.department.findMany({
+    select: { id: true, name: true },
+  });
+  const departmentIdByName = new Map(departments.map((d) => [d.name, d.id]));
+
+  // Create a reasonable number of teachers; each teaches multiple subjects.
+  const teacherCount = 18;
+  for (let i = 1; i <= teacherCount; i++) {
+    const { first, last, fullName } = makeTurkishFullName();
+    const staffNo = `T${pad(i, 4)}`;
+    const email = `${slugEmailPart(first)}.${slugEmailPart(last)}.${staffNo.toLowerCase()}@apro.edu`;
+
+    const dept = pick(ACADEMIC_DEPARTMENTS);
+    const departmentId = departmentIdByName.get(dept) ?? null;
+
+    // Pick 2-4 subjects.
+    const shuffled = [...subjectRows].sort(() => Math.random() - 0.5);
+    const teach = shuffled.slice(0, 2 + (i % 3));
+
+    await prisma.teacher.upsert({
+      where: { staffNo },
+      update: {
+        fullName,
+        email,
+        departmentId,
+        subjects: {
+          connect: teach.map((s) => ({ id: s.id })),
+        },
+      },
+      create: {
+        fullName,
+        staffNo,
+        email,
+        departmentId,
+        subjects: {
+          connect: teach.map((s) => ({ id: s.id })),
+        },
+      },
+      select: { id: true },
+    });
+  }
+}
+
+async function seedStudents() {
+  console.log("Setting up students (10 per group)...");
+
+  const groups = await prisma.group.findMany({
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+
+  for (const g of groups) {
+    const groupPrefix = String(g.name)
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "")
+      .slice(0, 18);
+
+    for (let i = 1; i <= 10; i++) {
+      const { first, last, fullName } = makeTurkishFullName();
+      const studentNumber = `${groupPrefix}-${pad(i, 2)}`;
+      const email = `${slugEmailPart(first)}.${slugEmailPart(last)}.${slugEmailPart(studentNumber)}@apro.edu`;
+
+      await prisma.student.upsert({
+        where: { studentNumber },
+        update: {
+          fullName,
+          email,
+          groupId: g.id,
+          groupName: g.name,
+          status: "ACTIVE",
+        },
+        create: {
+          fullName,
+          email,
+          groupId: g.id,
+          groupName: g.name,
+          studentNumber,
+          status: "ACTIVE",
+        },
+        select: { id: true },
+      });
+    }
+  }
+}
+
 async function seedAiModels() {
   const models: Array<{
     provider: string;
@@ -428,6 +712,10 @@ async function main() {
   await upsertAdmin();
   await seedReferenceData();
   await seedAcademicStructure();
+  await seedRooms();
+  await seedDepartments();
+  await seedSubjectsAndTeachers();
+  await seedStudents();
   await seedAiModels();
   console.log("✓ Seed complete");
   console.log(

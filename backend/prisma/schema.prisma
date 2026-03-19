@@ -563,8 +563,8 @@ model AiModel {
 model AiSettings {
   key                   String   @id
   isEnabled             Boolean  @default(true)
-  systemPrompt          String   @default("")
-  toolPlannerPrompt     String   @default("")
+  systemPrompt          String   @db.Text
+  toolPlannerPrompt     String   @db.Text
   defaultUserChatModelId  String? @db.Char(36)
   defaultAdminChatModelId String? @db.Char(36)
   createdAt             DateTime @default(now())
@@ -587,6 +587,22 @@ model AiToolConfig {
   updatedAt         DateTime @updatedAt
 
   @@map("AiToolConfig")
+}
+
+// Persisted Google Sheets configuration (singleton row).
+// Allows admins to set Spreadsheet IDs from the UI (instead of env-only).
+model SheetsSettings {
+  key String @id
+
+  studentsSpreadsheetId   String?
+  teachersSpreadsheetId   String?
+  attendanceSpreadsheetId String?
+  gradesSpreadsheetId     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("SheetsSettings")
 }
 
 // Audit log for AI requests (admin-visible).

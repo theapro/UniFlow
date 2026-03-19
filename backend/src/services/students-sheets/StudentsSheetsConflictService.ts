@@ -132,8 +132,10 @@ export class StudentsSheetsConflictService {
     status?: "OPEN" | "RESOLVED";
     take?: number;
     skip?: number;
+    spreadsheetId?: string;
   }) {
-    const spreadsheetId = env.studentsSheetsSpreadsheetId;
+    const spreadsheetId =
+      opts?.spreadsheetId ?? env.studentsSheetsSpreadsheetId;
     if (!spreadsheetId) return [];
 
     const take = Math.min(Math.max(opts?.take ?? 50, 1), 200);
@@ -157,12 +159,7 @@ export class StudentsSheetsConflictService {
     if (!conflict) throw new Error("CONFLICT_NOT_FOUND");
     if (conflict.status !== "OPEN") throw new Error("CONFLICT_NOT_OPEN");
 
-    const spreadsheetId = env.studentsSheetsSpreadsheetId;
-    if (!spreadsheetId)
-      throw new Error("STUDENTS_SHEETS_MISSING_SPREADSHEET_ID");
-    if (conflict.spreadsheetId !== spreadsheetId) {
-      throw new Error("CONFLICT_SPREADSHEET_MISMATCH");
-    }
+    const spreadsheetId = conflict.spreadsheetId;
 
     const sheetPayload = (conflict.sheetPayload ?? null) as any;
     const dbPayload = (conflict.dbPayload ?? null) as any;
@@ -191,7 +188,7 @@ export class StudentsSheetsConflictService {
     if (!sheetTitle) throw new Error("CONFLICT_MISSING_SHEET_TITLE");
 
     // Apply DB and/or Sheet updates depending on resolution.
-    const client = new StudentsSheetsClient();
+    const client = new StudentsSheetsClient({ spreadsheetId });
 
     const applyToDb = async () => {
       const cohort = String(finalPayloadRaw.cohort ?? "").trim() || null;

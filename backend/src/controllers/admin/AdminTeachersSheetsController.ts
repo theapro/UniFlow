@@ -5,12 +5,11 @@ import { fail, ok } from "../../utils/responses";
 import { jsonStringArray } from "../../utils/json";
 import { TeachersSheetsClient } from "../../services/teachers-sheets/TeachersSheetsClient";
 import { TeachersSheetsSyncService } from "../../services/teachers-sheets/TeachersSheetsSyncService";
-
-function maskSpreadsheetId(id: string | undefined | null) {
-  if (!id) return null;
-  if (id.length <= 10) return id;
-  return `${id.slice(0, 6)}…${id.slice(-4)}`;
-}
+import {
+  SheetsSettingsService,
+  maskSpreadsheetId,
+} from "../../services/sheets/SheetsSettingsService";
+import { formatGoogleSheetsConnectionError } from "../../services/sheets/googleSheetsError";
 
 function maskEmail(email: string | undefined | null) {
   if (!email) return null;
@@ -19,6 +18,7 @@ function maskEmail(email: string | undefined | null) {
 
 export class AdminTeachersSheetsController {
   private syncService: TeachersSheetsSyncService;
+  private readonly sheetsSettings = new SheetsSettingsService();
 
   constructor() {
     this.syncService = new TeachersSheetsSyncService(prisma);
@@ -28,11 +28,29 @@ export class AdminTeachersSheetsController {
     return this.syncService;
   }
 
+  patchConfig = async (req: Request, res: Response) => {
+    const { spreadsheetId } = req.body ?? {};
+
+    const settings = await this.sheetsSettings.patch(prisma, {
+      teachersSpreadsheetId: spreadsheetId,
+    });
+
+    return ok(res, "Teachers Sheets config updated", {
+      spreadsheetId: settings.effective.teachersSpreadsheetId,
+      spreadsheetIdMasked: maskSpreadsheetId(
+        settings.effective.teachersSpreadsheetId,
+      ),
+    });
+  };
+
   getHealth = async (_req: Request, res: Response) => {
+    const settings = await this.sheetsSettings.getOrCreate(prisma);
+    const effectiveSpreadsheetId = settings.effective.teachersSpreadsheetId;
+
     const config = {
       enabled: env.teachersSheetsEnabled,
-      spreadsheetId: env.teachersSheetsSpreadsheetId ?? null,
-      spreadsheetIdMasked: maskSpreadsheetId(env.teachersSheetsSpreadsheetId),
+      spreadsheetId: effectiveSpreadsheetId,
+      spreadsheetIdMasked: maskSpreadsheetId(effectiveSpreadsheetId),
       clientEmail: maskEmail(env.googleSheetsClientEmail),
       privateKeyProvided: Boolean(
         env.googleSheetsPrivateKeyBase64 || env.googleSheetsPrivateKey,
@@ -42,7 +60,7 @@ export class AdminTeachersSheetsController {
     };
 
     const canAttemptConnection = Boolean(
-      env.teachersSheetsSpreadsheetId &&
+      effectiveSpreadsheetId &&
       env.googleSheetsClientEmail &&
       (env.googleSheetsPrivateKeyBase64 || env.googleSheetsPrivateKey),
     );
@@ -59,7 +77,9 @@ export class AdminTeachersSheetsController {
     }
 
     try {
-      const client = new TeachersSheetsClient();
+      const client = new TeachersSheetsClient({
+        spreadsheetId: effectiveSpreadsheetId ?? undefined,
+      });
       const meta = await client.getSpreadsheetMetadata();
 
       return ok(res, "Teachers Sheets health fetched", {
@@ -75,10 +95,7 @@ export class AdminTeachersSheetsController {
         },
       });
     } catch (error: any) {
-      const message =
-        typeof error?.message === "string"
-          ? error.message
-          : "SHEETS_HEALTH_FAILED";
+      const message = formatGoogleSheetsConnectionError(error);
 
       return ok(res, "Teachers Sheets health fetched", {
         config,
@@ -92,7 +109,8 @@ export class AdminTeachersSheetsController {
   };
 
   getStatus = async (_req: Request, res: Response) => {
-    const spreadsheetId = env.teachersSheetsSpreadsheetId;
+    const spreadsheetId =
+      await this.sheetsSettings.getEffectiveTeachersSpreadsheetId(prisma);
 
     const state = spreadsheetId
       ? await prisma.teachersSheetsSyncState.findUnique({
@@ -110,8 +128,8 @@ export class AdminTeachersSheetsController {
 
     return ok(res, "Teachers Sheets status fetched", {
       enabled: env.teachersSheetsEnabled,
-      spreadsheetId: env.teachersSheetsSpreadsheetId ?? null,
-      spreadsheetIdMasked: maskSpreadsheetId(env.teachersSheetsSpreadsheetId),
+      spreadsheetId,
+      spreadsheetIdMasked: maskSpreadsheetId(spreadsheetId),
       detectedSubjects: jsonStringArray(state?.detectedSubjects),
       syncedTeachers: state?.syncedTeachers ?? 0,
       spreadsheetRows: state?.spreadsheetRows ?? 0,
@@ -133,11 +151,16 @@ export class AdminTeachersSheetsController {
   };
 
   syncNow = async (_req: Request, res: Response) => {
+    const spreadsheetId =
+      await this.sheetsSettings.getEffectiveTeachersSpreadsheetId(prisma);
     try {
-      const result = await this.syncService.syncOnce({ reason: "admin_force" });
+      const result = await this.syncService.syncOnce({
+        reason: "admin_force",
+        spreadsheetId: spreadsheetId ?? undefined,
+      });
       return ok(res, "Teachers Sheets sync completed", result);
     } catch (e: any) {
-      await this.syncService.recordFailure(e);
+      await this.syncService.recordFailure(e, spreadsheetId ?? undefined);
       return fail(res, 500, "Teachers Sheets sync failed: " + e.message);
     }
   };

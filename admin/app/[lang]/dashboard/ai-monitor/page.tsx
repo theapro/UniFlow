@@ -19,6 +19,11 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 type AiSettings = {
   id: string;
@@ -31,7 +36,6 @@ type AiSettings = {
 };
 
 type AiToolConfig = {
-  id: string;
   name: string;
   isEnabled: boolean;
   enabledForStudents: boolean;
@@ -39,6 +43,15 @@ type AiToolConfig = {
   enabledForAdmins: boolean;
   updatedAt: string;
 };
+
+function toolSection(
+  name: string,
+): "Student" | "Groups" | "Schedule" | "Admin" {
+  if (name.includes("Schedule")) return "Schedule";
+  if (name.startsWith("getStudent")) return "Student";
+  if (name.startsWith("getGroup")) return "Groups";
+  return "Admin";
+}
 
 type AiUsageLog = {
   id: string;
@@ -110,6 +123,21 @@ export default function AIMonitorPage() {
     onError: () => toast.error("Tool sozlamasini yangilashda xatolik"),
   });
 
+  const groupedTools = (() => {
+    const items = tools ?? [];
+    const sections: Record<
+      "Student" | "Groups" | "Schedule" | "Admin",
+      AiToolConfig[]
+    > = {
+      Student: [],
+      Groups: [],
+      Schedule: [],
+      Admin: [],
+    };
+    for (const t of items) sections[toolSection(t.name)].push(t);
+    return sections;
+  })();
+
   return (
     <div className="container space-y-6">
       <div className="flex flex-col gap-1">
@@ -169,20 +197,20 @@ export default function AIMonitorPage() {
           <CardTitle>Tools</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tool</TableHead>
-                  <TableHead className="text-right">Enabled</TableHead>
-                  <TableHead className="text-right">Students</TableHead>
-                  <TableHead className="text-right">Teachers</TableHead>
-                  <TableHead className="text-right">Admins</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {toolsLoading ? (
-                  Array.from({ length: 8 }).map((_, i) => (
+          {toolsLoading ? (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tool</TableHead>
+                    <TableHead className="text-right">Enabled</TableHead>
+                    <TableHead className="text-right">Students</TableHead>
+                    <TableHead className="text-right">Teachers</TableHead>
+                    <TableHead className="text-right">Admins</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array.from({ length: 8 }).map((_, i) => (
                     <TableRow key={i}>
                       <TableCell>
                         <Skeleton className="h-6 w-48" />
@@ -200,80 +228,140 @@ export default function AIMonitorPage() {
                         <Skeleton className="h-6 w-12 ml-auto" />
                       </TableCell>
                     </TableRow>
-                  ))
-                ) : tools && tools.length > 0 ? (
-                  tools.map((t) => (
-                    <TableRow key={t.id}>
-                      <TableCell>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : tools && tools.length > 0 ? (
+            <div className="space-y-2">
+              {(["Student", "Schedule", "Groups", "Admin"] as const).map(
+                (section) => {
+                  const items = groupedTools[section];
+                  if (items.length === 0) return null;
+                  return (
+                    <Collapsible
+                      key={section}
+                      defaultOpen={section === "Student"}
+                    >
+                      <div className="flex items-center justify-between rounded-md border px-3 py-2">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs">{t.name}</span>
-                          {!t.isEnabled ? (
-                            <Badge variant="secondary" className="text-[10px]">
-                              disabled
-                            </Badge>
-                          ) : null}
+                          <div className="text-sm font-medium">{section}</div>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {items.length}
+                          </Badge>
                         </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Switch
-                          checked={t.isEnabled}
-                          disabled={patchTool.isPending}
-                          onCheckedChange={(v) =>
-                            patchTool.mutate({
-                              name: t.name,
-                              patch: { isEnabled: v },
-                            })
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Switch
-                          checked={t.enabledForStudents}
-                          disabled={!t.isEnabled || patchTool.isPending}
-                          onCheckedChange={(v) =>
-                            patchTool.mutate({
-                              name: t.name,
-                              patch: { enabledForStudents: v },
-                            })
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Switch
-                          checked={t.enabledForTeachers}
-                          disabled={!t.isEnabled || patchTool.isPending}
-                          onCheckedChange={(v) =>
-                            patchTool.mutate({
-                              name: t.name,
-                              patch: { enabledForTeachers: v },
-                            })
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Switch
-                          checked={t.enabledForAdmins}
-                          disabled={!t.isEnabled || patchTool.isPending}
-                          onCheckedChange={(v) =>
-                            patchTool.mutate({
-                              name: t.name,
-                              patch: { enabledForAdmins: v },
-                            })
-                          }
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={5}>
-                      <p className="text-sm text-muted-foreground">No tools</p>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                        <CollapsibleTrigger asChild>
+                          <Button variant="secondary" size="sm">
+                            Toggle
+                          </Button>
+                        </CollapsibleTrigger>
+                      </div>
+                      <CollapsibleContent>
+                        <div className="mt-2 rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Tool</TableHead>
+                                <TableHead className="text-right">
+                                  Enabled
+                                </TableHead>
+                                <TableHead className="text-right">
+                                  Students
+                                </TableHead>
+                                <TableHead className="text-right">
+                                  Teachers
+                                </TableHead>
+                                <TableHead className="text-right">
+                                  Admins
+                                </TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {items.map((t) => (
+                                <TableRow key={t.name}>
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-mono text-xs">
+                                        {t.name}
+                                      </span>
+                                      {!t.isEnabled ? (
+                                        <Badge
+                                          variant="secondary"
+                                          className="text-[10px]"
+                                        >
+                                          disabled
+                                        </Badge>
+                                      ) : null}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Switch
+                                      checked={t.isEnabled}
+                                      disabled={patchTool.isPending}
+                                      onCheckedChange={(v) =>
+                                        patchTool.mutate({
+                                          name: t.name,
+                                          patch: { isEnabled: v },
+                                        })
+                                      }
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Switch
+                                      checked={t.enabledForStudents}
+                                      disabled={
+                                        !t.isEnabled || patchTool.isPending
+                                      }
+                                      onCheckedChange={(v) =>
+                                        patchTool.mutate({
+                                          name: t.name,
+                                          patch: { enabledForStudents: v },
+                                        })
+                                      }
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Switch
+                                      checked={t.enabledForTeachers}
+                                      disabled={
+                                        !t.isEnabled || patchTool.isPending
+                                      }
+                                      onCheckedChange={(v) =>
+                                        patchTool.mutate({
+                                          name: t.name,
+                                          patch: { enabledForTeachers: v },
+                                        })
+                                      }
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Switch
+                                      checked={t.enabledForAdmins}
+                                      disabled={
+                                        !t.isEnabled || patchTool.isPending
+                                      }
+                                      onCheckedChange={(v) =>
+                                        patchTool.mutate({
+                                          name: t.name,
+                                          patch: { enabledForAdmins: v },
+                                        })
+                                      }
+                                    />
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  );
+                },
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No tools</p>
+          )}
         </CardContent>
       </Card>
 

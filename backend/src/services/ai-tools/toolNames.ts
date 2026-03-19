@@ -6,6 +6,7 @@ export const AI_TOOL_NAMES = [
   "getStudentAttendance",
   "getStudentGroup",
   "getStudentSchedule",
+  "getStudentMonthlySchedule",
 
   "getGroupStudents",
   "getGroupGrades",

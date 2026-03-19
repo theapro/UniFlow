@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { formatDbTime } from "../../utils/time";
 import { getWeekdayUTC } from "../../utils/weekday";
+import { syncGroupSubjectDerivedLinks } from "../sync/derivedRelations";
 
 function pad2(n: number) {
   return String(n).padStart(2, "0");
@@ -476,6 +477,16 @@ export class AdminMonthlyScheduleService {
         };
       }
 
+      try {
+        await syncGroupSubjectDerivedLinks(prisma, {
+          groupId: created.row.groupId,
+          subjectId: created.row.subjectId,
+          teacherIdsHint: [created.row.teacherId],
+        });
+      } catch {
+        // Non-fatal
+      }
+
       return {
         ok: true as const,
         data: {
@@ -624,7 +635,11 @@ export class AdminMonthlyScheduleService {
           },
         });
 
-        return { kind: "ok" as const, row };
+        return {
+          kind: "ok" as const,
+          row,
+          prev: { groupId: existing.groupId, subjectId: existing.subjectId },
+        };
       });
 
       if (updated.kind === "not_found") {
@@ -655,6 +670,25 @@ export class AdminMonthlyScheduleService {
           status: 409,
           message: `${label} already has a lesson at that time`,
         };
+      }
+
+      try {
+        const targets = new Set<string>([
+          `${updated.row.groupId}:${updated.row.subjectId}`,
+          `${updated.prev.groupId}:${updated.prev.subjectId}`,
+        ]);
+
+        for (const key of targets) {
+          const [groupId, subjectId] = key.split(":");
+          if (!groupId || !subjectId) continue;
+          await syncGroupSubjectDerivedLinks(prisma, {
+            groupId,
+            subjectId,
+            teacherIdsHint: [updated.row.teacherId],
+          });
+        }
+      } catch {
+        // Non-fatal
       }
 
       return {
@@ -695,7 +729,23 @@ export class AdminMonthlyScheduleService {
 
   async remove(id: string) {
     try {
+      const existing = await prisma.schedule.findUnique({
+        where: { id },
+        select: { groupId: true, subjectId: true },
+      });
+
       await prisma.schedule.delete({ where: { id } });
+
+      if (existing?.groupId && existing?.subjectId) {
+        try {
+          await syncGroupSubjectDerivedLinks(prisma, {
+            groupId: existing.groupId,
+            subjectId: existing.subjectId,
+          });
+        } catch {
+          // Non-fatal
+        }
+      }
       return { ok: true as const };
     } catch (err: any) {
       if (isKnownRequestError(err) && err.code === "P2025") {
@@ -813,6 +863,19 @@ export class AdminMonthlyScheduleService {
         status: created.status,
         message: created.message,
       };
+    }
+
+    const targets = new Set<string>(
+      list.map((it) => `${it.groupId}:${it.subjectId}`),
+    );
+    for (const key of targets) {
+      const [groupId, subjectId] = key.split(":");
+      if (!groupId || !subjectId) continue;
+      try {
+        await syncGroupSubjectDerivedLinks(prisma, { groupId, subjectId });
+      } catch {
+        // Non-fatal
+      }
     }
 
     return {

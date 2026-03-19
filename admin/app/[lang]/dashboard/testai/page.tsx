@@ -19,6 +19,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type DebugLog = {
   id: string;
@@ -37,6 +45,19 @@ export default function TestAiPage() {
   const [message, setMessage] = React.useState<string>("");
   const [userId, setUserId] = React.useState<string>("");
   const [requestedModel, setRequestedModel] = React.useState<string>("");
+
+  const [suite, setSuite] = React.useState<
+    Array<{
+      message: string;
+      requestId: string;
+      toolUsed: string | null;
+      status: string | null;
+      error: string | null;
+      ms: number | null;
+      reply: string;
+    }>
+  >([]);
+  const [suiteRunning, setSuiteRunning] = React.useState(false);
 
   const [last, setLast] = React.useState<{
     reply: string;
@@ -85,6 +106,68 @@ export default function TestAiPage() {
     },
   });
 
+  const quickPrompts = React.useMemo(() => {
+    const student = [
+      "Men haqimdagi ma'lumotlarni bera olasanmi?",
+      "Bugungi dars jadvalim qanday?",
+      "Bu haftalik jadvalimni ko'rsat.",
+      "Bu oygi schedulim qanday?",
+      "O'qituvchilarim kimlar?",
+    ];
+    const teacher = [
+      "Men haqimdagi ma'lumotlarni bera olasanmi?",
+      "Bugun qaysi guruhlarda darsim bor?",
+      "Bu oygi jadvalim qanday?",
+      "Guruhlarim ro'yxatini bera olasanmi?",
+    ];
+    return asRole === "STUDENT" ? student : teacher;
+  }, [asRole]);
+
+  async function runSuite() {
+    try {
+      setSuiteRunning(true);
+      setSuite([]);
+
+      for (const msg of quickPrompts) {
+        const res = await aiAdminApi.testChat({
+          message: msg,
+          asRole,
+          userId: userId.trim() ? userId.trim() : null,
+          requestedModel: requestedModel.trim()
+            ? requestedModel.trim()
+            : undefined,
+        });
+        const data = res.data?.data;
+        const log = (data?.debug?.log ?? null) as DebugLog | null;
+
+        setSuite((prev) => [
+          ...prev,
+          {
+            message: msg,
+            requestId: String(data?.requestId ?? ""),
+            toolUsed: (data?.toolUsed ?? null) as string | null,
+            status: log?.status ?? null,
+            error: log?.error ?? null,
+            ms: typeof log?.ms === "number" ? log.ms : null,
+            reply: String(data?.reply ?? ""),
+          },
+        ]);
+      }
+
+      toast.success("Quick checks tugadi");
+    } catch (e: any) {
+      const msg =
+        typeof e?.response?.data?.message === "string"
+          ? e.response.data.message
+          : typeof e?.message === "string"
+            ? e.message
+            : "Xatolik";
+      toast.error(msg);
+    } finally {
+      setSuiteRunning(false);
+    }
+  }
+
   return (
     <div className="container space-y-6">
       <div className="flex flex-col gap-1">
@@ -100,6 +183,30 @@ export default function TestAiPage() {
           <CardTitle>So‘rov</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <div className="text-sm font-medium">Quick prompts</div>
+            <div className="flex flex-wrap gap-2">
+              {quickPrompts.map((p) => (
+                <Button
+                  key={p}
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setMessage(p)}
+                  disabled={send.isPending || suiteRunning}
+                >
+                  {p}
+                </Button>
+              ))}
+              <Button
+                type="button"
+                onClick={() => runSuite()}
+                disabled={send.isPending || suiteRunning}
+              >
+                {suiteRunning ? "Running…" : "Run checks"}
+              </Button>
+            </div>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <div className="text-sm font-medium">Test role</div>
@@ -222,6 +329,64 @@ export default function TestAiPage() {
                 </pre>
               </div>
             </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick checks</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {suite.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Hali quick checks yo‘q.
+            </p>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Message</TableHead>
+                    <TableHead>Tool</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">ms</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {suite.map((r) => (
+                    <TableRow key={r.requestId || r.message}>
+                      <TableCell className="text-xs">{r.message}</TableCell>
+                      <TableCell className="text-xs font-mono">
+                        {r.toolUsed ?? "-"}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        <Badge
+                          variant={
+                            r.status === "ERROR"
+                              ? "destructive"
+                              : r.status
+                                ? "default"
+                                : "secondary"
+                          }
+                          className="text-[10px]"
+                        >
+                          {r.status ?? "-"}
+                        </Badge>
+                        {r.error ? (
+                          <div className="mt-1 text-[10px] text-muted-foreground">
+                            {r.error}
+                          </div>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="text-right text-xs font-mono">
+                        {typeof r.ms === "number" ? r.ms : "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

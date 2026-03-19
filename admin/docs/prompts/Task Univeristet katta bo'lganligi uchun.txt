@@ -1,0 +1,35 @@
+Task Univeristet katta bo'lganligi uchun schedule va grouolarni logicni boshqattan ishlab chiqaman
+
+1. Cohort degan narsa bo'lishi kerak shunchaki table emas Cohort degan page qo'sh Academic> Cohort bu pageda cohort create qilish mumkin bo'lsin.
+Cohort ichida Departmentlar bo'ladi 5 ta doimiy va mutlaq department IT, Japanese, Partner University, Employability/Cowork, Language University, ularni ichida oddiy studentlar kiritiladigan grouplar bo'lishi kerak.
+
+2. scheduleda groups uchun yana bitta row qo'shish kerak ya'ni Employability/Cowork deb nomlangan.
+Groups grid sectionni ham logicni yaxshilash kerak. hullas avto add groups degan function qo'shish kerak ai va google tool ishlatishi kerak schedule generate kabi 
+IT bo'limi cohortlar bo'yicha tartiblanishi kerak ya'ni birinchi 19/20/21 guruh column birinchi qo'yiladu, keyin 22, keyin 23 va hkz. iloji bo'lsa hammasi ni ranglar bilan ajratib qo'yish kerak.
+
+Lekin japanese bo'limi cohortlar bilan tartiblanmaydi chunki bitta guruhda ikki cohort studenti ichida bo'lishi mumkin. bunga o'zing yaxshiroq logic topa olasanmi
+
+Employability/cowork esa butun cohortga birdaginga bitta dars bo'ladi shuning uchun har IT department ni hisobga olgan holda joylashtirish kerak masalan Employability/Cowork 23 guruh bo'lsa 
+bu kabi ko'rinishda bo'lishi kerak
+
+[23A] [23B] [23c] [23D] hullas hammasida 23 bor va ostida
+[   Employability 23  ] shu kabi bo'lishi kerak
+
+aytgancha IT department ga tegishli guruh schedule workspacedagi faqat IT row,cell,columnga ga qo'yish mumkin bo'lsin
+
+schedule sidebardagi guruhlarni ham departmentlardan va cohortlardan olib keladigan qilish kerakli
+
+WARNING!!! databaseda confusing yoki duplicate joyi bo'lmasligi kerak agar ortiqcha joyi bo'lsa o'chirib yuborish uchun migartion ber va qo'shish kerakli bo'lsa qo'shish uchun migration ber
+
+WARNING 2 !!! Frontend ADmin panelda ham confusing joylari bo'lmasin Chiroyli tree shaklida bo'lsin
+
+va .bd seeder ga bu ma'lumotlarni qo'shib chiqish kerak boshqa fake ma'lumotlarni o'chirib yubor masalan Teacher student yoki groupdagilar ammo ai models qolsin va boshqa kerakli joylar qolsin
+
+IT: 19/20/21 , 22A, 22B, 23A,23B,23C,23D,23E,24A,24B,24C,24D,25A,25B,25C,25D,25E,25F
+Japanese: N5A, N5B, N5C, N5D, 25E, 25F,N2A, N2B, N2C, N2D, N2E, N3A, N3B, N3C, N3D, N3E, N3F, N3G, N4
+Partner: sanno f, sanno k, Okayama a, okayama b
+Employability/Cowork:Employability 19/20/21 / Co-work 19/20/21,Employability 22 / Co-work 22,Employability 23 / Co-work 23,Employability 24 / Co-work 24, Employability 25 A,Employability 25 B
+Language university: UZBEK TILI A / Dinshunoslik A, UZBEK TILI B / Dinshunoslik B, UZBEK TILI D / Dinshunoslik D, UZBEK TILI E / Dinshunoslik E, UZBEK TILI F / Dinshunoslik F
+
+
+ENG OHIRIDA O"ZGARTIRILGAN JOYLARNI .MD FAYLIDA YAXSHILAB DETAILED REPORT BER
