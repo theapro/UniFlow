@@ -222,7 +222,7 @@ export function AttendanceSheetsView({
   const bodyRows = previewRows.slice(1);
 
   return (
-    <div className="container space-y-6 max-w-7xl mx-auto py-4">
+    <div className="container max-w-7xl py-10 space-y-12">
       <PageHeader
         title={title}
         description={
@@ -562,29 +562,34 @@ export function AttendanceSheetsView({
                   No rows found
                 </div>
               ) : (
-                <div className="rounded-md border overflow-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {header.slice(0, 20).map((h, idx) => (
-                          <TableHead key={idx} className="whitespace-nowrap">
-                            {h || "(blank)"}
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {bodyRows.slice(0, 29).map((row, rIdx) => (
-                        <TableRow key={rIdx}>
-                          {header.slice(0, 20).map((_h, cIdx) => (
-                            <TableCell key={cIdx} className="whitespace-nowrap">
-                              {row[cIdx] ?? ""}
-                            </TableCell>
+                <div className="rounded-3xl border border-border/40 bg-muted/10 overflow-hidden">
+                  <div className="overflow-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          {header.slice(0, 20).map((h, idx) => (
+                            <TableHead key={idx} className="whitespace-nowrap">
+                              {h || "(blank)"}
+                            </TableHead>
                           ))}
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {bodyRows.slice(0, 29).map((row, rIdx) => (
+                          <TableRow key={rIdx}>
+                            {header.slice(0, 20).map((_h, cIdx) => (
+                              <TableCell
+                                key={cIdx}
+                                className="whitespace-nowrap"
+                              >
+                                {row[cIdx] ?? ""}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               )}
 

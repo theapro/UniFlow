@@ -7,7 +7,6 @@ import { toast } from "sonner";
 
 import { gradesSheetsApi } from "@/lib/api";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -157,13 +156,13 @@ export function GradesTabEditView({
   );
 
   return (
-    <div className="container space-y-4">
+    <div className="container max-w-7xl py-10 space-y-12">
       <PageHeader
         title={dict?.grades?.editTab ?? "Edit grades tab"}
         description={sheetTitle}
         actions={
           <div className="flex gap-2">
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" className="rounded-2xl">
               <Link
                 href={`/${lang}/dashboard/grades/${encodeURIComponent(
                   sheetTitle,
@@ -175,6 +174,7 @@ export function GradesTabEditView({
             <Button
               onClick={() => saveMutation.mutate()}
               disabled={saveMutation.isPending}
+              className="rounded-2xl"
             >
               {saveMutation.isPending
                 ? (dict?.common?.loading ?? "Saving...")
@@ -184,45 +184,45 @@ export function GradesTabEditView({
         }
       />
 
-      <Card>
-        <CardContent className="pt-6 space-y-4">
-          {isLoading ? (
-            <div>{dict?.common?.loading ?? "Loading..."}</div>
-          ) : isError ? (
-            <div className="text-sm text-destructive">
-              {(error as any)?.response?.data?.message ??
-                (error as any)?.message ??
-                "Failed to load preview"}
-            </div>
-          ) : rows.length === 0 ? (
-            <div className="text-sm text-muted-foreground">
-              {dict?.grades?.emptyPreview ?? "No data in this tab yet."}
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="space-y-1">
-                  <div className="text-xs font-semibold text-muted-foreground">
-                    {dict?.attendance?.assignmentCount ??
-                      dict?.grades?.assignmentCount ??
-                      "Assignments (HW count)"}
-                  </div>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={200}
-                    value={assignmentCount}
-                    onChange={(e) => setAssignmentCount(Number(e.target.value))}
-                    className="w-40"
-                  />
+      <section className="rounded-[32px] border border-border/40 bg-muted/10 p-6 space-y-4">
+        {isLoading ? (
+          <div>{dict?.common?.loading ?? "Loading..."}</div>
+        ) : isError ? (
+          <div className="text-sm text-destructive">
+            {(error as any)?.response?.data?.message ??
+              (error as any)?.message ??
+              "Failed to load preview"}
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="text-sm text-muted-foreground">
+            {dict?.grades?.emptyPreview ?? "No data in this tab yet."}
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <div className="text-xs font-semibold text-muted-foreground">
+                  {dict?.attendance?.assignmentCount ??
+                    dict?.grades?.assignmentCount ??
+                    "Assignments (HW count)"}
                 </div>
-                <div className="text-xs text-muted-foreground max-w-xl">
-                  {dict?.grades?.editHint ??
-                    "Edits here update the Grades sheet directly. Decreasing HW count does not delete existing columns; it only changes which HW columns you edit here."}
-                </div>
+                <Input
+                  type="number"
+                  min={1}
+                  max={200}
+                  value={assignmentCount}
+                  onChange={(e) => setAssignmentCount(Number(e.target.value))}
+                  className="w-40 h-10 rounded-2xl border-border/40 bg-background/50"
+                />
               </div>
+              <div className="text-xs text-muted-foreground max-w-xl">
+                {dict?.grades?.editHint ??
+                  "Edits here update the Grades sheet directly. Decreasing HW count does not delete existing columns; it only changes which HW columns you edit here."}
+              </div>
+            </div>
 
-              <div className="rounded-md border overflow-auto">
+            <div className="rounded-3xl border border-border/40 bg-background/50 overflow-hidden">
+              <div className="overflow-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -269,7 +269,7 @@ export function GradesTabEditView({
                                   return next;
                                 });
                               }}
-                              className="h-8 w-24"
+                              className="h-8 w-24 rounded-2xl border-border/40 bg-background/50"
                             />
                           </TableCell>
                         ))}
@@ -278,10 +278,10 @@ export function GradesTabEditView({
                   </TableBody>
                 </Table>
               </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            </div>
+          </>
+        )}
+      </section>
 
       <div className="text-xs text-muted-foreground">
         {dict?.grades?.editFooterHint ??

@@ -74,7 +74,7 @@ export default function TeacherViewPage({
   const canResend = !!teacher?.user?.email;
 
   return (
-    <div className="space-y-4">
+    <div className="container max-w-7xl py-10 space-y-12">
       <PageHeader
         title={dict.teachers.viewTitle}
         actions={
@@ -95,7 +95,7 @@ export default function TeacherViewPage({
         }
       />
 
-      <Card>
+      <Card className="rounded-[32px] border border-border/40 bg-muted/10">
         <CardHeader>
           <CardTitle>{teacher.fullName}</CardTitle>
         </CardHeader>

@@ -86,7 +86,9 @@
     "group": "Guruh",
     "teacher": "O'qituvchi",
     "subject": "Fan",
-    "room": "Xona"
+    "room": "Xona",
+    "description": "Oylik dars jadvallarini boshqarish va ko'rish.",
+    "createNew": "Yangi jadval yaratish"
   },
   "attendance": {
     "title": "Davomat",

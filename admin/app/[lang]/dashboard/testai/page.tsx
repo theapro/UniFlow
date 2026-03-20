@@ -510,49 +510,51 @@ export default function TestAiPage() {
               Hali quick checks yo‘q.
             </p>
           ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Message</TableHead>
-                    <TableHead>Tool</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">ms</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {suite.map((r) => (
-                    <TableRow key={r.requestId || r.message}>
-                      <TableCell className="text-xs">{r.message}</TableCell>
-                      <TableCell className="text-xs font-mono">
-                        {r.toolUsed ?? "-"}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        <Badge
-                          variant={
-                            r.status === "ERROR"
-                              ? "destructive"
-                              : r.status
-                                ? "default"
-                                : "secondary"
-                          }
-                          className="text-[10px]"
-                        >
-                          {r.status ?? "-"}
-                        </Badge>
-                        {r.error ? (
-                          <div className="mt-1 text-[10px] text-muted-foreground">
-                            {r.error}
-                          </div>
-                        ) : null}
-                      </TableCell>
-                      <TableCell className="text-right text-xs font-mono">
-                        {typeof r.ms === "number" ? r.ms : "-"}
-                      </TableCell>
+            <div className="rounded-3xl border border-border/40 bg-muted/10 overflow-hidden">
+              <div className="overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Message</TableHead>
+                      <TableHead>Tool</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">ms</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {suite.map((r) => (
+                      <TableRow key={r.requestId || r.message}>
+                        <TableCell className="text-xs">{r.message}</TableCell>
+                        <TableCell className="text-xs font-mono">
+                          {r.toolUsed ?? "-"}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          <Badge
+                            variant={
+                              r.status === "ERROR"
+                                ? "destructive"
+                                : r.status
+                                  ? "default"
+                                  : "secondary"
+                            }
+                            className="text-[10px]"
+                          >
+                            {r.status ?? "-"}
+                          </Badge>
+                          {r.error ? (
+                            <div className="mt-1 text-[10px] text-muted-foreground">
+                              {r.error}
+                            </div>
+                          ) : null}
+                        </TableCell>
+                        <TableCell className="text-right text-xs font-mono">
+                          {typeof r.ms === "number" ? r.ms : "-"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           )}
         </CardContent>

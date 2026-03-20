@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 
 import { attendanceSheetsApi, groupsApi, subjectsApi } from "@/lib/api";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -101,7 +100,7 @@ export function AttendanceTabCreateView({
   const subjects = subjectsQuery.data ?? [];
 
   return (
-    <div className="container space-y-4">
+    <div className="container max-w-7xl py-10 space-y-12">
       <PageHeader
         title={dict?.attendance?.createTab ?? "Create attendance tab"}
         description={
@@ -110,101 +109,102 @@ export function AttendanceTabCreateView({
         }
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{dict?.attendance?.tabInfo ?? "Tab details"}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="space-y-2">
-              <div className="text-sm font-medium">
-                {dict?.schedule?.group ?? "Group"}
-              </div>
-              <Select value={groupId} onValueChange={setGroupId}>
-                <SelectTrigger>
-                  <SelectValue placeholder={dict?.schedule?.group ?? "Group"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {groups.map((g) => (
-                    <SelectItem key={g.id} value={g.id}>
-                      {g.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      <section className="rounded-[32px] border border-border/40 bg-muted/10 p-6 space-y-4">
+        <div className="text-lg font-semibold">
+          {dict?.attendance?.tabInfo ?? "Tab details"}
+        </div>
 
-            <div className="space-y-2">
-              <div className="text-sm font-medium">
-                {dict?.schedule?.subject ?? "Subject"}
-              </div>
-              <Select
-                value={subjectId}
-                onValueChange={setSubjectId}
-                disabled={!groupId}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={dict?.schedule?.subject ?? "Subject"}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {subjects.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="space-y-2">
+            <div className="text-sm font-medium">
+              {dict?.schedule?.group ?? "Group"}
             </div>
+            <Select value={groupId} onValueChange={setGroupId}>
+              <SelectTrigger className="h-10 rounded-2xl border-border/40 bg-background/50">
+                <SelectValue placeholder={dict?.schedule?.group ?? "Group"} />
+              </SelectTrigger>
+              <SelectContent>
+                {groups.map((g) => (
+                  <SelectItem key={g.id} value={g.id}>
+                    {g.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
             <div className="text-sm font-medium">
-              {dict?.attendance?.lessonDays ?? "Lesson days"}
+              {dict?.schedule?.subject ?? "Subject"}
             </div>
-            <MultiSelectCalendar value={dates} onChange={setDates} />
-            <div className="text-xs text-muted-foreground">
-              {dict?.attendance?.lessonDaysHint ??
-                "Click dates to select multiple days. These will become date columns in the Sheet."}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-sm font-medium">
-              {dict?.attendance?.assignmentCount ?? "Assignments (HW count)"}
-            </div>
-            <Input
-              type="number"
-              min={1}
-              step={1}
-              value={assignmentCount}
-              onChange={(e) => setAssignmentCount(e.target.value)}
-            />
-            <div className="text-xs text-muted-foreground">
-              {dict?.attendance?.assignmentCountHint ??
-                "This controls HW1..HWN columns in the Grades spreadsheet."}
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <Button
-              onClick={() => createMutation.mutate()}
-              disabled={
-                createMutation.isPending ||
-                !groupId ||
-                !subjectId ||
-                dates.length === 0 ||
-                !(Number(assignmentCount) > 0)
-              }
+            <Select
+              value={subjectId}
+              onValueChange={setSubjectId}
+              disabled={!groupId}
             >
-              {createMutation.isPending
-                ? (dict?.common?.loading ?? "Saving...")
-                : (dict?.common?.create ?? "Create")}
-            </Button>
+              <SelectTrigger className="h-10 rounded-2xl border-border/40 bg-background/50">
+                <SelectValue
+                  placeholder={dict?.schedule?.subject ?? "Subject"}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {subjects.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        <div className="space-y-2">
+          <div className="text-sm font-medium">
+            {dict?.attendance?.lessonDays ?? "Lesson days"}
+          </div>
+          <MultiSelectCalendar value={dates} onChange={setDates} />
+          <div className="text-xs text-muted-foreground">
+            {dict?.attendance?.lessonDaysHint ??
+              "Click dates to select multiple days. These will become date columns in the Sheet."}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="text-sm font-medium">
+            {dict?.attendance?.assignmentCount ?? "Assignments (HW count)"}
+          </div>
+          <Input
+            type="number"
+            min={1}
+            step={1}
+            value={assignmentCount}
+            onChange={(e) => setAssignmentCount(e.target.value)}
+            className="h-10 rounded-2xl border-border/40 bg-background/50"
+          />
+          <div className="text-xs text-muted-foreground">
+            {dict?.attendance?.assignmentCountHint ??
+              "This controls HW1..HWN columns in the Grades spreadsheet."}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button
+            onClick={() => createMutation.mutate()}
+            disabled={
+              createMutation.isPending ||
+              !groupId ||
+              !subjectId ||
+              dates.length === 0 ||
+              !(Number(assignmentCount) > 0)
+            }
+            className="rounded-2xl"
+          >
+            {createMutation.isPending
+              ? (dict?.common?.loading ?? "Saving...")
+              : (dict?.common?.create ?? "Create")}
+          </Button>
+        </div>
+      </section>
     </div>
   );
 }

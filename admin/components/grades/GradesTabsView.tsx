@@ -8,7 +8,6 @@ import { ClipboardList, ChevronRight } from "lucide-react";
 import { gradesSheetsApi } from "@/lib/api";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 type TabItem = {
@@ -30,7 +29,7 @@ export function GradesTabsView({ lang, dict }: { lang: string; dict: any }) {
   const tabs = data?.items ?? [];
 
   return (
-    <div className="container space-y-4">
+    <div className="container max-w-7xl py-10 space-y-12">
       <PageHeader
         title={dict?.grades?.title ?? "Grades"}
         description={
@@ -52,38 +51,39 @@ export function GradesTabsView({ lang, dict }: { lang: string; dict: any }) {
           }
         />
       ) : tabs.length ? (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {tabs.map((t) => {
-                const href = `/${lang}/dashboard/grades/${encodeURIComponent(
-                  t.sheetTitle,
-                )}/view`;
+        <section className="rounded-[32px] border border-border/40 bg-muted/10 p-6">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {tabs.map((t) => {
+              const href = `/${lang}/dashboard/grades/${encodeURIComponent(
+                t.sheetTitle,
+              )}/view`;
 
-                return (
-                  <Link key={t.sheetTitle} href={href} className="block">
-                    <div className="flex items-center justify-between rounded-lg border p-4 hover:bg-muted/50">
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div className="font-medium">
-                            {t.groupName} / {t.subjectName}
-                          </div>
-                          <Badge variant="outline" className="text-[10px]">
-                            {dict?.grades?.tab ?? "Tab"}
-                          </Badge>
+              return (
+                <Link key={t.sheetTitle} href={href} className="block">
+                  <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/40 bg-background/50 p-4 hover:bg-muted/30 transition-colors">
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="font-medium truncate">
+                          {t.groupName} / {t.subjectName}
                         </div>
-                        <div className="text-xs text-muted-foreground break-all">
-                          {t.sheetTitle}
-                        </div>
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] border-border/40"
+                        >
+                          {dict?.grades?.tab ?? "Tab"}
+                        </Badge>
                       </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      <div className="text-xs text-muted-foreground break-all">
+                        {t.sheetTitle}
+                      </div>
                     </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
       ) : (
         <EmptyState
           icon={ClipboardList}

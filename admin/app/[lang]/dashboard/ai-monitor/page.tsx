@@ -139,14 +139,14 @@ export default function AIMonitorPage() {
   })();
 
   return (
-    <div className="container space-y-6">
+    <div className="container max-w-7xl py-10 space-y-12">
       <div className="flex flex-col gap-1">
         <PageHeader title="AI Monitor" />
         <p className="text-sm text-muted-foreground">
           AI sozlamalari, tool ruxsatlari va usage loglar.
         </p>
       </div>
-      <Card>
+      <Card className="rounded-[32px] border border-border/40 bg-muted/10">
         <CardHeader>
           <CardTitle>Settings</CardTitle>
         </CardHeader>
@@ -192,45 +192,47 @@ export default function AIMonitorPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="rounded-[32px] border border-border/40 bg-muted/10">
         <CardHeader>
           <CardTitle>Tools</CardTitle>
         </CardHeader>
         <CardContent>
           {toolsLoading ? (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Tool</TableHead>
-                    <TableHead className="text-right">Enabled</TableHead>
-                    <TableHead className="text-right">Students</TableHead>
-                    <TableHead className="text-right">Teachers</TableHead>
-                    <TableHead className="text-right">Admins</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell>
-                        <Skeleton className="h-6 w-48" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-6 w-12 ml-auto" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-6 w-12 ml-auto" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-6 w-12 ml-auto" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-6 w-12 ml-auto" />
-                      </TableCell>
+            <div className="rounded-3xl border border-border/40 bg-muted/10 overflow-hidden">
+              <div className="overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tool</TableHead>
+                      <TableHead className="text-right">Enabled</TableHead>
+                      <TableHead className="text-right">Students</TableHead>
+                      <TableHead className="text-right">Teachers</TableHead>
+                      <TableHead className="text-right">Admins</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell>
+                          <Skeleton className="h-6 w-48" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-6 w-12 ml-auto" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-6 w-12 ml-auto" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-6 w-12 ml-auto" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-6 w-12 ml-auto" />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           ) : tools && tools.length > 0 ? (
             <div className="space-y-2">
@@ -243,7 +245,7 @@ export default function AIMonitorPage() {
                       key={section}
                       defaultOpen={section === "Student"}
                     >
-                      <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                      <div className="flex items-center justify-between rounded-2xl border border-border/40 bg-background/50 px-4 py-3">
                         <div className="flex items-center gap-2">
                           <div className="text-sm font-medium">{section}</div>
                           <Badge variant="secondary" className="text-[10px]">
@@ -257,101 +259,103 @@ export default function AIMonitorPage() {
                         </CollapsibleTrigger>
                       </div>
                       <CollapsibleContent>
-                        <div className="mt-2 rounded-md border">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Tool</TableHead>
-                                <TableHead className="text-right">
-                                  Enabled
-                                </TableHead>
-                                <TableHead className="text-right">
-                                  Students
-                                </TableHead>
-                                <TableHead className="text-right">
-                                  Teachers
-                                </TableHead>
-                                <TableHead className="text-right">
-                                  Admins
-                                </TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {items.map((t) => (
-                                <TableRow key={t.name}>
-                                  <TableCell>
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-mono text-xs">
-                                        {t.name}
-                                      </span>
-                                      {!t.isEnabled ? (
-                                        <Badge
-                                          variant="secondary"
-                                          className="text-[10px]"
-                                        >
-                                          disabled
-                                        </Badge>
-                                      ) : null}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <Switch
-                                      checked={t.isEnabled}
-                                      disabled={patchTool.isPending}
-                                      onCheckedChange={(v) =>
-                                        patchTool.mutate({
-                                          name: t.name,
-                                          patch: { isEnabled: v },
-                                        })
-                                      }
-                                    />
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <Switch
-                                      checked={t.enabledForStudents}
-                                      disabled={
-                                        !t.isEnabled || patchTool.isPending
-                                      }
-                                      onCheckedChange={(v) =>
-                                        patchTool.mutate({
-                                          name: t.name,
-                                          patch: { enabledForStudents: v },
-                                        })
-                                      }
-                                    />
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <Switch
-                                      checked={t.enabledForTeachers}
-                                      disabled={
-                                        !t.isEnabled || patchTool.isPending
-                                      }
-                                      onCheckedChange={(v) =>
-                                        patchTool.mutate({
-                                          name: t.name,
-                                          patch: { enabledForTeachers: v },
-                                        })
-                                      }
-                                    />
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <Switch
-                                      checked={t.enabledForAdmins}
-                                      disabled={
-                                        !t.isEnabled || patchTool.isPending
-                                      }
-                                      onCheckedChange={(v) =>
-                                        patchTool.mutate({
-                                          name: t.name,
-                                          patch: { enabledForAdmins: v },
-                                        })
-                                      }
-                                    />
-                                  </TableCell>
+                        <div className="rounded-3xl border border-border/40 bg-muted/10 overflow-hidden">
+                          <div className="overflow-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Tool</TableHead>
+                                  <TableHead className="text-right">
+                                    Enabled
+                                  </TableHead>
+                                  <TableHead className="text-right">
+                                    Students
+                                  </TableHead>
+                                  <TableHead className="text-right">
+                                    Teachers
+                                  </TableHead>
+                                  <TableHead className="text-right">
+                                    Admins
+                                  </TableHead>
                                 </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
+                              </TableHeader>
+                              <TableBody>
+                                {items.map((t) => (
+                                  <TableRow key={t.name}>
+                                    <TableCell>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-mono text-xs">
+                                          {t.name}
+                                        </span>
+                                        {!t.isEnabled ? (
+                                          <Badge
+                                            variant="secondary"
+                                            className="text-[10px]"
+                                          >
+                                            disabled
+                                          </Badge>
+                                        ) : null}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <Switch
+                                        checked={t.isEnabled}
+                                        disabled={patchTool.isPending}
+                                        onCheckedChange={(v) =>
+                                          patchTool.mutate({
+                                            name: t.name,
+                                            patch: { isEnabled: v },
+                                          })
+                                        }
+                                      />
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <Switch
+                                        checked={t.enabledForStudents}
+                                        disabled={
+                                          !t.isEnabled || patchTool.isPending
+                                        }
+                                        onCheckedChange={(v) =>
+                                          patchTool.mutate({
+                                            name: t.name,
+                                            patch: { enabledForStudents: v },
+                                          })
+                                        }
+                                      />
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <Switch
+                                        checked={t.enabledForTeachers}
+                                        disabled={
+                                          !t.isEnabled || patchTool.isPending
+                                        }
+                                        onCheckedChange={(v) =>
+                                          patchTool.mutate({
+                                            name: t.name,
+                                            patch: { enabledForTeachers: v },
+                                          })
+                                        }
+                                      />
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <Switch
+                                        checked={t.enabledForAdmins}
+                                        disabled={
+                                          !t.isEnabled || patchTool.isPending
+                                        }
+                                        onCheckedChange={(v) =>
+                                          patchTool.mutate({
+                                            name: t.name,
+                                            patch: { enabledForAdmins: v },
+                                          })
+                                        }
+                                      />
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
                         </div>
                       </CollapsibleContent>
                     </Collapsible>
@@ -370,91 +374,93 @@ export default function AIMonitorPage() {
           <CardTitle>Usage Logs (last 50)</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Provider / Model</TableHead>
-                  <TableHead>Tool</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">ms</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {logsLoading ? (
-                  Array.from({ length: 8 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell>
-                        <Skeleton className="h-6 w-40" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-6 w-16" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-6 w-48" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-6 w-40" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-6 w-16" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-6 w-12 ml-auto" />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : logs && logs.length > 0 ? (
-                  logs.map((l) => (
-                    <TableRow key={l.id}>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {l.createdAt
-                          ? new Date(l.createdAt).toLocaleString()
-                          : "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="text-[10px]">
-                          {l.role ?? "-"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        <span className="font-mono">
-                          {(l.provider ?? "-") + " / " + (l.model ?? "-")}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-xs font-mono">
-                        {l.toolName ?? "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            l.status === "OK"
-                              ? "default"
-                              : l.status === "ERROR"
-                                ? "destructive"
-                                : "secondary"
-                          }
-                          className="text-[10px]"
-                        >
-                          {l.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right text-xs font-mono">
-                        {typeof l.ms === "number" ? l.ms : "-"}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
+          <div className="rounded-3xl border border-border/40 bg-muted/10 overflow-hidden">
+            <div className="overflow-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={6}>
-                      <p className="text-sm text-muted-foreground">No logs</p>
-                    </TableCell>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Provider / Model</TableHead>
+                    <TableHead>Tool</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">ms</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {logsLoading ? (
+                    Array.from({ length: 8 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell>
+                          <Skeleton className="h-6 w-40" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-6 w-16" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-6 w-48" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-6 w-40" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-6 w-16" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-6 w-12 ml-auto" />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : logs && logs.length > 0 ? (
+                    logs.map((l) => (
+                      <TableRow key={l.id}>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {l.createdAt
+                            ? new Date(l.createdAt).toLocaleString()
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {l.role ?? "-"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          <span className="font-mono">
+                            {(l.provider ?? "-") + " / " + (l.model ?? "-")}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-xs font-mono">
+                          {l.toolName ?? "-"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              l.status === "OK"
+                                ? "default"
+                                : l.status === "ERROR"
+                                  ? "destructive"
+                                  : "secondary"
+                            }
+                            className="text-[10px]"
+                          >
+                            {l.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-xs font-mono">
+                          {typeof l.ms === "number" ? l.ms : "-"}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6}>
+                        <p className="text-sm text-muted-foreground">No logs</p>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </CardContent>
       </Card>

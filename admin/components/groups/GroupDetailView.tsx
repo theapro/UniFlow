@@ -7,12 +7,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Users,
-  Edit2,
   Trash2,
   CheckCircle2,
   AlertCircle,
   Loader2,
   MoreHorizontal,
+  Pencil,
 } from "lucide-react";
 
 import { groupsApi, parentGroupsApi, sheetsApi, studentsApi } from "@/lib/api";
@@ -23,7 +23,6 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -33,7 +32,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 type Group = {
   id: string;
@@ -74,9 +73,11 @@ export function GroupDetailView({
   const queryClient = useQueryClient();
   const router = useRouter();
 
-  const [renameOpen, setRenameOpen] = React.useState(false);
+  const [editOpen, setEditOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [nameDraft, setNameDraft] = React.useState("");
+  const [parentGroupDraft, setParentGroupDraft] =
+    React.useState<string>("none");
 
   // Queries
   const { data: group, isLoading: groupLoading } = useQuery({
@@ -112,28 +113,16 @@ export function GroupDetailView({
   }, [sheetsGroups, id]);
 
   // Mutations
-  const renameMutation = useMutation({
-    mutationFn: (name: string) => groupsApi.update(id, { name }),
+  const updateMutation = useMutation({
+    mutationFn: (payload: { name: string; parentGroupId: string | null }) =>
+      groupsApi.update(id, payload),
     onSuccess: async () => {
-      setRenameOpen(false);
-      await queryClient.invalidateQueries({ queryKey: ["groups", id] });
-    },
-  });
-
-  const updateParentGroupMutation = useMutation({
-    mutationFn: (parentGroupId: string | null) =>
-      groupsApi.update(id, { parentGroupId }),
-    onSuccess: async () => {
-      toast.success(dict?.common?.success ?? "Updated");
+      setEditOpen(false);
+      toast.success(dict?.common?.success ?? "Group updated");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["groups", id] }),
         queryClient.invalidateQueries({ queryKey: ["groups"] }),
       ]);
-    },
-    onError: (err: any) => {
-      const msg =
-        err?.response?.data?.message || err?.message || "Failed to update";
-      toast.error(msg);
     },
   });
 
@@ -148,55 +137,180 @@ export function GroupDetailView({
   const isLoading = groupLoading || studentsLoading;
 
   return (
-    <div className="container space-y-6">
-      {/* Top Navigation */}
-      <Link
-        href={`/${lang}/dashboard/groups`}
-        className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors group"
-      >
-        <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
-        {dict?.common?.back ?? "Groups"}
-      </Link>
-
-      <div className="flex items-start justify-between">
-        <div className="space-y-1.5">
-          <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50">
+    <div className="container max-w-7xl py-10 space-y-8">
+      {/* Top Navigation & Breadcrumb */}
+      <div className="flex items-center gap-4 px-1">
+        <Link
+          href={`/${lang}/dashboard/groups`}
+          className="group flex h-10 w-10 items-center justify-center rounded-xl border border-border/40 bg-muted/20 text-muted-foreground hover:border-primary/30 hover:text-primary transition-all"
+        >
+          <ArrowLeft className="h-5 w-5 transition-transform group-hover:-translate-x-0.5" />
+        </Link>
+        <div className="flex flex-col">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+            {dict?.nav?.groups ?? "Groups Management"}
+          </span>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground/90">
             {group?.name ?? "..."}
           </h1>
+        </div>
+      </div>
 
-          {/* Status Indicators */}
-          <div className="flex items-center gap-2">
-            {sheetsGroups?.enabled ? (
-              <div
-                className={`flex items-center text-xs font-medium ${missingTab ? "text-destructive" : "text-emerald-600"}`}
-              >
-                {missingTab ? (
-                  <AlertCircle className="w-3.5 h-3.5 mr-1" />
-                ) : (
-                  <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                )}
-                {missingTab
-                  ? (dict?.groups?.missingTab ?? "Sync Error")
-                  : (dict?.groups?.tabOk ?? "Synced with Sheets")}
+      {/* Header Info Card */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 flex flex-col md:flex-row md:items-center justify-between gap-6 rounded-[32px] border border-border/40 bg-muted/10 p-8">
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Sync Status Badge */}
+              {sheetsGroups?.enabled ? (
+                <div
+                  className={cn(
+                    "flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-bold border",
+                    missingTab
+                      ? "bg-destructive/10 border-destructive/20 text-destructive"
+                      : "bg-chart-2/10 border-chart-2/20 text-chart-2",
+                  )}
+                >
+                  {missingTab ? (
+                    <AlertCircle className="h-3.5 w-3.5" />
+                  ) : (
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  )}
+                  {missingTab
+                    ? (dict?.groups?.missingTab ?? "NOT SYNCED")
+                    : (dict?.groups?.tabOk ?? "SHEETS SYNCED")}
+                </div>
+              ) : (
+                <div className="rounded-full bg-muted/40 px-3 py-1 text-[11px] font-bold text-muted-foreground border border-border/40">
+                  LOCAL DATA ONLY
+                </div>
+              )}
+
+              {/* Student Count Badge */}
+              <div className="flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-[11px] font-bold text-primary border border-primary/20">
+                <Users className="h-3.5 w-3.5" />
+                {students?.length ?? 0} {dict?.nav?.students ?? "STUDENTS"}
               </div>
-            ) : (
-              <span className="text-xs text-muted-foreground italic">
-                Local group
-              </span>
-            )}
+            </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2">
               <span className="text-xs text-muted-foreground">
                 {dict?.parentGroups?.label ?? "Department group"}:
               </span>
-              <Select
-                value={group?.parentGroup?.id ?? "none"}
-                onValueChange={(v) =>
-                  updateParentGroupMutation.mutate(v === "none" ? null : v)
-                }
-                disabled={updateParentGroupMutation.isPending}
+              <div className="h-10 w-[260px] rounded-2xl border border-border/40 bg-background/50 px-4 flex items-center text-sm">
+                {group?.parentGroup?.name ?? dict?.common?.none ?? "None"}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-12 w-12 rounded-2xl border-border/40 bg-background/50"
+                >
+                  <MoreHorizontal className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-56 rounded-2xl border-border/40 p-2"
               >
-                <SelectTrigger className="h-8 w-[220px]">
+                <DropdownMenuItem
+                  onClick={() => {
+                    setNameDraft(group?.name ?? "");
+                    setParentGroupDraft(group?.parentGroup?.id ?? "none");
+                    setEditOpen(true);
+                  }}
+                  className="rounded-xl p-3 cursor-pointer"
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  {dict?.common?.edit ?? "Edit"}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setDeleteOpen(true)}
+                  className="rounded-xl text-destructive focus:bg-destructive/10 focus:text-destructive p-3 cursor-pointer"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {dict?.common?.delete ?? "Delete Group"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Table Area */}
+      <div className="rounded-[32px] px-3 py-3 border border-border/40 bg-muted/5 overflow-hidden transition-all">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-32 space-y-4">
+            <div className="relative">
+              <div className="h-12 w-12 rounded-full border-2 border-primary/20" />
+              <div className="absolute top-0 h-12 w-12 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+            <p className="text-sm font-medium text-muted-foreground animate-pulse">
+              {dict?.common?.loading ?? "Loading student records..."}
+            </p>
+          </div>
+        ) : students && students.length > 0 ? (
+          <div className="p-2">
+            <StudentTable students={students} lang={lang} dict={dict} />
+          </div>
+        ) : (
+          <div className="py-24">
+            <EmptyState
+              icon={Users}
+              title={dict?.common?.noData ?? "No Students Yet"}
+              description={
+                dict?.groups?.noStudentsDescription ??
+                "This group is currently empty. Add students to get started."
+              }
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Dialogs - Minimal & Matching */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-md rounded-[28px] border-border/40 bg-card p-8">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">
+              {dict?.common?.edit ?? "Edit Group"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-6 space-y-6">
+            <Label
+              htmlFor="name"
+              className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 ml-1"
+            >
+              {dict?.common?.name ?? "New Group Name"}
+            </Label>
+            <Input
+              id="name"
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              className="h-12 rounded-2xl border-border/40 bg-muted/20 px-4 focus-visible:ring-primary/20"
+              autoFocus
+            />
+
+            <div className="space-y-2">
+              <Label
+                htmlFor="department"
+                className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 ml-1"
+              >
+                {dict?.parentGroups?.label ?? "Department group"}
+              </Label>
+              <Select
+                value={parentGroupDraft}
+                onValueChange={setParentGroupDraft}
+                disabled={updateMutation.isPending}
+              >
+                <SelectTrigger
+                  id="department"
+                  className="h-12 rounded-2xl border-border/40 bg-muted/20 px-4"
+                >
                   <SelectValue
                     placeholder={dict?.parentGroups?.select ?? "Select..."}
                   />
@@ -214,94 +328,26 @@ export function GroupDetailView({
               </Select>
             </div>
           </div>
-        </div>
-
-        {/* Action Menu (3 dots) */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon" className="h-10 w-10">
-              <MoreHorizontal className="h-5 w-5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem
-              onClick={() => {
-                setNameDraft(group?.name ?? "");
-                setRenameOpen(true);
-              }}
-              className="cursor-pointer"
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="ghost"
+              onClick={() => setEditOpen(false)}
+              className="rounded-2xl h-12"
             >
-              <Edit2 className="mr-2 h-4 w-4" />
-              {dict?.common?.edit ?? "Rename"}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => setDeleteOpen(true)}
-              className="text-destructive focus:text-destructive cursor-pointer"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              {dict?.common?.delete ?? "Delete"}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* Main Content Area */}
-      <div className="pt-4">
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-24 space-y-3">
-            <Loader2 className="h-10 w-10 animate-spin text-primary/60" />
-            <p className="text-sm text-muted-foreground animate-pulse">
-              {dict?.common?.loading ?? "Fetching students..."}
-            </p>
-          </div>
-        ) : students && students.length > 0 ? (
-          <div className=" rounded-xl">
-            <StudentTable students={students} lang={lang} dict={dict} />
-          </div>
-        ) : (
-          <EmptyState
-            icon={Users}
-            title={dict?.common?.noData ?? "Empty Group"}
-            description={
-              dict?.groups?.noStudentsDescription ??
-              "Start by adding students to this group."
-            }
-          />
-        )}
-      </div>
-
-      {/* Rename Dialog */}
-      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{dict?.groups?.rename ?? "Update Name"}</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <Label
-              htmlFor="name"
-              className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block"
-            >
-              {dict?.common?.name ?? "Group Name"}
-            </Label>
-            <Input
-              id="name"
-              value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
-              className="h-11"
-              autoFocus
-            />
-          </div>
-          <DialogFooter className="sm:justify-end gap-2">
-            <Button variant="ghost" onClick={() => setRenameOpen(false)}>
               {dict?.common?.cancel ?? "Cancel"}
             </Button>
             <Button
-              onClick={() => renameMutation.mutate(nameDraft.trim())}
-              disabled={renameMutation.isPending || !nameDraft.trim()}
-              className="px-8"
+              onClick={() =>
+                updateMutation.mutate({
+                  name: nameDraft.trim(),
+                  parentGroupId:
+                    parentGroupDraft === "none" ? null : parentGroupDraft,
+                })
+              }
+              disabled={updateMutation.isPending || !nameDraft.trim()}
+              className="rounded-2xl h-12 px-8"
             >
-              {renameMutation.isPending && (
+              {updateMutation.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
               {dict?.common?.save ?? "Save"}
@@ -310,17 +356,15 @@ export function GroupDetailView({
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        title={dict?.groups?.deleteTitle ?? "Delete Group"}
+        title={dict?.groups?.deleteTitle ?? "Delete Group?"}
         description={
           dict?.groups?.deleteDescription ??
-          "This action is permanent and will remove all student references in this group."
+          "All student associations for this group will be removed. This action cannot be undone."
         }
-        confirmLabel={dict?.common?.delete ?? "Yes, Delete"}
-        cancelLabel={dict?.common?.cancel ?? "Cancel"}
+        confirmLabel={dict?.common?.delete ?? "Confirm Delete"}
         onConfirm={() => deleteMutation.mutate()}
       />
     </div>

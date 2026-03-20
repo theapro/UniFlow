@@ -29,7 +29,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -286,7 +285,7 @@ export function ParentGroupsView({ lang, dict }: { lang: string; dict: any }) {
   ];
 
   return (
-    <div className="container space-y-6 py-4">
+    <div className="container max-w-7xl py-10 space-y-12">
       <PageHeader
         title={dict?.nav?.parentGroups ?? "Department Groups"}
         description={
@@ -296,7 +295,7 @@ export function ParentGroupsView({ lang, dict }: { lang: string; dict: any }) {
         actions={
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="rounded-2xl">
                 <Plus className="h-4 w-4 mr-2" />
                 {dict?.common?.create ?? "Create"}
               </Button>
@@ -321,18 +320,21 @@ export function ParentGroupsView({ lang, dict }: { lang: string; dict: any }) {
                   placeholder={
                     dict?.parentGroups?.namePlaceholder ?? "e.g. Grade 10"
                   }
+                  className="h-10 rounded-2xl border-border/40 bg-background/50"
                 />
               </div>
 
               <DialogFooter>
                 <Button
                   variant="outline"
+                  className="rounded-2xl"
                   onClick={() => setCreateOpen(false)}
                   disabled={createMutation.isPending}
                 >
                   {dict?.common?.cancel ?? "Cancel"}
                 </Button>
                 <Button
+                  className="rounded-2xl"
                   onClick={() => createMutation.mutate(nameDraft.trim())}
                   disabled={
                     createMutation.isPending || nameDraft.trim().length === 0
@@ -348,25 +350,21 @@ export function ParentGroupsView({ lang, dict }: { lang: string; dict: any }) {
         }
       />
 
-      <Card>
-        <CardContent className="pt-6">
-          <DataTable
-            data={items ?? []}
-            columns={columns}
-            isLoading={isLoading}
-            emptyLabel={
-              dict?.parentGroups?.empty ?? "No department groups yet."
-            }
-          />
+      <section className="rounded-[32px] border border-border/40 bg-muted/10 p-6">
+        <DataTable
+          data={items ?? []}
+          columns={columns}
+          isLoading={isLoading}
+          emptyLabel={dict?.parentGroups?.empty ?? "No department groups yet."}
+        />
 
-          {!isLoading && (items ?? []).length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-sm text-muted-foreground">
-              <Layers className="h-8 w-8 mb-2" />
-              {dict?.parentGroups?.emptyHint ?? "Create one to get started."}
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+        {!isLoading && (items ?? []).length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 text-sm text-muted-foreground">
+            <Layers className="h-8 w-8 mb-2" />
+            {dict?.parentGroups?.emptyHint ?? "Create one to get started."}
+          </div>
+        ) : null}
+      </section>
 
       {/* Edit Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
@@ -381,12 +379,14 @@ export function ParentGroupsView({ lang, dict }: { lang: string; dict: any }) {
               id="pg-edit-name"
               value={nameDraft}
               onChange={(e) => setNameDraft(e.target.value)}
+              className="h-10 rounded-2xl border-border/40 bg-background/50"
             />
           </div>
 
           <DialogFooter>
             <Button
               variant="outline"
+              className="rounded-2xl"
               onClick={() => {
                 setEditOpen(false);
                 setEditTarget(null);
@@ -397,6 +397,7 @@ export function ParentGroupsView({ lang, dict }: { lang: string; dict: any }) {
               {dict?.common?.cancel ?? "Cancel"}
             </Button>
             <Button
+              className="rounded-2xl"
               onClick={() =>
                 editTarget &&
                 updateMutation.mutate({

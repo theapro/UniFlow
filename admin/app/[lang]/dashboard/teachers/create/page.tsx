@@ -30,7 +30,7 @@ export default function CreateTeacherPage({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="container max-w-7xl py-10 space-y-12">
       <PageHeader title={dict.teachers.createTitle} />
       <TeacherForm
         lang={lang}

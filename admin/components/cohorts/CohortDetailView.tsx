@@ -98,14 +98,16 @@ export function CohortDetailView({
 
   if (isLoading || !cohort) {
     return (
-      <div className="container">{dict?.common?.loading ?? "Loading..."}</div>
+      <div className="container max-w-7xl py-10">
+        {dict?.common?.loading ?? "Loading..."}
+      </div>
     );
   }
 
   const groups = Array.isArray(cohort.groups) ? cohort.groups : [];
 
   return (
-    <div className="container space-y-4">
+    <div className="container max-w-7xl py-10 space-y-12">
       <PageHeader
         title={`${dict?.nav?.cohorts ?? "Cohorts"}: ${cohort.code}`}
       />

@@ -69,7 +69,7 @@ export default function TeacherDetailPage({
   const canResend = !!teacher?.user?.email;
 
   return (
-    <div className="space-y-4">
+    <div className="container max-w-7xl py-10 space-y-12">
       <PageHeader title={dict.teachers.detailTitle} />
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -97,7 +97,7 @@ export default function TeacherDetailPage({
         </div>
 
         <div className="space-y-4">
-          <Card>
+          <Card className="rounded-[32px] border border-border/40 bg-muted/10">
             <CardHeader>
               <CardTitle>Account</CardTitle>
             </CardHeader>
@@ -158,7 +158,7 @@ export default function TeacherDetailPage({
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="rounded-[32px] border border-border/40 bg-muted/10">
             <CardHeader>
               <CardTitle>Teaching Schedule</CardTitle>
             </CardHeader>
@@ -169,7 +169,7 @@ export default function TeacherDetailPage({
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="rounded-[32px] border border-border/40 bg-muted/10">
             <CardHeader>
               <CardTitle>Classes</CardTitle>
             </CardHeader>

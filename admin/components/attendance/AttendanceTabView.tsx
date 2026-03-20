@@ -6,7 +6,6 @@ import { useQuery } from "@tanstack/react-query";
 
 import { attendanceSheetsApi } from "@/lib/api";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -46,12 +45,12 @@ export function AttendanceTabView({
   const body = rows.slice(1);
 
   return (
-    <div className="container space-y-4">
+    <div className="container max-w-7xl py-10 space-y-12">
       <PageHeader
         title={dict?.attendance?.viewTab ?? "View attendance tab"}
         description={sheetTitle}
         actions={
-          <Button variant="outline" asChild>
+          <Button variant="outline" asChild className="rounded-2xl">
             <Link
               href={`/${lang}/dashboard/attendance/${encodeURIComponent(
                 sheetTitle,
@@ -63,22 +62,22 @@ export function AttendanceTabView({
         }
       />
 
-      <Card>
-        <CardContent className="pt-6">
-          {isLoading ? (
-            <div>{dict?.common?.loading ?? "Loading..."}</div>
-          ) : isError ? (
-            <div className="text-sm text-destructive">
-              {(error as any)?.response?.data?.message ??
-                (error as any)?.message ??
-                "Failed to load preview"}
-            </div>
-          ) : rows.length === 0 ? (
-            <div className="text-sm text-muted-foreground">
-              {dict?.attendance?.emptyPreview ?? "No data in this tab yet."}
-            </div>
-          ) : (
-            <div className="rounded-md border overflow-auto">
+      <section className="rounded-[32px] border border-border/40 bg-muted/10 p-6">
+        {isLoading ? (
+          <div>{dict?.common?.loading ?? "Loading..."}</div>
+        ) : isError ? (
+          <div className="text-sm text-destructive">
+            {(error as any)?.response?.data?.message ??
+              (error as any)?.message ??
+              "Failed to load preview"}
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="text-sm text-muted-foreground">
+            {dict?.attendance?.emptyPreview ?? "No data in this tab yet."}
+          </div>
+        ) : (
+          <div className="rounded-3xl border border-border/40 bg-background/50 overflow-hidden">
+            <div className="overflow-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -102,9 +101,9 @@ export function AttendanceTabView({
                 </TableBody>
               </Table>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </section>
 
       <div className="text-xs text-muted-foreground">
         {dict?.attendance?.viewHint ??

@@ -1,16 +1,16 @@
 "use client";
 
-import { PageHeader } from "@/components/shared/PageHeader";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useState } from "react";
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Save, Loader2, BookOpen, Layers } from "lucide-react";
+import { toast } from "sonner";
+
+import { cohortsApi, parentGroupsApi, subjectsApi } from "@/lib/api";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { cohortsApi, parentGroupsApi, subjectsApi } from "@/lib/api";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { ArrowLeft, Save } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -45,13 +45,15 @@ function cohortLabel(c: CohortRow) {
 
 export default function CreateSubjectPage({
   params: { lang },
+  dict, // Lug'at (dictionary) kelayotgan bo'lsa
 }: {
   params: { lang: string };
+  dict?: any;
 }) {
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [parentGroupId, setParentGroupId] = useState("");
-  const [cohortId, setCohortId] = useState("");
+  const [name, setName] = React.useState("");
+  const [code, setCode] = React.useState("");
+  const [parentGroupId, setParentGroupId] = React.useState("");
+  const [cohortId, setCohortId] = React.useState("");
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -63,8 +65,7 @@ export default function CreateSubjectPage({
 
   const { data: departments } = useQuery({
     queryKey: ["parent-groups"],
-    queryFn: () =>
-      parentGroupsApi.list({ take: 1000 }).then((r) => r.data.data),
+    queryFn: () => parentGroupsApi.list({ take: 1000 }).then((r) => r.data.data),
     staleTime: 60_000,
   });
 
@@ -106,11 +107,7 @@ export default function CreateSubjectPage({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
-    if (!parentGroupId || !cohortId) {
-      toast.error("Select department and cohort");
-      return;
-    }
+    if (!canSubmit) return;
     createMutation.mutate({
       name,
       code: code || null,
@@ -126,101 +123,139 @@ export default function CreateSubjectPage({
     !createMutation.isPending;
 
   return (
-    <div className="container max-w-2xl mx-auto py-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
+    <div className="container max-w-7xl py-10 space-y-8 animate-in fade-in duration-500">
+      
+      {/* Top Navigation & Breadcrumb Style Header */}
+      <div className="flex items-center gap-4 px-1">
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-10 w-10 rounded-xl border-border/40 bg-muted/20 text-muted-foreground hover:border-primary/30 hover:text-primary transition-all shadow-sm"
+          onClick={() => router.back()}
+        >
+          <ArrowLeft className="h-5 w-5" />
         </Button>
-        <PageHeader title="Create New Subject" />
+        <div className="flex flex-col">
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 leading-none mb-1">
+             New Registration
+          </span>
+          <h1 className="text-2xl font-bold tracking-tight text-white/90 leading-none">
+            Create Subject
+          </h1>
+        </div>
       </div>
 
-      <Card className="shadow-sm border-none bg-muted/30">
-        <CardHeader>
-          <CardTitle className="text-lg">Subject Details</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Provide the official name and an optional shorthand code for the
-            subject.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold">
-                  Department <span className="text-destructive">*</span>
-                </Label>
-                <Select value={parentGroupId} onValueChange={setParentGroupId}>
-                  <SelectTrigger className="bg-background">
-                    <SelectValue placeholder="Select department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sortedDepartments.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+      <Card className="rounded-[32px] border-border/40 bg-muted/10 backdrop-blur-md shadow-none overflow-hidden">
+        <CardContent className="p-8 md:p-12">
+          <form onSubmit={handleSubmit} className="space-y-10">
+            
+            {/* Form Section: Primary Info */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 mb-2">
+                <BookOpen className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-bold uppercase tracking-widest text-white/50">Core Information</h3>
               </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2.5">
+                  <Label htmlFor="name" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 ml-1">
+                    Subject Name *
+                  </Label>
+                  <Input
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="h-12 rounded-2xl border-border/40 bg-background/40 px-4 focus:ring-primary/20 transition-all"
+                    placeholder="e.g. Advanced Mathematics"
+                    required
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold">
-                  Cohort <span className="text-destructive">*</span>
-                </Label>
-                <Select value={cohortId} onValueChange={setCohortId}>
-                  <SelectTrigger className="bg-background">
-                    <SelectValue placeholder="Select cohort" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sortedCohorts.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {cohortLabel(c)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2.5">
+                  <Label htmlFor="code" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 ml-1">
+                    Subject Code
+                  </Label>
+                  <Input
+                    id="code"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.toUpperCase())}
+                    className="h-12 rounded-2xl border-border/40 bg-background/40 px-4 font-mono transition-all"
+                    placeholder="MATH101"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-sm font-semibold">
-                Subject Name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="name"
-                placeholder="e.g. Advanced Mathematics"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="bg-background"
-              />
+            {/* Form Section: Academic Context */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 mb-2">
+                <Layers className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-bold uppercase tracking-widest text-white/50">Academic Placement</h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2.5">
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 ml-1">
+                    Department *
+                  </Label>
+                  <Select value={parentGroupId} onValueChange={setParentGroupId}>
+                    <SelectTrigger className="h-12 rounded-2xl border-border/40 bg-background/40 px-4 transition-all">
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl border-border/40 backdrop-blur-xl">
+                      {sortedDepartments.map((d) => (
+                        <SelectItem key={d.id} value={d.id} className="rounded-xl cursor-pointer">
+                          {d.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2.5">
+                  <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 ml-1">
+                    Cohort *
+                  </Label>
+                  <Select value={cohortId} onValueChange={setCohortId}>
+                    <SelectTrigger className="h-12 rounded-2xl border-border/40 bg-background/40 px-4 transition-all">
+                      <SelectValue placeholder="Select cohort" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl border-border/40 backdrop-blur-xl">
+                      {sortedCohorts.map((c) => (
+                        <SelectItem key={c.id} value={c.id} className="rounded-xl cursor-pointer">
+                          {cohortLabel(c)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="code" className="text-sm font-semibold">
-                Subject Code (Optional)
-              </Label>
-              <Input
-                id="code"
-                placeholder="e.g. MATH-401"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className="bg-background uppercase"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-muted">
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-3 pt-6 border-t border-white/[0.05]">
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 onClick={() => router.back()}
+                className="rounded-2xl h-12 px-8 hover:bg-white/5 transition-colors"
                 disabled={createMutation.isPending}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={!canSubmit}>
-                <Save className="h-4 w-4 mr-2" />
-                {createMutation.isPending ? "Creating..." : "Create Subject"}
+              <Button
+                type="submit"
+                disabled={!canSubmit}
+                className="rounded-2xl h-12 px-10 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold transition-all shadow-lg shadow-primary/20"
+              >
+                {createMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Create Subject
+                  </>
+                )}
               </Button>
             </div>
           </form>

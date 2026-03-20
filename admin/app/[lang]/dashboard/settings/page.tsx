@@ -10,10 +10,10 @@ export default function SettingsPage({
   params: { lang: string };
 }) {
   return (
-    <div className="container space-y-6 py-4">
+    <div className="container max-w-7xl py-10 space-y-12">
       <PageHeader title="Settings" />
 
-      <Card>
+      <Card className="rounded-[32px] border border-border/40 bg-muted/10">
         <CardHeader>
           <CardTitle>Administration</CardTitle>
         </CardHeader>

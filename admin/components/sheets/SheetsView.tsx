@@ -247,7 +247,7 @@ export function SheetsView({ lang, dict }: { lang: string; dict: any }) {
   const title = dict?.nav?.sheets ?? "Students Sheets";
 
   return (
-    <div className="container space-y-6 max-w-7xl mx-auto py-4">
+    <div className="container max-w-7xl py-10 space-y-12">
       <PageHeader
         title={title}
         description={

@@ -86,7 +86,9 @@
     "group": "Group",
     "teacher": "Teacher",
     "subject": "Subject",
-    "room": "Room"
+    "room": "Room",
+    "description": "Manage and view lesson schedules by month.",
+    "createNew": "Create new schedule"
   },
   "attendance": {
     "title": "Attendance",

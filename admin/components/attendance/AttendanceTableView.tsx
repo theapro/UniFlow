@@ -253,59 +253,63 @@ export function AttendanceTableView({
               No students found for this group.
             </p>
           ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{labels.studentLabel}</TableHead>
-                    <TableHead className="w-[220px]">
-                      {labels.statusLabel}
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {students.map((s) => (
-                    <TableRow key={s.id}>
-                      <TableCell>
-                        <div className="font-medium">{s.fullName}</div>
-                        {s.studentNumber ? (
-                          <div className="text-xs text-muted-foreground">
-                            {s.studentNumber}
-                          </div>
-                        ) : null}
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={draft[s.id] ?? ""}
-                          onValueChange={(value) => {
-                            setDraft((prev) => ({
-                              ...prev,
-                              [s.id]: (value as AttendanceStatus | "") ?? "",
-                            }));
-                          }}
-                        >
-                          <SelectTrigger className="w-[200px]">
-                            <SelectValue placeholder="—" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="NONE">—</SelectItem>
-                            <SelectItem value="PRESENT">
-                              {labels.present}
-                            </SelectItem>
-                            <SelectItem value="ABSENT">
-                              {labels.absent}
-                            </SelectItem>
-                            <SelectItem value="LATE">{labels.late}</SelectItem>
-                            <SelectItem value="EXCUSED">
-                              {labels.excused}
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
+            <div className="rounded-3xl border border-border/40 bg-muted/10 overflow-hidden">
+              <div className="overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{labels.studentLabel}</TableHead>
+                      <TableHead className="w-[220px]">
+                        {labels.statusLabel}
+                      </TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {students.map((s) => (
+                      <TableRow key={s.id}>
+                        <TableCell>
+                          <div className="font-medium">{s.fullName}</div>
+                          {s.studentNumber ? (
+                            <div className="text-xs text-muted-foreground">
+                              {s.studentNumber}
+                            </div>
+                          ) : null}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={draft[s.id] ?? ""}
+                            onValueChange={(value) => {
+                              setDraft((prev) => ({
+                                ...prev,
+                                [s.id]: (value as AttendanceStatus | "") ?? "",
+                              }));
+                            }}
+                          >
+                            <SelectTrigger className="w-[200px]">
+                              <SelectValue placeholder="—" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="NONE">—</SelectItem>
+                              <SelectItem value="PRESENT">
+                                {labels.present}
+                              </SelectItem>
+                              <SelectItem value="ABSENT">
+                                {labels.absent}
+                              </SelectItem>
+                              <SelectItem value="LATE">
+                                {labels.late}
+                              </SelectItem>
+                              <SelectItem value="EXCUSED">
+                                {labels.excused}
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           )}
         </CardContent>

@@ -6,7 +6,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreateTeacherInput, UpdateTeacherInput } from "@/types/teacher.types";
 import { subjectsApi } from "@/lib/api";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -99,13 +98,13 @@ export function TeacherForm({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
+    <section className="rounded-[32px] border border-border/40 bg-muted/10 overflow-hidden">
+      <div className="p-6 pb-3 border-b border-border/40">
+        <div className="text-xl font-semibold">
           {teacher ? dict.teachers.editTitle : dict.teachers.createTitle}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+        </div>
+      </div>
+      <div className="p-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="fullName">{dict.teachers.fullName}</Label>
@@ -114,6 +113,7 @@ export function TeacherForm({
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
+              className="h-10 rounded-2xl border-border/40 bg-background/50"
             />
           </div>
 
@@ -126,6 +126,7 @@ export function TeacherForm({
               onChange={(e) => setEmail(e.target.value)}
               required={!teacher}
               placeholder="user@example.com"
+              className="h-10 rounded-2xl border-border/40 bg-background/50"
             />
           </div>
 
@@ -135,6 +136,7 @@ export function TeacherForm({
               id="staffNo"
               value={staffNo}
               onChange={(e) => setStaffNo(e.target.value)}
+              className="h-10 rounded-2xl border-border/40 bg-background/50"
             />
           </div>
 
@@ -145,6 +147,7 @@ export function TeacherForm({
               value={departmentId}
               onChange={(e) => setDepartmentId(e.target.value)}
               placeholder="Department ID"
+              className="h-10 rounded-2xl border-border/40 bg-background/50"
             />
           </div>
 
@@ -155,6 +158,7 @@ export function TeacherForm({
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+998..."
+              className="h-10 rounded-2xl border-border/40 bg-background/50"
             />
           </div>
 
@@ -167,6 +171,7 @@ export function TeacherForm({
               value={telegram}
               onChange={(e) => setTelegram(e.target.value)}
               placeholder="@username"
+              className="h-10 rounded-2xl border-border/40 bg-background/50"
             />
           </div>
 
@@ -176,12 +181,13 @@ export function TeacherForm({
               id="note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
+              className="h-10 rounded-2xl border-border/40 bg-background/50"
             />
           </div>
 
           <div className="space-y-2">
             <Label>{dict.teachers.subjects || "Subjects"}</Label>
-            <div className="rounded-md border p-3">
+            <div className="rounded-3xl border border-border/40 bg-background/50 p-4">
               {subjectsLoading ? (
                 <div className="text-sm text-muted-foreground">Loading...</div>
               ) : (subjects ?? []).length ? (
@@ -240,20 +246,25 @@ export function TeacherForm({
             </div>
           </div>
 
-          <div className="flex gap-2">
-            <Button type="submit" disabled={loading || !canSubmit}>
+          <div className="flex gap-2 pt-2">
+            <Button
+              type="submit"
+              disabled={loading || !canSubmit}
+              className="rounded-2xl"
+            >
               {loading ? dict.common.loading : dict.common.save}
             </Button>
             <Button
               type="button"
               variant="outline"
               onClick={() => router.back()}
+              className="rounded-2xl"
             >
               {dict.common.cancel}
             </Button>
           </div>
         </form>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

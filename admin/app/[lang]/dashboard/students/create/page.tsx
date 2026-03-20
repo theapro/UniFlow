@@ -110,7 +110,7 @@ export default function CreateStudentPage({
   };
 
   return (
-    <div className="container space-y-6">
+    <div className="container max-w-7xl py-10 space-y-12">
       {/* Top Navigation */}
       <div className="flex items-center justify-between">
         <Link

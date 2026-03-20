@@ -93,7 +93,7 @@ export default function StudentsPage({
   };
 
   return (
-    <div className="container space-y-4">
+    <div className="container max-w-7xl py-10 space-y-12">
       <PageHeader
         title={dict.students.title}
         actions={
@@ -112,15 +112,17 @@ export default function StudentsPage({
         }
       />
 
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder={dict.common.search}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8"
-          />
+      <div className="rounded-[32px] border border-border/40 bg-muted/10 p-4">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder={dict.common.search}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-11 rounded-2xl border-border/40 bg-background/50 pl-10"
+            />
+          </div>
         </div>
       </div>
 

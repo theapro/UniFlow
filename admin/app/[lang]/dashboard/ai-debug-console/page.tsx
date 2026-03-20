@@ -64,7 +64,7 @@ export default function AiDebugConsolePage({
   const nextCursor = (q.data?.nextCursor ?? null) as string | null;
 
   return (
-    <div className="space-y-4">
+    <div className="container max-w-7xl py-10 space-y-12">
       <PageHeader
         title="AI Debug Console"
         description="Full internal flow for recent AI messages (tools, Prisma queries, warnings, final response)."
@@ -118,7 +118,10 @@ export default function AiDebugConsolePage({
           const durationMs = trace?.execution?.durationMs;
 
           return (
-            <Card key={row.id ?? idx}>
+            <Card
+              key={row.id ?? idx}
+              className="rounded-[32px] border border-border/40 bg-muted/10"
+            >
               <CardHeader>
                 <CardTitle className="flex items-center justify-between gap-2">
                   <span>Message #{idx + 1}</span>
@@ -174,7 +177,7 @@ export default function AiDebugConsolePage({
                   <div className="text-xs font-medium text-muted-foreground">
                     Query
                   </div>
-                  <pre className="max-h-64 overflow-auto rounded-md border bg-muted/30 p-3 text-xs">
+                  <pre className="max-h-64 overflow-auto rounded-2xl border border-border/40 bg-background/50 p-4 text-xs">
                     {queryObj
                       ? JSON.stringify(queryObj, null, 2)
                       : "(no query)"}

@@ -82,7 +82,7 @@ export default function StudentViewPage({
   );
 
   return (
-    <div className="container space-y-6">
+    <div className="container max-w-7xl py-10 space-y-12">
       {/* Back Button - Minimalist */}
       <Link
         href={`/${lang}/dashboard/students`}
@@ -95,7 +95,7 @@ export default function StudentViewPage({
       <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
         {/* CHAP TOMON: Profil va Asosiy boshqaruv */}
         <div className="md:col-span-4 space-y-4">
-          <Card className="overflow-hidden border-none bg-muted/20 shadow-none">
+          <Card className="overflow-hidden rounded-[32px] border border-border/40 bg-muted/10 shadow-none">
             <CardContent className="p-6">
               <div className="flex flex-col items-center text-center">
                 <div className="relative mb-4">
@@ -174,7 +174,7 @@ export default function StudentViewPage({
 
         {/* O'NG TOMON: Batafsil ma'lumotlar */}
         <div className="md:col-span-8">
-          <Card className="h-full border-none shadow-sm">
+          <Card className="h-full rounded-[32px] border border-border/40 bg-muted/10 shadow-none">
             <CardContent className="p-8">
               <div className="grid gap-10">
                 {/* Section: Contact & Personal */}

@@ -12,7 +12,6 @@ import { DataTable } from "@/components/shared/DataTable";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -244,7 +243,7 @@ export function ClassroomsView({
         editParsedCapacityDraft < 0));
 
   return (
-    <div className="container space-y-6 py-4">
+    <div className="container max-w-7xl py-10 space-y-12">
       <PageHeader
         title={dict?.nav?.classrooms ?? "Classrooms"}
         description={
@@ -254,7 +253,7 @@ export function ClassroomsView({
         actions={
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="rounded-2xl">
                 <Plus className="h-4 w-4 mr-2" />
                 {dict?.common?.create ?? "Create"}
               </Button>
@@ -282,6 +281,7 @@ export function ClassroomsView({
                     placeholder={
                       dict?.classrooms?.namePlaceholder ?? "e.g. Room 101"
                     }
+                    className="h-10 rounded-2xl border-border/40 bg-background/50"
                   />
                 </div>
 
@@ -297,6 +297,7 @@ export function ClassroomsView({
                     placeholder={
                       dict?.classrooms?.capacityPlaceholder ?? "Optional"
                     }
+                    className="h-10 rounded-2xl border-border/40 bg-background/50"
                   />
                 </div>
               </div>
@@ -306,6 +307,7 @@ export function ClassroomsView({
                   variant="outline"
                   onClick={() => setCreateOpen(false)}
                   disabled={createMutation.isPending}
+                  className="rounded-2xl"
                 >
                   {dict?.common?.cancel ?? "Cancel"}
                 </Button>
@@ -320,6 +322,7 @@ export function ClassroomsView({
                     })
                   }
                   disabled={createDisabled}
+                  className="rounded-2xl"
                 >
                   {createMutation.isPending
                     ? (dict?.common?.loading ?? "Creating...")
@@ -331,23 +334,21 @@ export function ClassroomsView({
         }
       />
 
-      <Card>
-        <CardContent className="pt-6">
-          <DataTable
-            data={rooms ?? []}
-            columns={columns}
-            isLoading={isLoading}
-            emptyLabel={dict?.classrooms?.empty ?? "No classrooms yet."}
-          />
+      <section className="rounded-[32px] border border-border/40 bg-muted/10 p-6">
+        <DataTable
+          data={rooms ?? []}
+          columns={columns}
+          isLoading={isLoading}
+          emptyLabel={dict?.classrooms?.empty ?? "No classrooms yet."}
+        />
 
-          {!isLoading && (rooms ?? []).length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-sm text-muted-foreground">
-              <DoorClosed className="h-8 w-8 mb-2" />
-              {dict?.classrooms?.emptyHint ?? "Create one to get started."}
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+        {!isLoading && (rooms ?? []).length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 text-sm text-muted-foreground">
+            <DoorClosed className="h-8 w-8 mb-2" />
+            {dict?.classrooms?.emptyHint ?? "Create one to get started."}
+          </div>
+        ) : null}
+      </section>
 
       {/* Edit Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
@@ -365,6 +366,7 @@ export function ClassroomsView({
                 id="room-edit-name"
                 value={nameDraft}
                 onChange={(e) => setNameDraft(e.target.value)}
+                className="h-10 rounded-2xl border-border/40 bg-background/50"
               />
             </div>
 
@@ -380,6 +382,7 @@ export function ClassroomsView({
                 placeholder={
                   dict?.classrooms?.capacityPlaceholder ?? "Optional"
                 }
+                className="h-10 rounded-2xl border-border/40 bg-background/50"
               />
             </div>
           </div>
@@ -394,6 +397,7 @@ export function ClassroomsView({
                 setCapacityDraft("");
               }}
               disabled={updateMutation.isPending}
+              className="rounded-2xl"
             >
               {dict?.common?.cancel ?? "Cancel"}
             </Button>
@@ -410,6 +414,7 @@ export function ClassroomsView({
                 })
               }
               disabled={editDisabled}
+              className="rounded-2xl"
             >
               {updateMutation.isPending
                 ? (dict?.common?.loading ?? "Saving...")

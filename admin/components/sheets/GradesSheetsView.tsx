@@ -190,7 +190,7 @@ export function GradesSheetsView({ dict }: { lang: string; dict: any }) {
   const bodyRows = previewRows.slice(1);
 
   return (
-    <div className="container space-y-6 max-w-7xl mx-auto py-4">
+    <div className="container max-w-7xl py-10 space-y-12">
       <PageHeader
         title={title}
         description={
@@ -464,29 +464,34 @@ export function GradesSheetsView({ dict }: { lang: string; dict: any }) {
               {previewLoading ? (
                 <div>{dict?.common?.loading ?? "Loading..."}</div>
               ) : previewRows.length ? (
-                <div className="rounded-md border overflow-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {header.map((h, idx) => (
-                          <TableHead key={idx} className="whitespace-nowrap">
-                            {h || "-"}
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {bodyRows.map((r, ridx) => (
-                        <TableRow key={ridx}>
-                          {header.map((_, cidx) => (
-                            <TableCell key={cidx} className="whitespace-nowrap">
-                              {String(r?.[cidx] ?? "")}
-                            </TableCell>
+                <div className="rounded-3xl border border-border/40 bg-muted/10 overflow-hidden">
+                  <div className="overflow-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          {header.map((h, idx) => (
+                            <TableHead key={idx} className="whitespace-nowrap">
+                              {h || "-"}
+                            </TableHead>
                           ))}
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {bodyRows.map((r, ridx) => (
+                          <TableRow key={ridx}>
+                            {header.map((_, cidx) => (
+                              <TableCell
+                                key={cidx}
+                                className="whitespace-nowrap"
+                              >
+                                {String(r?.[cidx] ?? "")}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               ) : (
                 <div className="text-sm text-muted-foreground">No data</div>

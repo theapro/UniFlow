@@ -4,15 +4,25 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Pencil, Trash2, BookOpen, Users } from "lucide-react";
+import { 
+  ArrowLeft, Pencil, Trash2, BookOpen, 
+  Users, Calendar, Briefcase, Hash, Clock,
+  MoreHorizontal
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { subjectsApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 type Subject = {
   id: string;
@@ -28,22 +38,7 @@ type Subject = {
   };
 };
 
-function cohortLabel(c?: { code?: string; year?: number | null } | null) {
-  const code = String(c?.code ?? "").trim();
-  if (!code) return "(No cohort)";
-  const year = typeof c?.year === "number" ? c?.year : null;
-  return year ? `${code} (${year})` : code;
-}
-
-export function SubjectDetailView({
-  lang,
-  dict,
-  id,
-}: {
-  lang: string;
-  dict: any;
-  id: string;
-}) {
+export function SubjectDetailView({ lang, dict, id }: { lang: string; dict: any; id: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [deleteOpen, setDeleteOpen] = React.useState(false);
@@ -60,184 +55,183 @@ export function SubjectDetailView({
       await queryClient.invalidateQueries({ queryKey: ["subjects"] });
       router.push(`/${lang}/dashboard/subjects`);
     },
-    onError: (err: any) => {
-      toast.error(err?.response?.data?.message || "Failed to delete subject");
-    },
   });
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-12 text-center text-muted-foreground animate-pulse">
-        {dict?.common?.loading ?? "Loading..."}
+      <div className="flex flex-col items-center justify-center py-32 space-y-4">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <p className="text-sm text-muted-foreground animate-pulse font-medium">Loading details...</p>
       </div>
     );
   }
 
-  if (!subject) {
-    return (
-      <div className="container mx-auto py-12 text-center">
-        <h2 className="text-xl font-bold">
-          {dict?.common?.notFound ?? "Not found"}
-        </h2>
-        <Button variant="link" onClick={() => router.back()}>
-          {dict?.common?.back ?? "Go back"}
-        </Button>
-      </div>
-    );
-  }
+  if (!subject) return null;
 
   return (
-    <div className="container max-w-4xl mx-auto py-6 space-y-6">
-      <Link
-        href={`/${lang}/dashboard/subjects`}
-        className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors group"
-      >
-        <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
-        {dict?.nav?.subjects ?? "Subjects"}
-      </Link>
-
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-extrabold tracking-tight">
+    <div className="container max-w-7xl py-10 space-y-8 animate-in fade-in duration-700">
+      
+      {/* Top Navigation & Breadcrumb Style Header */}
+      <div className="flex items-center gap-4 px-1">
+        <Link
+          href={`/${lang}/dashboard/subjects`}
+          className="group flex h-10 w-10 items-center justify-center rounded-xl border border-border/40 bg-muted/20 text-muted-foreground hover:border-primary/30 hover:text-primary transition-all"
+        >
+          <ArrowLeft className="h-5 w-5 transition-transform group-hover:-translate-x-0.5" />
+        </Link>
+        <div className="flex flex-col">
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 leading-none mb-1">
+            Subject Profile
+          </span>
+          <h1 className="text-2xl font-bold tracking-tight text-white/90 leading-none">
             {subject.name}
           </h1>
-          <div className="flex items-center gap-2">
-            {subject.code ? (
-              <Badge variant="outline" className="font-mono">
-                {subject.code}
-              </Badge>
-            ) : (
-              <Badge variant="secondary">
-                {dict?.subjects?.noCode ?? "No code"}
-              </Badge>
-            )}
-
-            {subject.parentGroup?.name ? (
-              <Badge variant="secondary">{subject.parentGroup.name}</Badge>
-            ) : (
-              <Badge variant="outline">(No department)</Badge>
-            )}
-
-            <Badge variant="outline" className="font-mono">
-              {cohortLabel(subject.cohort)}
-            </Badge>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() =>
-              router.push(`/${lang}/dashboard/subjects/${subject.id}/edit`)
-            }
-          >
-            <Pencil className="h-4 w-4 mr-2" />
-            {dict?.common?.edit ?? "Edit"}
-          </Button>
-          <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
-            <Trash2 className="h-4 w-4 mr-2" />
-            {dict?.common?.delete ?? "Delete"}
-          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="md:col-span-2 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-xl">
-              {dict?.subjects?.overview ?? "Subject Overview"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-2 gap-8">
-              <div className="space-y-1">
-                <span className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
-                  {dict?.common?.id ?? "ID"}
-                </span>
-                <p className="font-mono text-sm break-all">{subject.id}</p>
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        {/* LEFT COLUMN: Essential Details (Glassmorphism Card) */}
+        <div className="lg:col-span-8">
+          <Card className="rounded-[32px] border-border/40 bg-muted/10 backdrop-blur-md shadow-none overflow-hidden">
+            <CardContent className="p-10">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
+                <InfoBlock 
+                  icon={Briefcase} 
+                  label="Academic Department" 
+                  value={subject.parentGroup?.name ?? "Independent Subject"} 
+                  description="Primary organizational unit"
+                />
+                <InfoBlock 
+                  icon={Calendar} 
+                  label="Enrollment Cohort" 
+                  value={subject.cohort?.code ? `Cohort ${subject.cohort.code}` : "Cross-Cohort"} 
+                  description="Academic year or group level"
+                />
+                <InfoBlock 
+                  icon={Hash} 
+                  label="Catalog Code" 
+                  value={subject.code ?? "N/A"} 
+                  isMono 
+                  description="Internal identification code"
+                />
+                <InfoBlock 
+                  icon={Clock} 
+                  label="System ID & Audit" 
+                  value={subject.id.slice(0, 8).toUpperCase()} 
+                  isMono 
+                  description={`Last update: ${new Date(subject.updatedAt).toLocaleDateString()}`}
+                />
               </div>
-              <div className="space-y-1">
-                <span className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
-                  {dict?.common?.updatedAt ?? "Updated"}
-                </span>
-                <p className="text-sm">
-                  {new Date(subject.updatedAt).toLocaleString(
-                    lang === "uz" ? "uz-UZ" : "en-US",
-                  )}
-                </p>
-              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* RIGHT COLUMN: Statistics & Actions */}
+        <div className="lg:col-span-4 space-y-6">
+          
+          {/* Stats Card */}
+          <div className="rounded-[32px] border border-border/40 bg-muted/10 p-8 space-y-8">
+            <div className="space-y-6">
+              <StatItem 
+                label="Assigned Faculty" 
+                value={subject._count?.teachers ?? 0} 
+                subtext="Active teaching staff"
+              />
+              <div className="h-px bg-white/[0.05]" />
+              <StatItem 
+                label="Curriculum Scope" 
+                value={subject._count?.lessons ?? 0} 
+                subtext="Total scheduled lessons"
+              />
             </div>
+          </div>
 
-            <Separator />
-
-            <div className="flex items-center gap-6">
-              <div className="p-3 bg-primary/10 rounded-full">
-                <Users className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <h4 className="font-semibold text-2xl font-mono">
-                  {subject._count?.teachers ?? 0}
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  {dict?.teachers?.title ?? "Teachers"}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-6 pt-2">
-              <div className="p-3 bg-secondary/10 rounded-full">
-                <BookOpen className="h-6 w-6 text-secondary-foreground" />
-              </div>
-              <div>
-                <h4 className="font-semibold text-2xl font-mono">
-                  {subject._count?.lessons ?? 0}
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  {dict?.lessons?.title ?? "Lessons"}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-destructive/20 h-fit">
-          <CardHeader>
-            <CardTitle className="text-lg text-destructive">
-              {dict?.common?.dangerZone ?? "Danger Zone"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              {dict?.subjects?.deleteHint ??
-                "Deleting this subject will remove related schedule entries and lessons."}
-            </p>
-            <Button
-              variant="destructive"
-              className="w-full"
-              onClick={() => setDeleteOpen(true)}
-              disabled={deleteMutation.isPending}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              {deleteMutation.isPending
-                ? (dict?.common?.loading ?? "Deleting...")
-                : (dict?.common?.delete ?? "Delete")}
-            </Button>
-          </CardContent>
-        </Card>
+          {/* Action Menu Card */}
+          <div className="rounded-[32px] border border-border/40 bg-muted/10 p-4 flex items-center justify-between">
+            <span className="ml-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+              Record Settings
+            </span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-12 w-12 rounded-2xl border-border/40 bg-background/50 hover:bg-white/5"
+                >
+                  <MoreHorizontal className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-56 rounded-2xl border-border/40 p-2 shadow-2xl backdrop-blur-xl"
+              >
+                <DropdownMenuItem
+                  onClick={() => router.push(`/${lang}/dashboard/subjects/${subject.id}/edit`)}
+                  className="rounded-xl p-3 cursor-pointer"
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit Subject
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setDeleteOpen(true)}
+                  className="rounded-xl text-destructive focus:bg-destructive/10 focus:text-destructive p-3 cursor-pointer"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Subject
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
       </div>
 
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        title={dict?.common?.delete ?? "Delete"}
-        description={
-          dict?.subjects?.deleteConfirm ??
-          "Are you sure you want to delete this subject?"
-        }
-        confirmLabel={dict?.common?.delete ?? "Delete"}
-        cancelLabel={dict?.common?.cancel ?? "Cancel"}
+        title="Confirm Deletion"
+        description="Are you sure you want to remove this subject? All associated lesson plans and teacher assignments will be affected."
+        confirmLabel="Delete Permanent"
         onConfirm={() => deleteMutation.mutate()}
       />
+    </div>
+  );
+}
+
+// Sub-components for cleaner structure
+function InfoBlock({ icon: Icon, label, value, description, isMono = false }: any) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2.5">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 border border-white/10 shadow-inner">
+           <Icon className="h-4 w-4 text-muted-foreground/70" />
+        </div>
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50">{label}</span>
+      </div>
+      <div className="space-y-1.5 pl-0.5">
+        <p className={cn(
+          "text-2xl font-semibold tracking-tight text-white/90", 
+          isMono && "font-mono text-lg tracking-normal text-primary/80"
+        )}>
+          {value}
+        </p>
+        <p className="text-[11px] text-muted-foreground/40 font-medium uppercase tracking-tight">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function StatItem({ label, value, subtext }: any) {
+  return (
+    <div className="flex justify-between items-end group">
+      <div className="space-y-1">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">{label}</p>
+        <p className="text-[11px] text-muted-foreground/30 font-medium">{subtext}</p>
+      </div>
+      <span className="text-5xl font-light tracking-tighter text-white/80 group-hover:text-primary transition-colors">
+        {value}
+      </span>
     </div>
   );
 }

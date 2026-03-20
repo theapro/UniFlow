@@ -69,7 +69,7 @@ export default function StudentDetailPage({
   };
 
   return (
-    <div className="container space-y-6">
+    <div className="container max-w-7xl py-10 space-y-12">
       {/* Back Button & Title */}
       <Link
         href={`/${lang}/dashboard/students`}
@@ -99,8 +99,8 @@ export default function StudentDetailPage({
 
         {/* O'ng tomon: Faqat Hisob holati (Account) */}
         <div className="space-y-6">
-          <Card className="border-muted/50 shadow-sm overflow-hidden">
-            <CardHeader className="bg-muted/30 border-b py-4">
+          <Card className="rounded-[32px] border border-border/40 bg-muted/10 overflow-hidden">
+            <CardHeader className="border-b border-border/30 py-5">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-muted-foreground" />
                 Hisob ma&apos;lumotlari
@@ -139,7 +139,7 @@ export default function StudentDetailPage({
 
               <Button
                 variant="outline"
-                className="w-full text-[11px] h-8 font-medium uppercase tracking-tight"
+                className="w-full text-[11px] h-10 rounded-2xl border-border/40 bg-background/50 font-medium uppercase tracking-tight"
                 disabled={
                   !student.user?.email || resendCredentialsMutation.isPending
                 }

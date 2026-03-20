@@ -12,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
@@ -123,13 +122,13 @@ export function StudentForm({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
+    <section className="rounded-[32px] border border-border/40 bg-muted/10 overflow-hidden">
+      <div className="p-6 pb-3 border-b border-border/40">
+        <div className="text-xl font-semibold">
           {student ? d.students.editTitle : d.students.createTitle}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+        </div>
+      </div>
+      <div className="p-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -141,6 +140,7 @@ export function StudentForm({
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
+                className="h-10 rounded-2xl border-border/40 bg-background/50"
               />
             </div>
 
@@ -153,6 +153,7 @@ export function StudentForm({
                 onChange={(e) => setEmail(e.target.value)}
                 required={!student}
                 placeholder="user@example.com"
+                className="h-10 rounded-2xl border-border/40 bg-background/50"
               />
             </div>
 
@@ -164,6 +165,7 @@ export function StudentForm({
                 id="studentNo"
                 value={studentNo}
                 onChange={(e) => setStudentNo(e.target.value)}
+                className="h-10 rounded-2xl border-border/40 bg-background/50"
               />
             </div>
 
@@ -174,6 +176,7 @@ export function StudentForm({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="e.g. 9989077727712"
+                className="h-10 rounded-2xl border-border/40 bg-background/50"
               />
             </div>
 
@@ -184,13 +187,17 @@ export function StudentForm({
                 value={cohort}
                 onChange={(e) => setCohort(e.target.value)}
                 placeholder="e.g. 2023"
+                className="h-10 rounded-2xl border-border/40 bg-background/50"
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="status">{d.students.status || "Status"}</Label>
               <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger id="status">
+                <SelectTrigger
+                  id="status"
+                  className="h-10 rounded-2xl border-border/40 bg-background/50"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -219,7 +226,7 @@ export function StudentForm({
               )}
             </div>
 
-            <div className="rounded-lg border">
+            <div className="rounded-3xl border border-border/40 bg-muted/10 overflow-hidden">
               <ScrollArea className="h-[220px]">
                 <Table>
                   <TableHeader>
@@ -242,7 +249,7 @@ export function StudentForm({
                       groups.map((g) => (
                         <TableRow
                           key={g.id}
-                          className="cursor-pointer"
+                          className="cursor-pointer hover:bg-muted/30"
                           onClick={() => setGroupId(g.id)}
                         >
                           <TableCell>
@@ -272,23 +279,29 @@ export function StudentForm({
               id="note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
+              className="h-10 rounded-2xl border-border/40 bg-background/50"
             />
           </div>
 
           <div className="flex gap-2 pt-4">
-            <Button type="submit" disabled={loading || !groupId}>
+            <Button
+              type="submit"
+              disabled={loading || !groupId}
+              className="rounded-2xl"
+            >
               {loading ? d.common.loading : d.common.save}
             </Button>
             <Button
               type="button"
               variant="outline"
               onClick={() => router.back()}
+              className="rounded-2xl"
             >
               {d.common.cancel}
             </Button>
           </div>
         </form>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

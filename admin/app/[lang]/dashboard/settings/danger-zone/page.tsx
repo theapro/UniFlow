@@ -45,7 +45,7 @@ export default function DangerZonePage() {
   const canRun = confirm.trim().length > 0;
 
   return (
-    <div className="container space-y-6">
+    <div className="container max-w-7xl py-10 space-y-12">
       <div className="flex flex-col gap-1">
         <PageHeader title="Danger Zone" />
         <p className="text-sm text-muted-foreground">
@@ -55,7 +55,7 @@ export default function DangerZonePage() {
         </p>
       </div>
 
-      <Card>
+      <Card className="rounded-[32px] border border-border/40 bg-muted/10">
         <CardHeader>
           <CardTitle>Bulk purge</CardTitle>
         </CardHeader>
@@ -106,7 +106,7 @@ export default function DangerZonePage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="rounded-[32px] border border-border/40 bg-muted/10">
         <CardHeader>
           <CardTitle>Result</CardTitle>
         </CardHeader>
