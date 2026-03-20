@@ -1,0 +1,179 @@
+1. User web da AI CHATNI EXPORT QILISH FUNCTIONINI QO"SH CHIROYLI FORMATDA TXT yoki Chatni yaxhsiroq ifodalash uchun istalgan fayl ko'rinishida
+
+2.Ai javob berayotganda Thinking degan loading text qo'sh yaxshi animation ham
+
+3-task :
+
+You are a senior backend engineer debugging a real production issue.
+
+My AI system returns EMPTY data even though the database contains correct data.
+
+Here is actual chat behavior:
+
+* Group works (returns "23C")
+* Schedule always returns "no schedule"
+* Attendance always empty
+* Grades always empty
+* Teachers cannot be found
+* Date-based queries do not work
+
+---
+
+# 🎯 YOUR TASK
+
+Find EXACTLY why Prisma queries are returning empty results.
+
+---
+
+# 🔍 STEP 1 — CHECK SCHEDULE QUERY
+
+Find the function used for:
+
+* getStudentSchedule
+* getTodaySchedule
+
+Show the Prisma query.
+
+Then:
+
+1. Print the actual query conditions
+2. Check:
+
+   * date filtering (is it using correct format?)
+   * timezone issues
+   * groupId vs studentId mismatch
+
+Add debug log:
+
+console.log("SCHEDULE QUERY", {
+studentId,
+groupId,
+date,
+result
+})
+
+---
+
+# 🔍 STEP 2 — VERIFY DATA EXISTS
+
+Write a test query:
+
+const all = await prisma.scheduleEntry.findMany({
+take: 10,
+include: { teacher: true, group: true }
+});
+
+console.log(all);
+
+Check:
+
+* is data actually in DB?
+* are teacherId and groupId populated?
+
+---
+
+# 🔍 STEP 3 — CHECK TEACHER RELATION
+
+Inspect Prisma schema:
+
+ScheduleEntry {
+teacherId
+}
+
+Check:
+
+* is relation defined?
+* is include used?
+
+Fix:
+
+include: {
+teacher: true
+}
+
+---
+
+# 🔍 STEP 4 — CHECK STUDENT → GROUP FLOW
+
+Trace:
+
+1. studentId
+2. student.groupId
+3. scheduleEntry.groupId
+
+Ensure:
+
+scheduleEntry.groupId === student.groupId
+
+---
+
+# 🔍 STEP 5 — CHECK DATE FILTER
+
+Find code like:
+
+where: {
+date: today
+}
+
+Verify:
+
+* format matches DB
+* use range instead:
+
+where: {
+date: {
+gte: startOfDay,
+lte: endOfDay
+}
+}
+
+---
+
+# 🔍 STEP 6 — CHECK TOOL RETURN
+
+Find tool like getStudentDashboard
+
+Check:
+
+if (!data.length) {
+return emptyState
+}
+
+👉 This might be hiding real issues.
+
+Log BEFORE returning empty:
+
+console.log("EMPTY RESULT DEBUG", data);
+
+---
+
+# 🔍 STEP 7 — TEST WITHOUT FILTER
+
+Run:
+
+await prisma.scheduleEntry.findMany()
+
+If data exists → problem is filter
+If empty → DB issue
+
+---
+
+# 🎯 OUTPUT
+
+Give:
+
+1. Exact broken query
+2. Exact reason (e.g. date mismatch, wrong field)
+3. Fixed query (correct code)
+4. Example result after fix
+
+---
+
+# 🚫 IMPORTANT
+
+* Do NOT guess
+* Show real code
+* Focus on Prisma queries and relations
+* Be precise
+
+This is a database debugging task, not AI theory.

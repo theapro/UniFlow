@@ -23,6 +23,7 @@
     "attendance": "Attendance",
     "grades": "Grades",
     "aiMonitor": "AI Monitor",
+    "aiDebugConsole": "AI Debug Console",
     "aiSettings": "AI Settings",
     "testAi": "Test AI",
     "aiModels": "AI Models",

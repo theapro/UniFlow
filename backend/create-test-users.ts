@@ -13,7 +13,10 @@ async function main() {
   // Create admin user
   const admin = await prisma.user.upsert({
     where: { email: "admin@uniflow.com" },
-    update: {},
+    update: {
+      passwordHash: bcrypt.hashSync("admin123", 10),
+      role: "ADMIN",
+    },
     create: {
       email: "admin@uniflow.com",
       passwordHash: bcrypt.hashSync("admin123", 10),
@@ -22,9 +25,13 @@ async function main() {
   });
   console.log("✓ Admin user created:", admin.email);
 
-  // Create teacher with user
-  const teacher = await prisma.teacher.create({
-    data: {
+  // Create/update teacher with user (idempotent)
+  const teacher = await prisma.teacher.upsert({
+    where: { staffNo: "T001" },
+    update: {
+      fullName: "John Teacher",
+    },
+    create: {
       fullName: "John Teacher",
       staffNo: "T001",
     },
@@ -32,7 +39,12 @@ async function main() {
 
   const teacherUser = await prisma.user.upsert({
     where: { email: "teacher@uniflow.com" },
-    update: {},
+    update: {
+      passwordHash: bcrypt.hashSync("teacher123", 10),
+      role: "TEACHER",
+      teacherId: teacher.id,
+      studentId: null,
+    },
     create: {
       email: "teacher@uniflow.com",
       passwordHash: bcrypt.hashSync("teacher123", 10),
@@ -42,17 +54,27 @@ async function main() {
   });
   console.log("✓ Teacher user created:", teacherUser.email);
 
-  // Create student with user
-  const student = await prisma.student.create({
-    data: {
+  // Create/update student with user (idempotent)
+  const student = await prisma.student.upsert({
+    where: { studentNumber: "S001" },
+    update: {
       fullName: "Jane Student",
-      studentNo: "S001",
+    },
+    create: {
+      fullName: "Jane Student",
+      studentNumber: "S001",
+      email: "student@uniflow.com",
     },
   });
 
   const studentUser = await prisma.user.upsert({
     where: { email: "student@uniflow.com" },
-    update: {},
+    update: {
+      passwordHash: bcrypt.hashSync("student123", 10),
+      role: "STUDENT",
+      studentId: student.id,
+      teacherId: null,
+    },
     create: {
       email: "student@uniflow.com",
       passwordHash: bcrypt.hashSync("student123", 10),

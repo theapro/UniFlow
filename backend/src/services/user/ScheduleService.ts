@@ -3,6 +3,20 @@ import { getWeekdayUTC } from "../../utils/weekday";
 import { formatDbTime } from "../../utils/time";
 
 export class ScheduleService {
+  async getScheduleByStudentId(studentId: string, weekday?: string) {
+    const membership = await prisma.studentGroup.findFirst({
+      where: { studentId, leftAt: null },
+      select: { groupId: true },
+      orderBy: [{ joinedAt: "desc" }, { createdAt: "desc" }],
+    });
+
+    if (!membership?.groupId) {
+      return [];
+    }
+
+    return this.getScheduleByGroupId(membership.groupId, weekday);
+  }
+
   async getScheduleByGroupId(groupId: string, weekday?: string) {
     const targetWeekday = weekday ? (weekday as any) : getWeekdayUTC();
 

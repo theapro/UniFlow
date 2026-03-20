@@ -143,9 +143,11 @@ function normalizeSheetPayloadForHash(payload: {
     email: payload.email.trim(),
     phone: payload.phone.trim(),
     status: parseStatus(payload.status),
-    teacher_ids: normalizeIdsCsv(payload.teacher_ids),
+    // Legacy field (removed from DB). Keep stable so hashing ignores it.
+    teacher_ids: "",
     parent_ids: normalizeIdsCsv(payload.parent_ids),
-    cohort: payload.cohort.trim(),
+    // Legacy field (removed from DB). Keep stable so hashing ignores it.
+    cohort: "",
     created_at: safeIso(createdAt),
     updated_at: safeIso(updatedAt),
     note: payload.note.trim(),
@@ -781,7 +783,14 @@ export class StudentsSheetsSyncService {
           // Check if DB changed while sheet stayed same
           const dbStudent = await this.prisma.student.findUnique({
             where: { id: studentUuid },
-            include: { group: { select: { name: true } } },
+            include: {
+              studentGroups: {
+                where: { leftAt: null },
+                select: { group: { select: { name: true } } },
+                orderBy: [{ joinedAt: "desc" }, { createdAt: "desc" }],
+                take: 1,
+              },
+            },
           });
 
           const dbPayloadForHash = dbStudent
@@ -792,17 +801,15 @@ export class StudentsSheetsSyncService {
                 email: dbStudent.email ?? "",
                 phone: dbStudent.phone ?? "",
                 status: dbStudent.status,
-                teacher_ids: jsonStringArray(dbStudent.teacherIds)
-                  .sort()
-                  .join(","),
+                teacher_ids: "",
                 parent_ids: jsonStringArray(dbStudent.parentIds)
                   .sort()
                   .join(","),
-                cohort: dbStudent.cohort ?? "",
+                cohort: "",
                 created_at: safeIso(dbStudent.createdAt),
                 updated_at: safeIso(dbStudent.updatedAt),
                 note: dbStudent.note ?? "",
-                group: dbStudent.group?.name ?? dbStudent.groupName ?? "",
+                group: dbStudent.studentGroups?.[0]?.group?.name ?? "",
               }
             : null;
 
@@ -870,9 +877,7 @@ export class StudentsSheetsSyncService {
         const emailVal = rowPayloadRaw.email.trim() || null;
         const phone = rowPayloadRaw.phone.trim() || null;
         const status = parseStatus(rowPayloadRaw.status);
-        const teacherIds = parseCsvIds(rowPayloadRaw.teacher_ids);
         const parentIds = parseCsvIds(rowPayloadRaw.parent_ids);
-        const cohort = rowPayloadRaw.cohort.trim() || null;
 
         // Ensure created_at/updated_at are valid and normalized in the sheet for robust conflict detection.
         const parsedCreatedAt = parseDate(rowPayloadRaw.created_at);
@@ -921,7 +926,14 @@ export class StudentsSheetsSyncService {
         if (prevBaseHash) {
           const dbStudent = await this.prisma.student.findUnique({
             where: { id: studentUuid },
-            include: { group: { select: { name: true } } },
+            include: {
+              studentGroups: {
+                where: { leftAt: null },
+                select: { group: { select: { name: true } } },
+                orderBy: [{ joinedAt: "desc" }, { createdAt: "desc" }],
+                take: 1,
+              },
+            },
           });
 
           const dbPayloadForHash = dbStudent
@@ -932,17 +944,15 @@ export class StudentsSheetsSyncService {
                 email: dbStudent.email ?? "",
                 phone: dbStudent.phone ?? "",
                 status: dbStudent.status,
-                teacher_ids: jsonStringArray(dbStudent.teacherIds)
-                  .sort()
-                  .join(","),
+                teacher_ids: "",
                 parent_ids: jsonStringArray(dbStudent.parentIds)
                   .sort()
                   .join(","),
-                cohort: dbStudent.cohort ?? "",
+                cohort: "",
                 created_at: safeIso(dbStudent.createdAt),
                 updated_at: safeIso(dbStudent.updatedAt),
                 note: dbStudent.note ?? "",
-                group: dbStudent.group?.name ?? dbStudent.groupName ?? "",
+                group: dbStudent.studentGroups?.[0]?.group?.name ?? "",
               }
             : null;
 
@@ -1051,12 +1061,8 @@ export class StudentsSheetsSyncService {
               email: emailVal,
               phone,
               status,
-              teacherIds,
               parentIds,
-              cohort,
-              groupName: groupTabName,
               note,
-              groupId: group.id,
               updatedAt,
             },
             create: {
@@ -1066,14 +1072,37 @@ export class StudentsSheetsSyncService {
               email: emailVal,
               phone,
               status,
-              teacherIds,
               parentIds,
-              cohort,
-              groupName: groupTabName,
               note,
-              groupId: group.id,
               createdAt,
               updatedAt,
+            },
+            select: { id: true },
+          });
+
+          // Ensure student is actively linked to this group.
+          await this.prisma.studentGroup.updateMany({
+            where: {
+              studentId: studentUuid,
+              leftAt: null,
+              groupId: { not: group.id },
+            },
+            data: { leftAt: now },
+          });
+
+          await this.prisma.studentGroup.upsert({
+            where: {
+              studentId_groupId: {
+                studentId: studentUuid,
+                groupId: group.id,
+              },
+            },
+            update: { leftAt: null },
+            create: {
+              studentId: studentUuid,
+              groupId: group.id,
+              joinedAt: now,
+              leftAt: null,
             },
             select: { id: true },
           });
@@ -1187,8 +1216,22 @@ export class StudentsSheetsSyncService {
             });
 
             await this.prisma.student.updateMany({
-              where: { id: st.studentId, groupId: group.id },
-              data: { status: "INACTIVE", groupId: null, updatedAt: now },
+              where: {
+                id: st.studentId,
+                studentGroups: {
+                  some: { groupId: group.id, leftAt: null },
+                },
+              },
+              data: { status: "INACTIVE", updatedAt: now },
+            });
+
+            await this.prisma.studentGroup.updateMany({
+              where: {
+                studentId: st.studentId,
+                groupId: group.id,
+                leftAt: null,
+              },
+              data: { leftAt: now },
             });
 
             log({
@@ -1330,7 +1373,14 @@ export class StudentsSheetsSyncService {
 
           const student = await this.prisma.student.findUnique({
             where: { id: ev.studentId },
-            include: { group: { select: { name: true } } },
+            include: {
+              studentGroups: {
+                where: { leftAt: null },
+                select: { group: { select: { name: true } } },
+                orderBy: [{ joinedAt: "desc" }, { createdAt: "desc" }],
+                take: 1,
+              },
+            },
           });
 
           if (!student) {
@@ -1345,7 +1395,10 @@ export class StudentsSheetsSyncService {
             continue;
           }
 
-          const sheetTitle = student.group?.name ?? ev.targetSheetTitle ?? null;
+          const sheetTitle =
+            student.studentGroups?.[0]?.group?.name ??
+            ev.targetSheetTitle ??
+            null;
           if (!sheetTitle) {
             throw new Error("OUTBOX_UPSERT_MISSING_SHEET_TITLE");
           }
@@ -1393,9 +1446,9 @@ export class StudentsSheetsSyncService {
             email: student.email ?? "",
             phone: student.phone ?? "",
             status: student.status,
-            teacher_ids: jsonStringArray(student.teacherIds).sort().join(","),
+            teacher_ids: "",
             parent_ids: jsonStringArray(student.parentIds).sort().join(","),
-            cohort: student.cohort ?? "",
+            cohort: "",
             created_at: formatDateForSheet(student.createdAt),
             updated_at: formatDateForSheet(student.updatedAt),
             note: student.note ?? "",

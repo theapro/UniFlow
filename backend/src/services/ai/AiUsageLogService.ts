@@ -81,6 +81,38 @@ export class AiUsageLogService {
     };
   }
 
+  async listDebugTraces(params: { take?: number; cursor?: string | null }) {
+    const take = Math.min(Math.max(params.take ?? 50, 1), 200);
+
+    const rows = await prisma.aiUsageLog.findMany({
+      take,
+      ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        userId: true,
+        role: true,
+        requestId: true,
+        provider: true,
+        model: true,
+        toolName: true,
+        toolArgs: true,
+        userMessage: true,
+        assistantMessage: true,
+        status: true,
+        error: true,
+        ms: true,
+        meta: true,
+        createdAt: true,
+      },
+    });
+
+    return {
+      items: rows,
+      nextCursor: rows.length > 0 ? rows[rows.length - 1].id : null,
+    };
+  }
+
   async findLatestByRequestId(params: { requestId: string }) {
     const requestId = String(params.requestId ?? "").trim();
     if (!requestId) return null;

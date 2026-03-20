@@ -1,19 +1,10 @@
 export const AI_TOOL_NAMES = [
   "getStudentProfile",
-  "getStudentFullContext",
-  "getStudentGroupSubjects",
-  "getStudentGrades",
-  "getStudentAttendance",
-  "getStudentGroup",
-  "getStudentSchedule",
-  "getStudentMonthlySchedule",
-
-  "getGroupStudents",
-  "getGroupGrades",
-  "getGroupAttendance",
-
-  "getTopStudents",
-  "getFailingStudents",
+  "getStudentScheduleToday",
+  "getStudentAttendanceRecent",
+  "getStudentGradesRecent",
+  "getStudentDashboard",
+  "getTeacherDashboard",
   "getSystemStats",
 ] as const;
 

@@ -1,106 +1,63 @@
-# UniFlow AI Assistant (Tool-Based, RBAC, Prisma)
+# UniFlow Unified AI Assistant (Tool-First, RBAC, Prisma)
 
-This backend implements a **tool-based AI gateway**:
+This backend implements a **single unified AI assistant** behind one endpoint:
 
 - The LLM never queries the database directly.
-- The LLM can only access data through **backend tools** in `src/services/ai-tools/`.
-- Every tool call is validated against **role-based permissions**.
-- Admins can control AI behavior via DB-backed settings, tool toggles, and usage logs.
+- The LLM can only access data through **backend tools**.
+- Tools are **tool-first** and **role-gated** (RBAC).
+- Admins can control tool enablement via DB-backed tool toggles and usage logs.
+
+## API
+
+- `POST /api/ai/chat` — unified chat endpoint (SSE streaming)
+
+Legacy endpoints like `/api/ai/llm/chat` and `/api/ai/assistant/chat` are removed.
 
 ## Folder Structure
 
-- `src/services/ai-tools/`
-  - `toolNames.ts` — tool name registry
-  - `access.ts` — RBAC guard helpers
-  - `student.tools.ts` — student-scoped tools
-  - `group.tools.ts` — group-scoped tools
-  - `admin.tools.ts` — admin/system tools
-  - `executeTool.ts` — single dispatcher + centralized access validation
+- `src/ai/`
+  - `core/`
+    - `AiOrchestrator.ts` — single entry orchestration (session → context → classify → tool/answer → persist → SSE)
+    - `AiClassifier.ts` — 1-call LLM classifier/router (JSON-only decision)
+    - `AiResponder.ts` — deterministic formatting for tool results (no extra LLM call)
+  - `context/`
+    - `buildContext.ts` — minimal, role-aware context injection (today + recent history)
+  - `services/`
+    - `LlmService.ts` — OpenAI-compatible client wrapper (Groq/OpenAI)
+  - `tools/`
+    - `toolRegistry.ts` — tool metadata + dispatcher
+    - `executeTool.ts` — centralized RBAC + tool-config gating + usage logging
+    - `studentTools.ts` — merged “smart tools” for students
+    - `teacherTools.ts` — merged “smart tools” for teachers
+    - `adminTools.ts` — merged “smart tools” for admins
+  - `types.ts` — shared AI request/decision/result types
+
 - `src/services/ai/`
-  - `AiAssistantService.ts` — orchestration (planner → tool → final answer → logs)
-  - `OpenAiCompatibleClient.ts` — OpenAI-compatible `chat.completions` client (Groq/OpenAI)
-  - `AiSettingsService.ts` — singleton settings (enabled + prompts + default models)
+  - `AiSettingsService.ts` — global AI enablement + system prompt + default models
   - `AiToolConfigService.ts` — tool toggles (global + per-role)
   - `AiUsageLogService.ts` — request logging for admins
-- `src/controllers/ai/AiAssistantController.ts`
-  - `POST /api/ai/assistant/chat`
-- `src/controllers/admin/`
-  - `AdminAiSettingsController.ts` — `GET/PATCH /api/admin/ai/settings`
-  - `AdminAiToolsController.ts` — `GET/PATCH /api/admin/ai/tools`
-  - `AdminAiLogsController.ts` — `GET /api/admin/ai/logs`
+  - `AiModelService.ts` — model resolution/allowlist
 
-## Tool List (Implemented)
+## Tool List (Merged Smart Tools)
 
-Student tools:
-
-- `getStudentProfile(studentId)`
-- `getStudentGrades(studentId)`
-- `getStudentAttendance(studentId)`
-- `getStudentGroup(studentId)`
-- `getStudentSchedule(studentId)`
-
-Teacher tools:
-
-- `getGroupStudents(groupId)`
-- `getGroupGrades(groupId)`
-- `getGroupAttendance(groupId)`
-
-Admin tools:
-
-- `getTopStudents(limit)`
-- `getFailingStudents()`
-- `getSystemStats()`
+- Student:
+  - `getStudentDashboard`
+- Teacher:
+  - `getTeacherDashboard`
+- Admin:
+  - `getSystemStats`
 
 ## RBAC Rules (Enforced)
 
-- Student: can only access their own `studentId`.
-- Teacher: can only access groups they teach (via `ScheduleEntry` or `Lesson`), and only students belonging to those groups.
+- Student: can only access their own data.
+- Teacher: can only access teacher-scoped data.
 - Admin: full access.
 
-## Prompts
+## Classification Contract
 
-### Tool Planner Prompt (example)
+The classifier returns **JSON only** and decides:
 
-Stored in `AiSettings.toolPlannerPrompt` (default provided by `AiSettingsService`).
+- `{ "type": "tool", "tool": "getStudentDashboard", "args": { ... }, "confidence": 0.0-1.0 }`
+- or `{ "type": "llm", "response": "...", "confidence": 0.0-1.0 }`
 
-Key requirements:
-
-- Output **ONLY JSON**.
-- Choose exactly one tool call OR ask 1 clarifying question.
-- Never invent IDs.
-
-Example output:
-
-```json
-{
-  "tool": "getStudentAttendance",
-  "args": { "studentId": "<uuid>" },
-  "needsClarification": false,
-  "clarifyingQuestion": ""
-}
-```
-
-### System Prompt (example)
-
-Stored in `AiSettings.systemPrompt`.
-
-Minimal production rules:
-
-- Role-aware privacy
-- Ask for missing identifiers
-- Don’t mention internal tooling
-
-## Admin Controls
-
-- Enable/disable AI: `PATCH /api/admin/ai/settings` with `{ "isEnabled": false }`
-- Change prompts: `PATCH /api/admin/ai/settings` with `{ "systemPrompt": "...", "toolPlannerPrompt": "..." }`
-- Enable/disable tools: `PATCH /api/admin/ai/tools/:name`
-- Monitor logs: `GET /api/admin/ai/logs`
-
-## Notes on Grades
-
-Grades are stored in Prisma as `GradeBook` / `GradeRecord`.
-
-`GradesSheetsSyncService.syncOnce()` now optionally persists HW columns into these tables when constructed with a Prisma client (admin sync already passes Prisma).
-
-Run `prisma migrate dev` + `prisma generate` after applying schema changes.
+The system is designed to keep requests to **~1 LLM call** per chat turn (classifier embeds the fallback response for `type=llm`).

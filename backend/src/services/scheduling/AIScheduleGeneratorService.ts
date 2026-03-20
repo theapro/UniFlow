@@ -222,6 +222,7 @@ export class AIScheduleGeneratorService {
     }
 
     const timeSlots = await prisma.timeSlot.findMany({
+      where: { isBreak: false },
       select: { id: true, slotNumber: true },
       orderBy: { slotNumber: "asc" },
       take: 100,

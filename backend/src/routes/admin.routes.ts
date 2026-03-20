@@ -29,6 +29,7 @@ import { AiToolConfigService } from "../services/ai/AiToolConfigService";
 import { AdminAiLogsController } from "../controllers/admin/AdminAiLogsController";
 import { AiUsageLogService } from "../services/ai/AiUsageLogService";
 import { AdminAiTestController } from "../controllers/admin/AdminAiTestController";
+import { AdminAiDebugController } from "../controllers/admin/AdminAiDebugController";
 import { AdminStudentsSheetsController } from "../controllers/admin/AdminStudentsSheetsController";
 import { AdminTeachersSheetsController } from "../controllers/admin/AdminTeachersSheetsController";
 import { AdminAttendanceSheetsController } from "../controllers/admin/AdminAttendanceSheetsController";
@@ -94,6 +95,9 @@ const adminAiToolsController = new AdminAiToolsController(
   new AiToolConfigService(),
 );
 const adminAiLogsController = new AdminAiLogsController(
+  new AiUsageLogService(),
+);
+const adminAiDebugController = new AdminAiDebugController(
   new AiUsageLogService(),
 );
 const adminAiTestController = new AdminAiTestController();
@@ -164,6 +168,10 @@ router.delete("/monthly-schedule/:id", adminMonthlyScheduleController.remove);
 
 // AI Automatic Schedule Generator
 router.post("/ai-schedule/generate", adminAiScheduleController.generate);
+router.post(
+  "/ai-schedule/one-tap-generate",
+  adminAiScheduleController.oneTapGenerate,
+);
 
 // AI Helpers
 router.post("/ai-groups/arrange", adminAiGroupsController.arrange);
@@ -237,8 +245,12 @@ router.patch("/ai/tools/:name", adminAiToolsController.patch);
 
 router.get("/ai/logs", adminAiLogsController.list);
 
+// Full debug traces (meta.debugTrace)
+router.get("/ai/debug-traces", adminAiDebugController.list);
+
 // Admin-only AI testing endpoint (impersonates student/teacher roles)
 router.post("/ai/test-chat", adminAiTestController.chat);
+router.post("/ai/test-tool", adminAiTestController.runTool);
 
 // Students Spreadsheet (Google Sheets) Sync
 router.get("/students-sheets/health", adminStudentsSheetsController.getHealth);

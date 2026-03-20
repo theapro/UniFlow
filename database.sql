@@ -1,0 +1,9 @@
+-- UniFlow Database (reference)
+--
+-- UniFlow uses Prisma migrations as the source of truth.
+-- The canonical reference SQL file is maintained in:
+--   backend/database.sql
+--
+-- Generate/refresh it from the current Prisma schema (MySQL):
+--   cd backend
+--   npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > database.sql

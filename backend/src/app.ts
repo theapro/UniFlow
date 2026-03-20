@@ -6,6 +6,11 @@ import { createRequestId, logError, logInfo, redact } from "./utils/logger";
 
 const app = express();
 
+// This API is consumed by SPAs that expect JSON bodies.
+// Express' default ETag/conditional GET can produce 304 responses with no body,
+// which breaks axios/react-query flows (e.g. debug console listing endpoints).
+app.set("etag", false);
+
 // Request ID + request/response logging
 app.use((req, res, next) => {
   const requestId = createRequestId();

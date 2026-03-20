@@ -15,9 +15,6 @@ import {
   Share2,
   RotateCcw,
   MoreHorizontal,
-  ChevronDown,
-  ChevronRight,
-  Brain,
 } from "lucide-react";
 
 export function AssistantMessageBubble({
@@ -29,89 +26,9 @@ export function AssistantMessageBubble({
   copied: boolean;
   onCopy: () => void;
 }) {
-  const [showThought, setShowThought] = useState(false);
-
-  // Parse content to separate optional details (Izoh/<think>) from the main answer.
-  const formatContent = (rawContent: string) => {
-    let s = rawContent ?? "";
-
-    // 1) Optional <think> block
-    const thinkMatch = s.match(/<think>([\s\S]*?)<\/think>/i);
-    const think = thinkMatch ? thinkMatch[1].trim() : null;
-    if (thinkMatch) {
-      s = s.replace(/<think>[\s\S]*?<\/think>/i, "");
-    }
-
-    // 2) Optional "Izoh:" section (we treat this as safe, high-level explanation)
-    const izohMatch = s.match(/(^|\n)\s*(Izoh:)\s*/i);
-    let main = s.trim();
-    let izoh: string | null = null;
-
-    if (izohMatch) {
-      const idx = izohMatch.index ?? -1;
-      if (idx >= 0) {
-        const before = s.slice(0, idx).trim();
-        const after = s
-          .slice(idx)
-          .replace(/(^|\n)\s*Izoh:\s*/i, "")
-          .trim();
-        main = before;
-        izoh = after.length > 0 ? after : null;
-      }
-    }
-
-    // Prefer <think> when present. If both exist, append Izoh into the details.
-    let details = think;
-    let detailsLabel: string | null = think ? "Reasoning" : null;
-
-    if (!details && izoh) {
-      details = izoh;
-      detailsLabel = "Izoh";
-    } else if (details && izoh) {
-      details = `${details}\n\n---\n\nIzoh:\n${izoh}`;
-      detailsLabel = "Reasoning";
-    }
-
-    return { details, detailsLabel, cleanContent: main || s.trim() };
-  };
-
-  const { details, detailsLabel, cleanContent } = formatContent(content);
-
   return (
     <div className="group flex w-full justify-start py-4">
       <div className="relative w-full break-words text-foreground">
-        {/* Details Section (Izoh / Reasoning) */}
-        {details && (
-          <div className="mb-4">
-            <button
-              onClick={() => setShowThought(!showThought)}
-              className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted/50">
-                <Brain className="h-3 w-3" />
-              </div>
-              <span>
-                {showThought
-                  ? `${detailsLabel ?? "Izoh"}ni yashirish`
-                  : `${detailsLabel ?? "Izoh"}ni ko‘rsatish`}
-              </span>
-              {showThought ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronRight className="h-3 w-3" />
-              )}
-            </button>
-
-            {showThought && (
-              <div className="mt-2 border-l-2 border-muted pl-4 py-1 italic text-xs text-muted-foreground/80 bg-muted/20 rounded-r-md animate-in fade-in slide-in-from-top-1 duration-200">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {details}
-                </ReactMarkdown>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Main Content */}
         <div className="prose prose-sm dark:prose-invert max-w-none break-words [&_p]:my-2">
           <ReactMarkdown
@@ -151,7 +68,7 @@ export function AssistantMessageBubble({
               },
             }}
           >
-            {cleanContent || content}
+            {content}
           </ReactMarkdown>
         </div>
 

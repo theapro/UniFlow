@@ -1,0 +1,949 @@
+  requestId: '820fab1f-ecd5-4b9e-8b83-a398da323ac0',
+  method: 'GET',
+  path: '/api/admin/ai/debug-traces',
+  query: { take: '50' },
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '820fab1f-ecd5-4b9e-8b83-a398da323ac0',
+  method: 'GET',
+  path: '/ai/debug-traces',
+  status: 304,
+  ms: 6,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] request {
+  requestId: '176960cd-11b5-42f2-8fe3-c237ab435991',
+  method: 'GET',
+  path: '/api/admin/ai/debug-traces',
+  query: { take: '50' },
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '176960cd-11b5-42f2-8fe3-c237ab435991',
+  method: 'GET',
+  path: '/ai/debug-traces',
+  status: 304,
+  ms: 7,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] request {
+  requestId: '97f5d585-5f64-4409-bbcd-d4e3ed08a93f',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/settings',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '97f5d585-5f64-4409-bbcd-d4e3ed08a93f',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/settings',
+  status: 204,
+  ms: 1,
+  user: 'undefined'
+}
+[HTTP] request {
+  requestId: '1bdb8a3c-32cc-451d-af6c-3cf64b481fd4',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/tools',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '1bdb8a3c-32cc-451d-af6c-3cf64b481fd4',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/tools',
+  status: 204,
+  ms: 1,
+  user: 'undefined'
+}
+[HTTP] request {
+  requestId: 'c20d2cbd-f09a-4ba9-afb2-813a63cc7160',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/logs',
+  query: { take: '50' },
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: 'c20d2cbd-f09a-4ba9-afb2-813a63cc7160',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/logs',
+  status: 204,
+  ms: 1,
+  user: 'undefined'
+}
+[HTTP] request {
+  requestId: '00e4c7d7-8346-4379-a186-14e599e86381',
+  method: 'OPTIONS',
+  path: '/api/admin/verify',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '00e4c7d7-8346-4379-a186-14e599e86381',
+  method: 'OPTIONS',
+  path: '/api/admin/verify',
+  status: 204,
+  ms: 1,
+  user: 'undefined'
+}
+[HTTP] request {
+  requestId: 'e2f58ea0-ba3f-4a02-aa37-00b87daac78f',
+  method: 'GET',
+  path: '/api/admin/ai/settings',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] request {
+  requestId: '003f5314-2af5-4982-be1a-f984a9bff096',
+  method: 'GET',
+  path: '/api/admin/ai/tools',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] request {
+  requestId: '6b576eca-16c1-471c-b5e0-a77810801431',
+  method: 'GET',
+  path: '/api/admin/ai/logs',
+  query: { take: '50' },
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] request {
+  requestId: '79d3c700-2383-4bbf-b1c2-55cabc98ceeb',
+  method: 'GET',
+  path: '/api/admin/verify',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: 'e2f58ea0-ba3f-4a02-aa37-00b87daac78f',
+  method: 'GET',
+  path: '/ai/settings',
+  status: 200,
+  ms: 21,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] response {
+  requestId: '79d3c700-2383-4bbf-b1c2-55cabc98ceeb',
+  method: 'GET',
+  path: '/verify',
+  status: 304,
+  ms: 12,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] response {
+  requestId: '6b576eca-16c1-471c-b5e0-a77810801431',
+  method: 'GET',
+  path: '/ai/logs',
+  status: 200,
+  ms: 21,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] response {
+  requestId: '003f5314-2af5-4982-be1a-f984a9bff096',
+  method: 'GET',
+  path: '/ai/tools',
+  status: 304,
+  ms: 28,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] request {
+  requestId: '6c5ec5bd-0eb6-4279-aa78-0b1f13d4e41a',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/tools',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '6c5ec5bd-0eb6-4279-aa78-0b1f13d4e41a',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/tools',
+  status: 204,
+  ms: 1,
+  user: 'undefined'
+}
+[HTTP] request {
+  requestId: '0188e896-1cb5-401a-8fa6-53829a4537cb',
+  method: 'OPTIONS',
+  path: '/api/admin/verify',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '0188e896-1cb5-401a-8fa6-53829a4537cb',
+  method: 'OPTIONS',
+  path: '/api/admin/verify',
+  status: 204,
+  ms: 1,
+  user: 'undefined'
+}
+[HTTP] request {
+  requestId: '7c99d74b-2cbc-49e7-be98-d744fe19da7f',
+  method: 'GET',
+  path: '/api/admin/ai/tools',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] request {
+  requestId: '18250c76-f3ac-467a-b271-95faec13f322',
+  method: 'GET',
+  path: '/api/admin/verify',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '18250c76-f3ac-467a-b271-95faec13f322',
+  method: 'GET',
+  path: '/verify',
+  status: 304,
+  ms: 5,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] response {
+  requestId: '7c99d74b-2cbc-49e7-be98-d744fe19da7f',
+  method: 'GET',
+  path: '/ai/tools',
+  status: 304,
+  ms: 10,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] request {
+  requestId: '2dea8b62-397e-41b2-8d69-0eb99543fed2',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/test-chat',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '2dea8b62-397e-41b2-8d69-0eb99543fed2',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/test-chat',
+  status: 204,
+  ms: 1,
+  user: 'undefined'
+}
+[HTTP] request {
+  requestId: 'da5098d6-b191-4238-9a04-3528574cbf7f',
+  method: 'POST',
+  path: '/api/admin/ai/test-chat',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: 'da5098d6-b191-4238-9a04-3528574cbf7f',
+  method: 'POST',
+  path: '/ai/test-chat',
+  status: 200,
+  ms: 1462,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] request {
+  requestId: 'cc3f0266-4190-4846-8131-cbf0bfcae4e8',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/debug-traces',
+  query: { take: '50' },
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: 'cc3f0266-4190-4846-8131-cbf0bfcae4e8',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/debug-traces',
+  status: 204,
+  ms: 1,
+  user: 'undefined'
+}
+[HTTP] request {
+  requestId: 'fcbcfb04-9b92-458f-bace-be4577985685',
+  method: 'OPTIONS',
+  path: '/api/admin/verify',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: 'fcbcfb04-9b92-458f-bace-be4577985685',
+  method: 'OPTIONS',
+  path: '/api/admin/verify',
+  status: 204,
+  ms: 0,
+  user: 'undefined'
+}
+[HTTP] request {
+  requestId: '58fbb0db-a106-463a-b06b-1719010b282d',
+  method: 'GET',
+  path: '/api/admin/ai/debug-traces',
+  query: { take: '50' },
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] request {
+  requestId: '35eb80c4-76c5-438b-a88f-19057bc57150',
+  method: 'GET',
+  path: '/api/admin/verify',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '35eb80c4-76c5-438b-a88f-19057bc57150',
+  method: 'GET',
+  path: '/verify',
+  status: 304,
+  ms: 6,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] response {
+  requestId: '58fbb0db-a106-463a-b06b-1719010b282d',
+  method: 'GET',
+  path: '/ai/debug-traces',
+  status: 304,
+  ms: 10,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] request {
+  requestId: 'f47d49ab-6e04-4f4e-9857-200824b6d59e',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/debug-traces',
+  query: { take: '50', cursor: 'a0ce23ce-9779-4582-ba20-fcd37d804f02' },
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: 'f47d49ab-6e04-4f4e-9857-200824b6d59e',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/debug-traces',
+  status: 204,
+  ms: 1,
+  user: 'undefined'
+}
+[HTTP] request {
+  requestId: '22b50a53-f9e8-4c5f-8ddc-d2f949ae66a3',
+  method: 'GET',
+  path: '/api/admin/ai/debug-traces',
+  query: { take: '50', cursor: 'a0ce23ce-9779-4582-ba20-fcd37d804f02' },
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '22b50a53-f9e8-4c5f-8ddc-d2f949ae66a3',
+  method: 'GET',
+  path: '/ai/debug-traces',
+  status: 304,
+  ms: 3,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] request {
+  requestId: '7bb11fb2-b6e1-48d0-91bc-3f80cae38f74',
+  method: 'GET',
+  path: '/api/admin/ai/debug-traces',
+  query: { take: '50', cursor: 'a0ce23ce-9779-4582-ba20-fcd37d804f02' },
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] request {
+  requestId: '38f89995-4664-4142-9eb3-82ab00253e77',
+  method: 'GET',
+  path: '/api/admin/ai/debug-traces',
+  query: { take: '50' },
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '7bb11fb2-b6e1-48d0-91bc-3f80cae38f74',
+  method: 'GET',
+  path: '/ai/debug-traces',
+  status: 304,
+  ms: 4,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] response {
+  requestId: '38f89995-4664-4142-9eb3-82ab00253e77',
+  method: 'GET',
+  path: '/ai/debug-traces',
+  status: 304,
+  ms: 4,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] request {
+  requestId: '51fabdbe-afed-4fd6-b62d-7431c3ce4984',
+  method: 'GET',
+  path: '/api/admin/ai/debug-traces',
+  query: { take: '50' },
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '51fabdbe-afed-4fd6-b62d-7431c3ce4984',
+  method: 'GET',
+  path: '/ai/debug-traces',
+  status: 304,
+  ms: 5,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[TeachersSheetsSyncService] dbToSheets failed: GaxiosError: Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:119100703907'.
+    at Gaxios._request (C:\Users\Apro\Documents\UniFlow\backend\node_modules\gaxios\src\gaxios.ts:146:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async JWT.requestAsync (C:\Users\Apro\Documents\UniFlow\backend\node_modules\google-auth-library\build\src\auth\oauth2client.js:429:18)
+    at async TeachersSheetsClient.getSheetValuesRange (C:\Users\Apro\Documents\UniFlow\backend\src\services\teachers-sheets\TeachersSheetsClient.ts:217:17)
+    at async TeachersSheetsSyncService.syncDbToSheets (C:\Users\Apro\Documents\UniFlow\backend\src\services\teachers-sheets\TeachersSheetsSyncService.ts:695:22)
+    at async TeachersSheetsSyncService.syncOnce (C:\Users\Apro\Documents\UniFlow\backend\src\services\teachers-sheets\TeachersSheetsSyncService.ts:588:11)
+    at async Timeout.runOnce (C:\Users\Apro\Documents\UniFlow\backend\src\services\teachers-sheets\TeachersSheetsWorker.ts:50:9) {
+  config: {
+    url: 'https://sheets.googleapis.com/v4/spreadsheets/1LCxhpHd-tkYPX_WxKa-NH4cu3f8KGr-VC_RcXlOM4Os/values/Employability%20Skills%21A1%3AZ?majorDimension=ROWS',
+    method: 'GET',
+    apiVersion: '',
+    userAgentDirectives: [ [Object] ],
+    paramsSerializer: [Function (anonymous)],
+    headers: {
+      'x-goog-api-client': 'gdcl/7.2.0 gl-node/22.18.0',
+      'Accept-Encoding': 'gzip',
+      'User-Agent': 'google-api-nodejs-client/7.2.0 (gzip)',
+      Authorization: '<<REDACTED> - See `errorRedactor` option in `gaxios` for configuration>.'        
+    },
+    params: { majorDimension: 'ROWS' },
+    validateStatus: [Function (anonymous)],
+    retry: true,
+    responseType: 'unknown',
+    errorRedactor: [Function: defaultErrorRedactor],
+    retryConfig: {
+      currentRetryAttempt: 3,
+      retry: 3,
+      httpMethodsToRetry: [Array],
+      noResponseRetries: 2,
+      retryDelayMultiplier: 2,
+      timeOfFirstRequest: 1774030030184,
+      totalTimeout: 9007199254740991,
+      maxRetryDelay: 9007199254740991,
+      statusCodesToRetry: [Array]
+    }
+  },
+  response: {
+    config: {
+      url: 'https://sheets.googleapis.com/v4/spreadsheets/1LCxhpHd-tkYPX_WxKa-NH4cu3f8KGr-VC_RcXlOM4Os/values/Employability%20Skills%21A1%3AZ?majorDimension=ROWS',
+      method: 'GET',
+      apiVersion: '',
+      userAgentDirectives: [Array],
+      paramsSerializer: [Function (anonymous)],
+      headers: [Object],
+      params: [Object],
+      validateStatus: [Function (anonymous)],
+      retry: true,
+      responseType: 'unknown',
+      errorRedactor: [Function: defaultErrorRedactor],
+      retryConfig: [Object]
+    },
+    data: { error: [Object] },
+    headers: {
+      'alt-svc': 'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000',
+      'content-encoding': 'gzip',
+      'content-type': 'application/json; charset=UTF-8',
+      date: 'Fri, 20 Mar 2026 18:04:33 GMT',
+      server: 'ESF',
+      'transfer-encoding': 'chunked',
+      vary: 'Origin, X-Origin, Referer',
+      'x-content-type-options': 'nosniff',
+      'x-frame-options': 'SAMEORIGIN',
+      'x-xss-protection': '0'
+    },
+    status: 429,
+    statusText: 'Too Many Requests',
+    request: {
+      responseURL: 'https://sheets.googleapis.com/v4/spreadsheets/1LCxhpHd-tkYPX_WxKa-NH4cu3f8KGr-VC_RcXlOM4Os/values/Employability%20Skills%21A1%3AZ?majorDimension=ROWS'
+    }
+  },
+  error: undefined,
+  status: 429,
+  code: 429,
+  errors: [
+    {
+      message: "Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:119100703907'.",
+      domain: 'global',
+      reason: 'rateLimitExceeded'
+    }
+  ],
+  [Symbol(gaxios-gaxios-error)]: '6.7.1'
+}
+[HTTP] request {
+  requestId: '9a468c01-04aa-4b4c-873c-44a9911ac648',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/debug-traces',
+  query: { take: '50' },
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '9a468c01-04aa-4b4c-873c-44a9911ac648',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/debug-traces',
+  status: 204,
+  ms: 1,
+  user: 'undefined'
+}
+[HTTP] request {
+  requestId: 'b7d6b9fe-4c16-44b3-9d5b-3a0781d6e7b7',
+  method: 'GET',
+  path: '/api/admin/ai/debug-traces',
+  query: { take: '50' },
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: 'b7d6b9fe-4c16-44b3-9d5b-3a0781d6e7b7',
+  method: 'GET',
+  path: '/ai/debug-traces',
+  status: 304,
+  ms: 10,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[SheetsSync] Row 3 skipped: email '2300129u@jdu.uz' is already used in this tab 
+[SheetsSync] Row 4 skipped: email '2300129u@jdu.uz' is already used in this tab 
+[SheetsSync] Failed to read sheet tab Employability 24 / Co-work 24 {
+  error: "Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:119100703907'."
+}
+[TeachersSheetsSyncService] Critical error during sync: GaxiosError: Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:119100703907'.
+    at Gaxios._request (C:\Users\Apro\Documents\UniFlow\backend\node_modules\gaxios\src\gaxios.ts:146:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async JWT.requestAsync (C:\Users\Apro\Documents\UniFlow\backend\node_modules\google-auth-library\build\src\auth\oauth2client.js:429:18)
+    at async TeachersSheetsClient.getSpreadsheetMetadata (C:\Users\Apro\Documents\UniFlow\backend\src\services\teachers-sheets\TeachersSheetsClient.ts:67:17)
+    at async TeachersSheetsSyncService.syncOnce (C:\Users\Apro\Documents\UniFlow\backend\src\services\teachers-sheets\TeachersSheetsSyncService.ts:149:20)
+    at async Timeout.runOnce (C:\Users\Apro\Documents\UniFlow\backend\src\services\teachers-sheets\TeachersSheetsWorker.ts:50:9) {
+  config: {
+    url: 'https://sheets.googleapis.com/v4/spreadsheets/1LCxhpHd-tkYPX_WxKa-NH4cu3f8KGr-VC_RcXlOM4Os?fields=spreadsheetId%2Cproperties.title%2Csheets.properties.sheetId%2Csheets.properties.title',
+    method: 'GET',
+    apiVersion: '',
+    userAgentDirectives: [ [Object] ],
+    paramsSerializer: [Function (anonymous)],
+    headers: {
+      'x-goog-api-client': 'gdcl/7.2.0 gl-node/22.18.0',
+      'Accept-Encoding': 'gzip',
+      'User-Agent': 'google-api-nodejs-client/7.2.0 (gzip)',
+      Authorization: '<<REDACTED> - See `errorRedactor` option in `gaxios` for configuration>.'        
+    },
+    params: {
+      fields: 'spreadsheetId,properties.title,sheets.properties.sheetId,sheets.properties.title'       
+    },
+    validateStatus: [Function (anonymous)],
+    retry: true,
+    responseType: 'unknown',
+    errorRedactor: [Function: defaultErrorRedactor],
+    retryConfig: {
+      currentRetryAttempt: 3,
+      retry: 3,
+      httpMethodsToRetry: [Array],
+      noResponseRetries: 2,
+      retryDelayMultiplier: 2,
+      timeOfFirstRequest: 1774030042089,
+      totalTimeout: 9007199254740991,
+      maxRetryDelay: 9007199254740991,
+      statusCodesToRetry: [Array]
+    }
+  },
+  response: {
+    config: {
+      url: 'https://sheets.googleapis.com/v4/spreadsheets/1LCxhpHd-tkYPX_WxKa-NH4cu3f8KGr-VC_RcXlOM4Os?fields=spreadsheetId%2Cproperties.title%2Csheets.properties.sheetId%2Csheets.properties.title',        
+      method: 'GET',
+      apiVersion: '',
+      userAgentDirectives: [Array],
+      paramsSerializer: [Function (anonymous)],
+      headers: [Object],
+      params: [Object],
+      validateStatus: [Function (anonymous)],
+      retry: true,
+      responseType: 'unknown',
+      errorRedactor: [Function: defaultErrorRedactor],
+      retryConfig: [Object]
+    },
+    data: { error: [Object] },
+    headers: {
+      'alt-svc': 'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000',
+      'content-encoding': 'gzip',
+      'content-type': 'application/json; charset=UTF-8',
+      date: 'Fri, 20 Mar 2026 18:04:45 GMT',
+      server: 'ESF',
+      'transfer-encoding': 'chunked',
+      vary: 'Origin, X-Origin, Referer',
+      'x-content-type-options': 'nosniff',
+      'x-frame-options': 'SAMEORIGIN',
+      'x-xss-protection': '0'
+    },
+    status: 429,
+    statusText: 'Too Many Requests',
+    request: {
+      responseURL: 'https://sheets.googleapis.com/v4/spreadsheets/1LCxhpHd-tkYPX_WxKa-NH4cu3f8KGr-VC_RcXlOM4Os?fields=spreadsheetId%2Cproperties.title%2Csheets.properties.sheetId%2Csheets.properties.title' 
+    }
+  },
+  error: undefined,
+  status: 429,
+  code: 429,
+  errors: [
+    {
+      message: "Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:119100703907'.",
+      domain: 'global',
+      reason: 'rateLimitExceeded'
+    }
+  ],
+  [Symbol(gaxios-gaxios-error)]: '6.7.1'
+}
+[TeachersSheetsWorker] sync failed GaxiosError: Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:119100703907'.
+    at Gaxios._request (C:\Users\Apro\Documents\UniFlow\backend\node_modules\gaxios\src\gaxios.ts:146:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async JWT.requestAsync (C:\Users\Apro\Documents\UniFlow\backend\node_modules\google-auth-library\build\src\auth\oauth2client.js:429:18)
+    at async TeachersSheetsClient.getSpreadsheetMetadata (C:\Users\Apro\Documents\UniFlow\backend\src\services\teachers-sheets\TeachersSheetsClient.ts:67:17)
+    at async TeachersSheetsSyncService.syncOnce (C:\Users\Apro\Documents\UniFlow\backend\src\services\teachers-sheets\TeachersSheetsSyncService.ts:149:20)
+    at async Timeout.runOnce (C:\Users\Apro\Documents\UniFlow\backend\src\services\teachers-sheets\TeachersSheetsWorker.ts:50:9) {
+  config: {
+    url: 'https://sheets.googleapis.com/v4/spreadsheets/1LCxhpHd-tkYPX_WxKa-NH4cu3f8KGr-VC_RcXlOM4Os?fields=spreadsheetId%2Cproperties.title%2Csheets.properties.sheetId%2Csheets.properties.title',
+    method: 'GET',
+    apiVersion: '',
+    userAgentDirectives: [ [Object] ],
+    paramsSerializer: [Function (anonymous)],
+    headers: {
+      'x-goog-api-client': 'gdcl/7.2.0 gl-node/22.18.0',
+      'Accept-Encoding': 'gzip',
+      'User-Agent': 'google-api-nodejs-client/7.2.0 (gzip)',
+      Authorization: '<<REDACTED> - See `errorRedactor` option in `gaxios` for configuration>.'        
+    },
+    params: {
+      fields: 'spreadsheetId,properties.title,sheets.properties.sheetId,sheets.properties.title'       
+    },
+    validateStatus: [Function (anonymous)],
+    retry: true,
+    responseType: 'unknown',
+    errorRedactor: [Function: defaultErrorRedactor],
+    retryConfig: {
+      currentRetryAttempt: 3,
+      retry: 3,
+      httpMethodsToRetry: [Array],
+      noResponseRetries: 2,
+      retryDelayMultiplier: 2,
+      timeOfFirstRequest: 1774030042089,
+      totalTimeout: 9007199254740991,
+      maxRetryDelay: 9007199254740991,
+      statusCodesToRetry: [Array]
+    }
+  },
+  response: {
+    config: {
+      url: 'https://sheets.googleapis.com/v4/spreadsheets/1LCxhpHd-tkYPX_WxKa-NH4cu3f8KGr-VC_RcXlOM4Os?fields=spreadsheetId%2Cproperties.title%2Csheets.properties.sheetId%2Csheets.properties.title',        
+      method: 'GET',
+      apiVersion: '',
+      userAgentDirectives: [Array],
+      paramsSerializer: [Function (anonymous)],
+      headers: [Object],
+      params: [Object],
+      validateStatus: [Function (anonymous)],
+      retry: true,
+      responseType: 'unknown',
+      errorRedactor: [Function: defaultErrorRedactor],
+      retryConfig: [Object]
+    },
+    data: { error: [Object] },
+    headers: {
+      'alt-svc': 'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000',
+      'content-encoding': 'gzip',
+      'content-type': 'application/json; charset=UTF-8',
+      date: 'Fri, 20 Mar 2026 18:04:45 GMT',
+      server: 'ESF',
+      'transfer-encoding': 'chunked',
+      vary: 'Origin, X-Origin, Referer',
+      'x-content-type-options': 'nosniff',
+      'x-frame-options': 'SAMEORIGIN',
+      'x-xss-protection': '0'
+    },
+    status: 429,
+    statusText: 'Too Many Requests',
+    request: {
+      responseURL: 'https://sheets.googleapis.com/v4/spreadsheets/1LCxhpHd-tkYPX_WxKa-NH4cu3f8KGr-VC_RcXlOM4Os?fields=spreadsheetId%2Cproperties.title%2Csheets.properties.sheetId%2Csheets.properties.title' 
+    }
+  },
+  error: undefined,
+  status: 429,
+  code: 429,
+  errors: [
+    {
+      message: "Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:119100703907'.",
+      domain: 'global',
+      reason: 'rateLimitExceeded'
+    }
+  ],
+  [Symbol(gaxios-gaxios-error)]: '6.7.1'
+}
+[SheetsSync] Failed to read sheet tab Employability 25 A {
+  error: "Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:119100703907'."
+}
+[SheetsSync] Failed to read sheet tab Employability 25 B {
+  error: "Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:119100703907'."
+}
+[HTTP] request {
+  requestId: '38b68b60-01ed-44ad-894a-0f0c5da82464',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/debug-traces',
+  query: { take: '50' },
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '38b68b60-01ed-44ad-894a-0f0c5da82464',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/debug-traces',
+  status: 204,
+  ms: 1,
+  user: 'undefined'
+}
+[HTTP] request {
+  requestId: '5478285f-1b84-4f5d-b27b-ad8f270b073a',
+  method: 'GET',
+  path: '/api/admin/ai/debug-traces',
+  query: { take: '50' },
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '5478285f-1b84-4f5d-b27b-ad8f270b073a',
+  method: 'GET',
+  path: '/ai/debug-traces',
+  status: 304,
+  ms: 7,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] request {
+  requestId: 'da0b4013-8606-4ee3-8d5c-07db5e0d6251',
+  method: 'GET',
+  path: '/api/admin/ai/debug-traces',
+  query: { take: '50' },
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: 'da0b4013-8606-4ee3-8d5c-07db5e0d6251',
+  method: 'GET',
+  path: '/ai/debug-traces',
+  status: 304,
+  ms: 7,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] request {
+  requestId: '44fc4d2b-44fa-4dec-9303-9eaa44bc5f4c',
+  method: 'OPTIONS',
+  path: '/api/admin/verify',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '44fc4d2b-44fa-4dec-9303-9eaa44bc5f4c',
+  method: 'OPTIONS',
+  path: '/api/admin/verify',
+  status: 204,
+  ms: 1,
+  user: 'undefined'
+}
+[HTTP] request {
+  requestId: 'b64df7ff-f8d0-46bd-a4fc-081214576cc7',
+  method: 'OPTIONS',
+  path: '/api/admin/verify',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: 'b64df7ff-f8d0-46bd-a4fc-081214576cc7',
+  method: 'OPTIONS',
+  path: '/api/admin/verify',
+  status: 204,
+  ms: 1,
+  user: 'undefined'
+}
+[HTTP] request {
+  requestId: '21a867ac-3f6a-4ae1-8ee0-8bb6b4e44183',
+  method: 'GET',
+  path: '/api/admin/verify',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '21a867ac-3f6a-4ae1-8ee0-8bb6b4e44183',
+  method: 'GET',
+  path: '/verify',
+  status: 304,
+  ms: 4,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] request {
+  requestId: '267b1db8-34fb-478f-90e8-54873a9686c5',
+  method: 'GET',
+  path: '/api/admin/verify',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '267b1db8-34fb-478f-90e8-54873a9686c5',
+  method: 'GET',
+  path: '/verify',
+  status: 304,
+  ms: 4,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] request {
+  requestId: 'c2b3d25c-1b8d-4ad2-82ff-9941a5b9aca6',
+  method: 'GET',
+  path: '/api/admin/ai/debug-traces',
+  query: { take: '50' },
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: 'c2b3d25c-1b8d-4ad2-82ff-9941a5b9aca6',
+  method: 'GET',
+  path: '/ai/debug-traces',
+  status: 304,
+  ms: 5,
+  user: {
+    id: '9825e1a6-69b4-4170-affb-59351124369e',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[SheetsSync] Row 3 skipped: email '2300129u@jdu.uz' is already used in this tab 
+[SheetsSync] Row 4 skipped: email '2300129u@jdu.uz' is already used in this tab 

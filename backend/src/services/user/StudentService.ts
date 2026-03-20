@@ -4,12 +4,13 @@ import { formatDbTime } from "../../utils/time";
 
 export class StudentService {
   async getTodaySchedule(studentId: string) {
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
-      select: { id: true, groupId: true },
+    const membership = await prisma.studentGroup.findFirst({
+      where: { studentId, leftAt: null },
+      select: { groupId: true },
+      orderBy: [{ joinedAt: "desc" }, { createdAt: "desc" }],
     });
 
-    if (!student?.groupId) {
+    if (!membership?.groupId) {
       return [];
     }
 
@@ -17,7 +18,7 @@ export class StudentService {
 
     const rows = await prisma.scheduleEntry.findMany({
       where: {
-        groupId: student.groupId,
+        groupId: membership.groupId,
         weekday,
         OR: [
           { effectiveFrom: null, effectiveTo: null },
@@ -77,12 +78,13 @@ export class StudentService {
   }
 
   async getTodayLessonsFromLessonTable(studentId: string) {
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
+    const membership = await prisma.studentGroup.findFirst({
+      where: { studentId, leftAt: null },
       select: { groupId: true },
+      orderBy: [{ joinedAt: "desc" }, { createdAt: "desc" }],
     });
 
-    if (!student?.groupId) {
+    if (!membership?.groupId) {
       return [];
     }
 
@@ -90,7 +92,7 @@ export class StudentService {
 
     return prisma.lesson.findMany({
       where: {
-        groupId: student.groupId,
+        groupId: membership.groupId,
         startsAt: { gte: start, lt: end },
       },
       include: {

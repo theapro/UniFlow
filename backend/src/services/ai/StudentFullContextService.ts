@@ -154,38 +154,45 @@ export class StudentFullContextService {
     const row = await prisma.student.findUnique({
       where: { id: studentId },
       include: {
-        group: {
+        studentGroups: {
+          where: { leftAt: null },
           include: {
-            cohort: { select: { id: true, code: true, year: true } },
-            gradeBooks: {
-              select: {
-                id: true,
-                subject: { select: { id: true, name: true } },
-                updatedAt: true,
-              },
-              orderBy: { updatedAt: "desc" },
-              take: 50,
-            },
-            scheduleEntries: {
+            group: {
               include: {
-                subject: { select: { id: true, name: true } },
-                teacher: { select: { id: true, fullName: true } },
-                timeSlot: {
+                cohort: { select: { id: true, code: true, year: true } },
+                gradeBooks: {
                   select: {
                     id: true,
-                    slotNumber: true,
-                    startTime: true,
-                    endTime: true,
+                    subject: { select: { id: true, name: true } },
+                    updatedAt: true,
                   },
+                  orderBy: { updatedAt: "desc" },
+                  take: 50,
                 },
-                room: { select: { id: true, name: true } },
+                scheduleEntries: {
+                  include: {
+                    subject: { select: { id: true, name: true } },
+                    teacher: { select: { id: true, fullName: true } },
+                    timeSlot: {
+                      select: {
+                        id: true,
+                        slotNumber: true,
+                        startTime: true,
+                        endTime: true,
+                      },
+                    },
+                    room: { select: { id: true, name: true } },
+                  },
+                  orderBy: [
+                    { weekday: "asc" },
+                    { timeSlot: { slotNumber: "asc" } },
+                  ],
+                },
               },
-              orderBy: [
-                { weekday: "asc" },
-                { timeSlot: { slotNumber: "asc" } },
-              ],
             },
           },
+          orderBy: [{ joinedAt: "desc" }, { createdAt: "desc" }],
+          take: 1,
         },
         attendance: {
           include: {
@@ -217,10 +224,12 @@ export class StudentFullContextService {
 
     if (!row) return null;
 
-    const scheduleEntries = row.group?.scheduleEntries ?? [];
+    const group = row.studentGroups[0]?.group ?? null;
+
+    const scheduleEntries = group?.scheduleEntries ?? [];
 
     const gradeBookSubjects = uniqById(
-      (row.group?.gradeBooks ?? [])
+      (group?.gradeBooks ?? [])
         .map((b) => b.subject)
         .filter((s): s is { id: string; name: string } => Boolean(s?.id)),
     );
@@ -404,7 +413,7 @@ export class StudentFullContextService {
         .filter(Boolean) as string[],
     );
     const hasGradesSubjectIds = new Set(
-      (row.group?.gradeBooks ?? [])
+      (group?.gradeBooks ?? [])
         .map((b) => b.subject?.id)
         .filter(Boolean) as string[],
     );
@@ -449,15 +458,15 @@ export class StudentFullContextService {
         phone: row.phone ?? null,
         status: row.status ? String(row.status) : null,
       },
-      group: row.group
+      group: group
         ? {
-            id: row.group.id,
-            name: row.group.name,
-            cohort: row.group.cohort
+            id: group!.id,
+            name: group!.name,
+            cohort: group!.cohort
               ? {
-                  id: row.group.cohort.id,
-                  code: row.group.cohort.code,
-                  year: row.group.cohort.year ?? null,
+                  id: group!.cohort.id,
+                  code: group!.cohort.code,
+                  year: group!.cohort.year ?? null,
                 }
               : null,
           }

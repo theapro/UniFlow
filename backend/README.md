@@ -81,7 +81,7 @@ cp .env.example .env
 Edit `.env`:
 
 ```env
-DATABASE_URL="postgresql://user:password@localhost:5432/uniflow"
+DATABASE_URL="mysql://user:password@localhost:3306/uniflow"
 JWT_SECRET="your-secret-key"
 JWT_EXPIRES_IN="7d"
 PORT=3001
@@ -97,8 +97,8 @@ npx prisma db seed
 # Dev reset (drops all tables, re-applies migrations, re-seeds)
 npm run db:reset
 
-# Optional (legacy/manual): raw SQL schema init
-# psql -U postgres -d uniflow -f database.sql
+# Optional: generate a raw SQL snapshot
+# npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > database.sql
 ```
 
 ### 4. Run

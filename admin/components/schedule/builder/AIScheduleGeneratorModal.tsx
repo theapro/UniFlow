@@ -281,6 +281,60 @@ export function AIScheduleGeneratorModal(props: {
     }
   }
 
+  async function onOneTapGenerate() {
+    if (submitting) return;
+
+    if (!Number.isFinite(month) || month < 1 || month > 12) {
+      toast.error("Month is required");
+      return;
+    }
+    if (!Number.isFinite(year) || year < 2000 || year > 2100) {
+      toast.error("Year must be 2000..2100");
+      return;
+    }
+
+    const wd = selectedWorkingDayValues();
+    if (!wd.length) {
+      toast.error("Select at least one working day");
+      return;
+    }
+
+    const holidays = parseHolidayNotesToIsoDates({
+      text: holidayNotes,
+      year,
+      month,
+    });
+
+    setPageBusy({ label: "One tap generating…" });
+    setSubmitting(true);
+    try {
+      const res = await aiScheduleApi.oneTapGenerate({
+        month,
+        year,
+        workingDays: wd,
+        holidays,
+        notes: notes.trim() ? notes.trim() : undefined,
+      });
+
+      const created = res.data?.data?.created;
+      toast.success(
+        typeof created === "number"
+          ? `Schedule generated (${created} lessons)`
+          : "Schedule generated",
+      );
+
+      props.onOpenChange(false);
+      await props.onGenerated();
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.message ?? "Failed to one tap generate schedule",
+      );
+    } finally {
+      setSubmitting(false);
+      setPageBusy(null);
+    }
+  }
+
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className="max-w-3xl">
@@ -498,6 +552,14 @@ export function AIScheduleGeneratorModal(props: {
             disabled={submitting}
           >
             Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onOneTapGenerate}
+            disabled={submitting}
+          >
+            {submitting ? "Generating…" : "One tap generate"}
           </Button>
           <Button type="button" onClick={onGenerate} disabled={submitting}>
             {submitting ? "Generating…" : "Generate Schedule"}

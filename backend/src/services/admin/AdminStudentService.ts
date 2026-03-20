@@ -12,11 +12,9 @@ export type CreateStudentInput = {
   studentNo?: string | null;
   phone?: string | null;
   status?: "ACTIVE" | "INACTIVE" | "GRADUATED" | "DROPPED";
-  teacherIds?: string[];
   parentIds?: string[];
   note?: string | null;
   groupId: string;
-  cohort?: string | null;
 };
 
 export type UpdateStudentInput = {
@@ -25,9 +23,7 @@ export type UpdateStudentInput = {
   studentNo?: string | null;
   phone?: string | null;
   status?: "ACTIVE" | "INACTIVE" | "GRADUATED" | "DROPPED";
-  teacherIds?: string[];
   parentIds?: string[];
-  cohort?: string | null;
   note?: string | null;
   groupId?: string | null;
 };
@@ -57,13 +53,20 @@ export class AdminStudentService {
       : {};
 
     if (params?.groupId) {
-      where.groupId = params.groupId;
+      where.studentGroups = {
+        some: { groupId: params.groupId, leftAt: null },
+      };
     }
 
-    return prisma.student.findMany({
+    const rows = await prisma.student.findMany({
       where,
       include: {
-        group: true,
+        studentGroups: {
+          where: { leftAt: null },
+          include: { group: true },
+          orderBy: [{ joinedAt: "desc" }, { createdAt: "desc" }],
+          take: 1,
+        },
         user: {
           select: { email: true, lastLoginAt: true, credentialsSentAt: true },
         },
@@ -72,18 +75,37 @@ export class AdminStudentService {
       take: params?.take ?? 50,
       skip: params?.skip ?? 0,
     });
+
+    return rows.map((s) => ({
+      ...s,
+      group: s.studentGroups[0]?.group ?? null,
+      studentGroups: undefined,
+    }));
   }
 
   async getById(id: string) {
-    return prisma.student.findUnique({
+    const row = await prisma.student.findUnique({
       where: { id },
       include: {
-        group: true,
+        studentGroups: {
+          where: { leftAt: null },
+          include: { group: true },
+          orderBy: [{ joinedAt: "desc" }, { createdAt: "desc" }],
+          take: 1,
+        },
         user: {
           select: { email: true, lastLoginAt: true, credentialsSentAt: true },
         },
       },
     });
+
+    if (!row) return null;
+
+    return {
+      ...row,
+      group: row.studentGroups[0]?.group ?? null,
+      studentGroups: undefined,
+    };
   }
 
   async create(input: CreateStudentInput) {
@@ -120,18 +142,18 @@ export class AdminStudentService {
           email: input.email,
           phone: input.phone ?? null,
           status: input.status ?? "ACTIVE",
-          teacherIds: input.teacherIds ?? [],
           parentIds: input.parentIds ?? [],
           note: input.note ?? null,
-          groupId: group.id,
-          groupName: group.name,
-          cohort:
-            input.cohort ||
-            group.cohort?.code ||
-            (group.cohort?.year ? String(group.cohort.year) : null),
-          updatedAt: new Date(),
         },
-        include: { group: true },
+      });
+
+      await tx.studentGroup.create({
+        data: {
+          studentId: createdStudent.id,
+          groupId: group.id,
+          joinedAt: new Date(),
+          leftAt: null,
+        },
       });
 
       const createdUser = await tx.user.create({
@@ -182,7 +204,12 @@ export class AdminStudentService {
     const createdStudent = await prisma.student.findUnique({
       where: { id: student.id },
       include: {
-        group: true,
+        studentGroups: {
+          where: { leftAt: null },
+          include: { group: true },
+          orderBy: [{ joinedAt: "desc" }, { createdAt: "desc" }],
+          take: 1,
+        },
         user: {
           select: { email: true, lastLoginAt: true, credentialsSentAt: true },
         },
@@ -193,7 +220,8 @@ export class AdminStudentService {
       const outbox = new StudentsSheetsOutboxService(prisma);
       await outbox.enqueueUpsert({
         studentId: student.id,
-        targetSheetTitle: createdStudent?.group?.name ?? null,
+        targetSheetTitle:
+          createdStudent?.studentGroups?.[0]?.group?.name ?? null,
       });
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -201,7 +229,13 @@ export class AdminStudentService {
     }
 
     return {
-      student: createdStudent,
+      student: createdStudent
+        ? {
+            ...createdStudent,
+            group: createdStudent.studentGroups[0]?.group ?? null,
+            studentGroups: undefined,
+          }
+        : null,
       credentials: {
         email: user.email,
         password,
@@ -236,35 +270,47 @@ export class AdminStudentService {
             : {}),
           ...(input.phone !== undefined ? { phone: input.phone } : {}),
           ...(input.status !== undefined ? { status: input.status } : {}),
-          ...(input.teacherIds !== undefined
-            ? { teacherIds: input.teacherIds }
-            : {}),
           ...(input.parentIds !== undefined
             ? { parentIds: input.parentIds }
             : {}),
-          ...(input.cohort !== undefined ? { cohort: input.cohort } : {}),
           ...(input.note !== undefined ? { note: input.note } : {}),
-          ...(input.groupId !== undefined
-            ? {
-                groupId: group?.id ?? null,
-                groupName: group?.name ?? null,
-                ...(input.cohort !== undefined
-                  ? {}
-                  : {
-                      cohort: group?.cohort?.year
-                        ? group?.cohort?.code || String(group.cohort.year)
-                        : group?.cohort?.code || null,
-                    }),
-              }
-            : {}),
-          updatedAt: new Date(),
         },
-        include: { group: true, user: { select: { id: true, email: true } } },
+        include: {
+          user: { select: { id: true, email: true } },
+          studentGroups: {
+            where: { leftAt: null },
+            include: { group: true },
+            orderBy: [{ joinedAt: "desc" }, { createdAt: "desc" }],
+            take: 1,
+          },
+        },
       });
+
+      if (input.groupId !== undefined) {
+        await tx.studentGroup.updateMany({
+          where: { studentId: id, leftAt: null },
+          data: { leftAt: new Date() },
+        });
+
+        if (group?.id) {
+          await tx.studentGroup.create({
+            data: {
+              studentId: id,
+              groupId: group.id,
+              joinedAt: new Date(),
+              leftAt: null,
+            },
+          });
+        }
+      }
 
       if (!input.email) {
         return {
-          student: updatedStudent,
+          student: {
+            ...updatedStudent,
+            group: updatedStudent.studentGroups[0]?.group ?? null,
+            studentGroups: undefined,
+          },
           credentialsToEmail: null as null | { to: string; password: string },
         };
       }
@@ -272,7 +318,11 @@ export class AdminStudentService {
       // If user exists and email didn't change, do nothing
       if (updatedStudent.user && updatedStudent.user.email === input.email) {
         return {
-          student: updatedStudent,
+          student: {
+            ...updatedStudent,
+            group: updatedStudent.studentGroups[0]?.group ?? null,
+            studentGroups: undefined,
+          },
           credentialsToEmail: null as null | { to: string; password: string },
         };
       }
@@ -299,6 +349,8 @@ export class AdminStudentService {
           student: {
             ...updatedStudent,
             user: { email: input.email },
+            group: updatedStudent.studentGroups[0]?.group ?? null,
+            studentGroups: undefined,
           },
           credentialsToEmail: { to: input.email, password },
         };
@@ -318,6 +370,8 @@ export class AdminStudentService {
         student: {
           ...updatedStudent,
           user: { email: input.email },
+          group: updatedStudent.studentGroups[0]?.group ?? null,
+          studentGroups: undefined,
         },
         credentialsToEmail: { to: input.email, password },
       };
@@ -343,7 +397,12 @@ export class AdminStudentService {
     const updated = await prisma.student.findUnique({
       where: { id },
       include: {
-        group: true,
+        studentGroups: {
+          where: { leftAt: null },
+          include: { group: true },
+          orderBy: [{ joinedAt: "desc" }, { createdAt: "desc" }],
+          take: 1,
+        },
         user: {
           select: { email: true, lastLoginAt: true, credentialsSentAt: true },
         },
@@ -354,14 +413,20 @@ export class AdminStudentService {
       const outbox = new StudentsSheetsOutboxService(prisma);
       await outbox.enqueueUpsert({
         studentId: id,
-        targetSheetTitle: updated?.group?.name ?? null,
+        targetSheetTitle: updated?.studentGroups?.[0]?.group?.name ?? null,
       });
     } catch (e) {
       // eslint-disable-next-line no-console
       console.warn("[SheetsSync][Outbox] failed to enqueue student update", e);
     }
 
-    return updated;
+    return updated
+      ? {
+          ...updated,
+          group: updated.studentGroups[0]?.group ?? null,
+          studentGroups: undefined,
+        }
+      : null;
   }
 
   async resendCredentials(id: string) {
@@ -415,7 +480,14 @@ export class AdminStudentService {
   async remove(id: string) {
     const before = await prisma.student.findUnique({
       where: { id },
-      include: { group: { select: { name: true } } },
+      include: {
+        studentGroups: {
+          where: { leftAt: null },
+          select: { group: { select: { name: true } } },
+          orderBy: [{ joinedAt: "desc" }, { createdAt: "desc" }],
+          take: 1,
+        },
+      },
     });
 
     await prisma.$transaction(async (tx) => {
@@ -431,6 +503,8 @@ export class AdminStudentService {
         await tx.user.delete({ where: { id: student.user.id } });
       }
 
+      await tx.studentGroup.deleteMany({ where: { studentId: id } });
+
       await tx.student.delete({ where: { id } });
     });
 
@@ -438,11 +512,11 @@ export class AdminStudentService {
       const outbox = new StudentsSheetsOutboxService(prisma);
       await outbox.enqueueDelete({
         studentId: id,
-        lastKnownSheetTitle: before?.group?.name ?? null,
+        lastKnownSheetTitle: before?.studentGroups?.[0]?.group?.name ?? null,
         payload: before
           ? {
               student_uuid: before.id,
-              group: before.group?.name ?? null,
+              group: before.studentGroups?.[0]?.group?.name ?? null,
             }
           : undefined,
       });

@@ -21,11 +21,11 @@ export class ScheduleController {
           return fail(res, 400, "Student profile not linked");
         }
 
-        const student = await this.scheduleService.getScheduleByGroupId(
+        const schedule = await this.scheduleService.getScheduleByStudentId(
           user.studentId,
           weekday,
         );
-        return ok(res, "Schedule fetched", student);
+        return ok(res, "Schedule fetched", schedule);
       }
 
       if (user.role === UserRole.TEACHER) {

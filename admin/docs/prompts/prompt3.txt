@@ -1,0 +1,129 @@
+AI ni improve qilish kerak 
+
+1. Scheduleda allaqachon teacher_uuid subject va guruh boglangan  ammo student so'raganda javob bera olamayapti ai ma'lumotlarni db dan ola olmayapti.
+
+aniqrogi ma'lumotlar db ga to'gri saqlanmayapti student ma'lumotlari to'lqi  yaxshiroq saqlanishi kerak 
+
+yo'q teacher saqlangan ekan ammo ai javob bera olmayapti bu ROW bittasida teacher saqlangan
+
+03e90a08-3f4f-4a86-b4d6-e6b288051772	Merve Yılmaz	debc3625-240a-4004-aa39-b3e08e343120	2026-03-18 19:06:26.009	2026-03-18 19:06:26.009	merve.y.lmaz.employability19202.01@apro.edu				ACTIVE	EMPLOYABILITY19202-01			Employability 19/20/21 / Co-work 19/20/21
+050585c0-cf69-4082-b429-8f0564105a6b	Ulanbek Soliyev	fb2193b4-5b68-49c0-ba33-3a678ab4206b	2026-03-18 19:12:50.356	2026-03-18 19:12:50.355	2300129u@jdu.uz		[]		ACTIVE	2300129	["706bda48-7fa1-4734-b603-71d2d879d065"]	2023	23C
+
+
+
+va bu tableda schedulega bog'liq m'lumotlarni saqlash to'gri bo'ladimi 
+
+boshqa errorlar 
+
+  }
+}
+[HTTP] response {
+  requestId: '9f52e1ed-39c6-45bc-a291-21daffc279a3',
+  method: 'GET',
+  path: '/ai/logs',
+  status: 200,
+  ms: 12,
+  user: {
+    id: 'f5a9f1a3-ad33-46cb-b459-a5784544d4be',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] request {
+  requestId: 'd88b71f4-f839-468a-8732-8b2396376a42',
+  method: 'OPTIONS',
+  path: '/api/admin/verify',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: 'd88b71f4-f839-468a-8732-8b2396376a42',
+  method: 'OPTIONS',
+  path: '/api/admin/verify',
+  status: 204,
+  ms: 1,
+  user: 'undefined'
+}
+[HTTP] request {
+  requestId: '3032254e-2536-4426-9987-059e297a4dcc',
+  method: 'GET',
+  path: '/api/admin/verify',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '3032254e-2536-4426-9987-059e297a4dcc',
+  method: 'GET',
+  path: '/verify',
+  status: 304,
+  ms: 4,
+  user: {
+    id: 'f5a9f1a3-ad33-46cb-b459-a5784544d4be',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}
+[HTTP] request {
+  requestId: '0339b9b0-0fc9-4af7-a18e-857c27c0912f',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/test-chat',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+[HTTP] response {
+  requestId: '0339b9b0-0fc9-4af7-a18e-857c27c0912f',
+  method: 'OPTIONS',
+  path: '/api/admin/ai/test-chat',
+  status: 204,
+  ms: 1,
+  user: 'undefined'
+}
+[HTTP] request {
+  requestId: '86811d7c-ffe1-4dd8-a819-d8f771bd3334',
+  method: 'POST',
+  path: '/api/admin/ai/test-chat',
+  query: {},
+  origin: 'http://localhost:3000',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+}
+AdminAiTestController.chat failed: PrismaClientKnownRequestError: 
+Invalid `prisma.aiUsageLog.update()` invocation in
+C:\Users\Apro\Documents\UniFlow\backend\src\services\ai\AiUsageLogService.ts:41:29
+
+  38   ms: number | null;
+  39   meta?: any;
+  40 }): Promise<void> {
+→ 41   await prisma.aiUsageLog.update(
+The provided value for the column is too long for the column's type. Column: error
+    at ei.handleRequestError (C:\Users\Apro\Documents\UniFlow\backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:228:13)
+    at ei.handleAndLogRequestError (C:\Users\Apro\Documents\UniFlow\backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:174:12)
+    at ei.request (C:\Users\Apro\Documents\UniFlow\backend\node_modules\@prisma\client\src\runtime\RequestHandler.ts:143:12)
+    at async a (C:\Users\Apro\Documents\UniFlow\backend\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:833:24)
+    at async AiUsageLogService.logFinish (C:\Users\Apro\Documents\UniFlow\backend\src\services\ai\AiUsageLogService.ts:41:5)
+    at async AiAssistantService.chat (C:\Users\Apro\Documents\UniFlow\backend\src\services\ai\AiAssistantService.ts:465:7)
+    at async chat (C:\Users\Apro\Documents\UniFlow\backend\src\controllers\admin\AdminAiTestController.ts:45:22) {
+  code: 'P2000',
+  meta: { modelName: 'AiUsageLog', column_name: 'error' },
+  clientVersion: '6.19.2'
+}
+[HTTP] response {
+  requestId: '86811d7c-ffe1-4dd8-a819-d8f771bd3334',
+  method: 'POST',
+  path: '/ai/test-chat',
+  status: 500,
+  ms: 5328,
+  user: {
+    id: 'f5a9f1a3-ad33-46cb-b459-a5784544d4be',
+    email: 'admin@uniflow.com',
+    role: 'ADMIN',
+    studentId: null,
+    teacherId: null
+  }
+}

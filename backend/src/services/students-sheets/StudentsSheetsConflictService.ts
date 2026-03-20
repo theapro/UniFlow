@@ -191,7 +191,6 @@ export class StudentsSheetsConflictService {
     const client = new StudentsSheetsClient({ spreadsheetId });
 
     const applyToDb = async () => {
-      const cohort = String(finalPayloadRaw.cohort ?? "").trim() || null;
       const studentNumber =
         String(finalPayloadRaw.student_number ?? "").trim() || null;
       const fullName = String(finalPayloadRaw.fullname ?? "").trim();
@@ -200,7 +199,6 @@ export class StudentsSheetsConflictService {
       const email = String(finalPayloadRaw.email ?? "").trim() || null;
       const phone = String(finalPayloadRaw.phone ?? "").trim() || null;
       const status = parseStatus(String(finalPayloadRaw.status ?? ""));
-      const teacherIds = parseCsvIds(String(finalPayloadRaw.teacher_ids ?? ""));
       const parentIds = parseCsvIds(String(finalPayloadRaw.parent_ids ?? ""));
       const note = String(finalPayloadRaw.note ?? "").trim() || null;
 
@@ -225,11 +223,7 @@ export class StudentsSheetsConflictService {
           email,
           phone,
           status,
-          teacherIds,
           parentIds,
-          cohort,
-          groupName: sheetTitle,
-          groupId: group.id,
           note,
           updatedAt,
         },
@@ -240,14 +234,35 @@ export class StudentsSheetsConflictService {
           email,
           phone,
           status,
-          teacherIds,
           parentIds,
-          cohort,
-          groupName: sheetTitle,
-          groupId: group.id,
           note,
           createdAt,
           updatedAt,
+        },
+        select: { id: true },
+      });
+
+      // Ensure this student is actively linked to the group.
+      const now = new Date();
+      await this.prisma.studentGroup.updateMany({
+        where: {
+          studentId: studentUuid,
+          leftAt: null,
+          groupId: { not: group.id },
+        },
+        data: { leftAt: now },
+      });
+
+      await this.prisma.studentGroup.upsert({
+        where: {
+          studentId_groupId: { studentId: studentUuid, groupId: group.id },
+        },
+        update: { leftAt: null },
+        create: {
+          studentId: studentUuid,
+          groupId: group.id,
+          joinedAt: now,
+          leftAt: null,
         },
         select: { id: true },
       });

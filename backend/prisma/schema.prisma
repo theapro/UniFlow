@@ -56,7 +56,7 @@ model Group {
   parentGroup     ParentGroup?    @relation(fields: [parentGroupId], references: [id], onDelete: SetNull)
   lessons         Lesson[]
   scheduleEntries ScheduleEntry[]
-  students        Student[]
+  studentGroups   StudentGroup[]
   gradeBooks      GradeBook[]
 
   schedules Schedule[]
@@ -96,24 +96,37 @@ model Cohort {
 model Student {
   id            String        @id @default(uuid()) @db.Char(36)
   fullName      String
-  groupId       String?       @db.Char(36)
   createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   email         String?
   note          String?
   parentIds     Json?
   phone         String?
   status        StudentStatus @default(ACTIVE)
   studentNumber String?       @unique
-  teacherIds    Json?
-  cohort        String?
-  groupName     String?       @map("group")
+  studentGroups StudentGroup[]
   attendance    Attendance[]
-  group         Group?        @relation(fields: [groupId], references: [id])
   user          User?
   gradeRecords   GradeRecord[]
 
   @@map("Student")
+}
+
+model StudentGroup {
+  id        String   @id @default(uuid()) @db.Char(36)
+  studentId String   @db.Char(36)
+  groupId   String   @db.Char(36)
+  joinedAt  DateTime? @db.Date
+  leftAt    DateTime? @db.Date
+  createdAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  group   Group   @relation(fields: [groupId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, groupId])
+  @@index([studentId])
+  @@index([groupId])
+  @@map("StudentGroup")
 }
 
 model StudentsSheetsConflict {
@@ -192,7 +205,7 @@ model TeachersSheetsSyncState {
   lastStatus       TeachersSheetsSyncStatus?
   lastSyncAt       DateTime?
   lastSuccessAt    DateTime?
-  lastError        String?
+  lastError        String?                   @db.LongText
   detectedSubjects Json?
   syncedTeachers   Int                       @default(0)
   spreadsheetRows  Int                       @default(0)
@@ -211,7 +224,7 @@ model TeachersSheetsSyncLog {
   action        String
   sheetTitle    String?
   teacherId     String?                    @db.Char(36)
-  message       String
+  message       String                     @db.LongText
   meta          Json?
   createdAt     DateTime                   @default(now())
 
@@ -225,7 +238,7 @@ model TeachersSheetsWorkerState {
   lastHeartbeatAt DateTime?
   lastStartedAt   DateTime?
   lastFinishedAt  DateTime?
-  lastError       String?
+  lastError       String?   @db.LongText
   isRunning       Boolean   @default(false)
   updatedAt       DateTime  @updatedAt
 
@@ -615,10 +628,10 @@ model AiUsageLog {
   model            String?
   toolName         String?
   toolArgs         Json?
-  userMessage      String
-  assistantMessage String?
+  userMessage      String   @db.LongText
+  assistantMessage String?  @db.LongText
   status           String
-  error            String?
+  error            String?  @db.LongText
   ms               Int?
   meta             Json?
   createdAt        DateTime @default(now())

@@ -1,6 +1,4 @@
-import { Prisma } from "@prisma/client";
 import type { PrismaClient } from ".prisma/client";
-import { jsonStringArray } from "../../utils/json";
 
 function uniqStrings(items: Array<string | null | undefined>): string[] {
   const out: string[] = [];
@@ -65,35 +63,5 @@ export async function syncGroupSubjectDerivedLinks(
     });
   }
 
-  // Update students.teacherIds for the group (union).
-  const students = await prisma.student.findMany({
-    where: { groupId: params.groupId },
-    select: { id: true, teacherIds: true },
-  });
-
-  const updates: Prisma.PrismaPromise<unknown>[] = [];
-  let studentsUpdated = 0;
-
-  for (const s of students) {
-    const prevTeacherIds = jsonStringArray(s.teacherIds);
-    const merged = uniqStrings([...prevTeacherIds, ...discoveredTeacherIds]);
-    const prev = uniqStrings(prevTeacherIds);
-    if (merged.length === prev.length) continue;
-    studentsUpdated++;
-    updates.push(
-      prisma.student.update({
-        where: { id: s.id },
-        data: { teacherIds: merged },
-        select: { id: true },
-      }),
-    );
-  }
-
-  // Chunk transactions to avoid oversized queries.
-  const CHUNK = 50;
-  for (let i = 0; i < updates.length; i += CHUNK) {
-    await prisma.$transaction(updates.slice(i, i + CHUNK));
-  }
-
-  return { teacherIds: discoveredTeacherIds, studentsUpdated };
+  return { teacherIds: discoveredTeacherIds, studentsUpdated: 0 };
 }

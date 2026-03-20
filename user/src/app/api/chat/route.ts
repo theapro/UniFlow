@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const backendResponse = await fetch(`${BACKEND_URL}/api/ai/llm/chat`, {
+    const backendResponse = await fetch(`${BACKEND_URL}/api/ai/chat`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -43,9 +43,6 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         sessionId,
         message,
-        studentId:
-          typeof body?.studentId === "string" ? body.studentId : undefined,
-        group: typeof body?.group === "string" ? body.group : undefined,
         model: typeof body?.model === "string" ? body.model : undefined,
         temperature:
           typeof body?.temperature === "number" ? body.temperature : undefined,

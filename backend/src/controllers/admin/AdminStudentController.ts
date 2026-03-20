@@ -57,16 +57,8 @@ export class AdminStudentController {
 
   create = async (req: Request, res: Response) => {
     try {
-      const {
-        fullName,
-        email,
-        studentNo,
-        groupId,
-        cohort,
-        phone,
-        status,
-        note,
-      } = req.body ?? {};
+      const { fullName, email, studentNo, groupId, phone, status, note } =
+        req.body ?? {};
       if (!fullName || typeof fullName !== "string") {
         return fail(res, 400, "fullName is required");
       }
@@ -83,7 +75,6 @@ export class AdminStudentController {
         studentNo:
           typeof studentNo === "string" ? studentNo : (studentNo ?? null),
         groupId,
-        cohort: typeof cohort === "string" ? cohort : (cohort ?? null),
         phone: typeof phone === "string" ? phone : (phone ?? null),
         status: parseStudentStatus(status),
         note: typeof note === "string" ? note : (note ?? null),
@@ -122,23 +113,14 @@ export class AdminStudentController {
 
   update = async (req: Request, res: Response) => {
     try {
-      const {
-        fullName,
-        email,
-        studentNo,
-        groupId,
-        cohort,
-        phone,
-        status,
-        note,
-      } = req.body ?? {};
+      const { fullName, email, studentNo, groupId, phone, status, note } =
+        req.body ?? {};
 
       const student = await this.studentService.update(req.params.id, {
         ...(fullName !== undefined ? { fullName } : {}),
         ...(email !== undefined ? { email } : {}),
         ...(studentNo !== undefined ? { studentNo } : {}),
         ...(groupId !== undefined ? { groupId } : {}),
-        ...(cohort !== undefined ? { cohort } : {}),
         ...(phone !== undefined ? { phone } : {}),
         ...(status !== undefined ? { status: parseStudentStatus(status) } : {}),
         ...(note !== undefined ? { note } : {}),

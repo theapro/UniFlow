@@ -27,8 +27,7 @@ async function testChatModel(model: string): Promise<{
       messages: [
         {
           role: "system",
-          content:
-            "Reply in plain text. Do not include <think> tags or hidden reasoning.",
+          content: "Reply in plain text. Do not include hidden reasoning.",
         },
         { role: "user", content: "ping" },
       ],
@@ -57,12 +56,7 @@ async function testChatModel(model: string): Promise<{
   }
 
   const ms = Date.now() - startedAt;
-  const preview = full
-    .replace(/<think>[\s\S]*?<\/think>/g, "")
-    .replace(/<think>[\s\S]*/g, "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .slice(0, 120);
+  const preview = full.trim().replace(/\s+/g, " ").slice(0, 120);
 
   const trimmedRaw = full.trim();
   const thinkOnly = trimmedRaw.length > 0 && preview.length === 0;

@@ -542,22 +542,35 @@ async function seedStudents() {
       const studentNumber = `${groupPrefix}-${pad(i, 2)}`;
       const email = `${slugEmailPart(first)}.${slugEmailPart(last)}.${slugEmailPart(studentNumber)}@apro.edu`;
 
-      await prisma.student.upsert({
+      const student = await prisma.student.upsert({
         where: { studentNumber },
         update: {
           fullName,
           email,
-          groupId: g.id,
-          groupName: g.name,
           status: "ACTIVE",
         },
         create: {
           fullName,
           email,
-          groupId: g.id,
-          groupName: g.name,
           studentNumber,
           status: "ACTIVE",
+        },
+        select: { id: true },
+      });
+
+      await prisma.studentGroup.upsert({
+        where: {
+          studentId_groupId: { studentId: student.id, groupId: g.id },
+        },
+        update: {
+          leftAt: null,
+          joinedAt: new Date(),
+        },
+        create: {
+          studentId: student.id,
+          groupId: g.id,
+          joinedAt: new Date(),
+          leftAt: null,
         },
         select: { id: true },
       });

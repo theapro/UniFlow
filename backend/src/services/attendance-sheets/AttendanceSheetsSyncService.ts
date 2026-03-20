@@ -685,7 +685,9 @@ export class AttendanceSheetsSyncService {
 
       // Build UUID->studentId map for the group
       const groupStudents = await this.prisma.student.findMany({
-        where: { groupId: group.id },
+        where: {
+          studentGroups: { some: { groupId: group.id, leftAt: null } },
+        },
         select: { id: true, fullName: true, studentNumber: true },
         orderBy: [{ studentNumber: "asc" }, { fullName: "asc" }],
       });
@@ -1000,7 +1002,9 @@ export class AttendanceSheetsSyncService {
 
     // Load group roster from DB
     const groupStudents = await this.prisma.student.findMany({
-      where: { groupId: group.id },
+      where: {
+        studentGroups: { some: { groupId: group.id, leftAt: null } },
+      },
       select: { id: true, fullName: true, studentNumber: true },
       orderBy: [{ studentNumber: "asc" }, { fullName: "asc" }],
       take: 5000,

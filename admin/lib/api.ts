@@ -241,6 +241,15 @@ export const aiScheduleApi = {
     }>;
     maxSeconds?: number;
   }) => axios.post("/api/admin/ai-schedule/generate", data),
+  oneTapGenerate: (data: {
+    month: number;
+    year: number;
+    cohortId?: string;
+    workingDays?: number[];
+    holidays?: string[];
+    notes?: string;
+    maxSeconds?: number;
+  }) => axios.post("/api/admin/ai-schedule/one-tap-generate", data),
 };
 
 export const aiGroupsApi = {
@@ -334,12 +343,22 @@ export const aiAdminApi = {
     list: (params?: { take?: number; cursor?: string | null }) =>
       axios.get("/api/admin/ai/logs", { params }),
   },
+  debugTraces: {
+    list: (params?: { take?: number; cursor?: string | null }) =>
+      axios.get("/api/admin/ai/debug-traces", { params }),
+  },
   testChat: (data: {
     message: string;
     asRole: "STUDENT" | "TEACHER";
     userId?: string | null;
     requestedModel?: string;
   }) => axios.post("/api/admin/ai/test-chat", data),
+  testTool: (data: {
+    tool: string;
+    args: Record<string, unknown>;
+    asRole: "STUDENT" | "TEACHER" | "ADMIN";
+    userId?: string | null;
+  }) => axios.post("/api/admin/ai/test-tool", data),
 };
 
 export const maintenanceApi = {

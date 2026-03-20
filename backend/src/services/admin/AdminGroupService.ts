@@ -19,29 +19,54 @@ export class AdminGroupService {
       ? { name: { contains: params.q } }
       : {};
 
-    return prisma.group.findMany({
+    const rows = await prisma.group.findMany({
       where,
       orderBy: { name: "asc" },
       include: {
         parentGroup: { select: { id: true, name: true } },
         cohort: { select: { id: true, code: true, sortOrder: true } },
-        _count: { select: { students: true } },
+        _count: { select: { studentGroups: true } },
       },
       take: params?.take ?? 100,
       skip: params?.skip ?? 0,
     });
+
+    return rows.map((g) => ({
+      ...g,
+      _count: {
+        ...(g as any)._count,
+        students: (g as any)._count?.studentGroups ?? 0,
+      },
+    }));
   }
 
   async getById(id: string) {
-    return prisma.group.findUnique({
+    const group = await prisma.group.findUnique({
       where: { id },
       include: {
         parentGroup: { select: { id: true, name: true } },
         cohort: { select: { id: true, code: true, sortOrder: true } },
-        students: { take: 5 },
-        _count: { select: { students: true } },
+        studentGroups: {
+          where: { leftAt: null },
+          select: { student: true },
+          orderBy: [{ joinedAt: "desc" }, { createdAt: "desc" }],
+          take: 5,
+        },
+        _count: { select: { studentGroups: true } },
       },
     });
+
+    if (!group) return null;
+
+    return {
+      ...group,
+      students: group.studentGroups.map((x) => x.student),
+      _count: {
+        ...(group as any)._count,
+        students: (group as any)._count?.studentGroups ?? 0,
+      },
+      studentGroups: undefined,
+    };
   }
 
   async create(input: CreateGroupInput) {

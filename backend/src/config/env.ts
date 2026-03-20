@@ -37,12 +37,17 @@ export const env = {
   jwtSecret: required("JWT_SECRET"),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "7d",
 
-  // LLM / Groq (optional unless /api/ai/llm/chat is used)
+  // LLM / Groq (optional unless the unified AI chat endpoint is used)
   groqApiKey: optional("GROQ_API_KEY"),
   groqModel: optional("GROQ_MODEL"),
   groqApiUrl: optional("GROQ_API_URL"),
   aiContextLimit: Number(process.env.AI_CONTEXT_LIMIT ?? 15),
   aiMaxTokens: Number(process.env.AI_MAX_TOKENS ?? 2048),
+  // Dev default: capture debug traces unless explicitly disabled.
+  // Prod default: disabled unless explicitly enabled.
+  aiDebugMode:
+    optionalBool("AI_DEBUG_MODE") ??
+    (process.env.NODE_ENV ?? "development") === "development",
 
   // LLM / OpenAI (OpenAI-compatible; optional)
   openaiApiKey: optional("OPENAI_API_KEY"),

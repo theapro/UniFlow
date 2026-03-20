@@ -377,6 +377,12 @@ export class TeachersSheetsSyncService {
       let syncedTeachers = 0;
       let teachersCreated = 0;
       let teachersUpdated = 0;
+      let staffNoConflicts = 0;
+      const staffNoConflictSamples: Array<{
+        sheetTeacherUuid: string;
+        staffNo: string;
+        existingTeacherId: string;
+      }> = [];
 
       await this.prisma.$transaction(async (tx) => {
         for (const teacher of aggregatedById.values()) {
@@ -384,14 +390,91 @@ export class TeachersSheetsSyncService {
             .map((name) => subjectIdByName.get(name))
             .filter((id): id is string => typeof id === "string");
 
-          const existed = await tx.teacher.findUnique({
+          const existedById = await tx.teacher.findUnique({
             where: { id: teacher.id },
             select: { id: true },
           });
 
-          await tx.teacher.upsert({
-            where: { id: teacher.id },
-            create: {
+          const staffNo = teacher.staffNo ? String(teacher.staffNo).trim() : "";
+          const ownerByStaffNo = staffNo
+            ? await tx.teacher.findUnique({
+                where: { staffNo },
+                select: { id: true },
+              })
+            : null;
+
+          // Case 1: teacher UUID exists in DB -> update it.
+          if (existedById) {
+            const staffNoBelongsToOther =
+              !!ownerByStaffNo && ownerByStaffNo.id !== teacher.id;
+
+            if (staffNoBelongsToOther) {
+              staffNoConflicts++;
+              if (staffNoConflictSamples.length < 20) {
+                staffNoConflictSamples.push({
+                  sheetTeacherUuid: teacher.id,
+                  staffNo,
+                  existingTeacherId: ownerByStaffNo.id,
+                });
+              }
+            }
+
+            await tx.teacher.update({
+              where: { id: teacher.id },
+              data: {
+                fullName: teacher.fullName,
+                ...(staffNoBelongsToOther ? {} : { staffNo: teacher.staffNo }),
+                email: teacher.email,
+                phone: teacher.phone,
+                telegram: teacher.telegram,
+                note: teacher.note,
+                sheetCreatedAt: teacher.sheetCreatedAt,
+                sheetUpdatedAt: teacher.sheetUpdatedAt,
+                subjects: { set: subjectIds.map((id) => ({ id })) },
+              },
+              select: { id: true },
+            });
+
+            syncedTeachers++;
+            teachersUpdated++;
+            continue;
+          }
+
+          // Case 2: teacher UUID doesn't exist. If staffNo belongs to someone else, update that existing record.
+          if (ownerByStaffNo) {
+            staffNoConflicts++;
+            if (staffNoConflictSamples.length < 20) {
+              staffNoConflictSamples.push({
+                sheetTeacherUuid: teacher.id,
+                staffNo,
+                existingTeacherId: ownerByStaffNo.id,
+              });
+            }
+
+            await tx.teacher.update({
+              where: { id: ownerByStaffNo.id },
+              data: {
+                fullName: teacher.fullName,
+                staffNo: teacher.staffNo,
+                email: teacher.email,
+                phone: teacher.phone,
+                telegram: teacher.telegram,
+                note: teacher.note,
+                sheetCreatedAt: teacher.sheetCreatedAt,
+                sheetUpdatedAt: teacher.sheetUpdatedAt,
+                subjects: { set: subjectIds.map((id) => ({ id })) },
+              },
+              select: { id: true },
+            });
+
+            syncedTeachers++;
+            teachersUpdated++;
+            continue;
+          }
+
+          // Case 3: create new teacher.
+          await tx.teacher.create({
+            data: {
               id: teacher.id,
               fullName: teacher.fullName,
               staffNo: teacher.staffNo,
@@ -403,23 +486,11 @@ export class TeachersSheetsSyncService {
               sheetUpdatedAt: teacher.sheetUpdatedAt,
               subjects: { connect: subjectIds.map((id) => ({ id })) },
             },
-            update: {
-              fullName: teacher.fullName,
-              staffNo: teacher.staffNo,
-              email: teacher.email,
-              phone: teacher.phone,
-              telegram: teacher.telegram,
-              note: teacher.note,
-              sheetCreatedAt: teacher.sheetCreatedAt,
-              sheetUpdatedAt: teacher.sheetUpdatedAt,
-              subjects: { set: subjectIds.map((id) => ({ id })) },
-            },
             select: { id: true },
           });
 
           syncedTeachers++;
-          if (existed) teachersUpdated++;
-          else teachersCreated++;
+          teachersCreated++;
         }
       });
 
@@ -434,6 +505,18 @@ export class TeachersSheetsSyncService {
           message:
             "Detected conflicting teacher fields across subject tabs; kept first non-empty value",
           meta: { count: fieldConflicts, samples: fieldConflictSamples },
+        });
+      }
+
+      if (staffNoConflicts > 0) {
+        await this.log({
+          spreadsheetId,
+          runId,
+          level: "WARN",
+          action: "staffNo_conflicts",
+          message:
+            "Detected duplicate staffNo values across different teacher_uuid rows; updated existing teacher to avoid unique constraint errors",
+          meta: { count: staffNoConflicts, samples: staffNoConflictSamples },
         });
       }
 

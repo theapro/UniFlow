@@ -34,23 +34,42 @@ export class AiDataService {
   }
 
   async searchStudents(query: string) {
-    return prisma.student.findMany({
+    const rows = await prisma.student.findMany({
       where: {
         OR: [
           { fullName: { contains: query } },
           { studentNumber: { contains: query } },
         ],
       },
-      include: { group: { select: { name: true } } },
+      include: {
+        studentGroups: {
+          where: { leftAt: null },
+          select: { group: { select: { id: true, name: true } } },
+          orderBy: [{ joinedAt: "desc" }, { createdAt: "desc" }],
+          take: 1,
+        },
+      },
       take: 10,
     });
+
+    return rows.map((s) => ({
+      ...s,
+      group: s.studentGroups[0]?.group ?? null,
+      studentGroups: undefined,
+    }));
   }
 
   async getGroupDetails(groupName: string) {
-    return prisma.group.findFirst({
+    const group = await prisma.group.findFirst({
       where: { name: { equals: groupName } },
       include: {
-        students: { select: { fullName: true, studentNumber: true } },
+        studentGroups: {
+          where: { leftAt: null },
+          select: {
+            student: { select: { fullName: true, studentNumber: true } },
+          },
+          take: 500,
+        },
         lessons: {
           select: {
             startsAt: true,
@@ -61,5 +80,13 @@ export class AiDataService {
         },
       },
     });
+
+    if (!group) return null;
+
+    return {
+      ...group,
+      students: group.studentGroups.map((x) => x.student),
+      studentGroups: undefined,
+    };
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { aiAdminApi } from "@/lib/api";
@@ -40,11 +40,30 @@ type DebugLog = {
   createdAt: string;
 };
 
+type ToolConfig = {
+  name: string;
+  isEnabled: boolean;
+  enabledForStudents: boolean;
+  enabledForTeachers: boolean;
+  enabledForAdmins: boolean;
+};
+
 export default function TestAiPage() {
-  const [asRole, setAsRole] = React.useState<"STUDENT" | "TEACHER">("STUDENT");
+  const [asRole, setAsRole] = React.useState<"STUDENT" | "TEACHER" | "ADMIN">(
+    "STUDENT",
+  );
   const [message, setMessage] = React.useState<string>("");
   const [userId, setUserId] = React.useState<string>("");
   const [requestedModel, setRequestedModel] = React.useState<string>("");
+
+  const [toolName, setToolName] = React.useState<string>("");
+  const [toolArgsText, setToolArgsText] = React.useState<string>("{}");
+  const [lastTool, setLastTool] = React.useState<{
+    requestId: string;
+    toolName: string;
+    result: any;
+    debugLog: DebugLog | null;
+  } | null>(null);
 
   const [suite, setSuite] = React.useState<
     Array<{
@@ -70,7 +89,7 @@ export default function TestAiPage() {
     mutationFn: async () => {
       const res = await aiAdminApi.testChat({
         message,
-        asRole,
+        asRole: asRole === "ADMIN" ? "STUDENT" : asRole,
         userId: userId.trim() ? userId.trim() : null,
         requestedModel: requestedModel.trim()
           ? requestedModel.trim()
@@ -120,7 +139,8 @@ export default function TestAiPage() {
       "Bu oygi jadvalim qanday?",
       "Guruhlarim ro'yxatini bera olasanmi?",
     ];
-    return asRole === "STUDENT" ? student : teacher;
+    if (asRole === "TEACHER") return teacher;
+    return student;
   }, [asRole]);
 
   async function runSuite() {
@@ -131,7 +151,7 @@ export default function TestAiPage() {
       for (const msg of quickPrompts) {
         const res = await aiAdminApi.testChat({
           message: msg,
-          asRole,
+          asRole: asRole === "ADMIN" ? "STUDENT" : asRole,
           userId: userId.trim() ? userId.trim() : null,
           requestedModel: requestedModel.trim()
             ? requestedModel.trim()
@@ -167,6 +187,57 @@ export default function TestAiPage() {
       setSuiteRunning(false);
     }
   }
+
+  const toolsQuery = useQuery({
+    queryKey: ["ai-admin", "tools"],
+    queryFn: async () => {
+      const res = await aiAdminApi.tools.list();
+      const items = (res.data?.data?.items ?? []) as ToolConfig[];
+      return items;
+    },
+  });
+
+  const runTool = useMutation({
+    mutationFn: async () => {
+      let parsedArgs: any = {};
+      try {
+        parsedArgs = toolArgsText.trim() ? JSON.parse(toolArgsText) : {};
+      } catch {
+        throw new Error("Args JSON noto'g'ri");
+      }
+
+      const res = await aiAdminApi.testTool({
+        tool: toolName,
+        args: parsedArgs,
+        asRole,
+        userId: userId.trim() ? userId.trim() : null,
+      });
+
+      const data = res.data?.data;
+      const log = (data?.debug?.log ?? null) as DebugLog | null;
+
+      return {
+        requestId: String(data?.requestId ?? ""),
+        toolName: String(data?.toolName ?? toolName),
+        result: data?.result ?? null,
+        debugLog: log,
+      };
+    },
+    onSuccess: (r) => {
+      setLastTool(r);
+      if (r.debugLog?.status === "ERROR") toast.error("Tool error");
+      else toast.success("Tool executed");
+    },
+    onError: (e: any) => {
+      const msg =
+        typeof e?.response?.data?.message === "string"
+          ? e.response.data.message
+          : typeof e?.message === "string"
+            ? e.message
+            : "Xatolik";
+      toast.error(msg);
+    },
+  });
 
   return (
     <div className="container space-y-6">
@@ -217,6 +288,7 @@ export default function TestAiPage() {
                 <SelectContent>
                   <SelectItem value="STUDENT">STUDENT</SelectItem>
                   <SelectItem value="TEACHER">TEACHER</SelectItem>
+                  <SelectItem value="ADMIN">ADMIN</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -272,6 +344,101 @@ export default function TestAiPage() {
               Clear
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Tool runner</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Tool</div>
+              <Select
+                value={toolName}
+                onValueChange={(v) => setToolName(v)}
+                disabled={toolsQuery.isLoading || toolsQuery.isError}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a tool" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(toolsQuery.data ?? []).map((t) => (
+                    <SelectItem key={t.name} value={t.name}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {toolsQuery.isError ? (
+                <div className="text-xs text-destructive">
+                  Tools list yuklanmadi
+                </div>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Args (JSON)</div>
+              <Textarea
+                value={toolArgsText}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                  setToolArgsText(e.target.value)
+                }
+                placeholder='e.g. {"studentId":"...","month":9,"year":2026}'
+                className="min-h-28 font-mono text-xs"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              onClick={() => runTool.mutate()}
+              disabled={runTool.isPending || !toolName.trim()}
+            >
+              {runTool.isPending ? "Running…" : "Run tool"}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setLastTool(null)}
+              disabled={runTool.isPending}
+            >
+              Clear
+            </Button>
+          </div>
+
+          {!lastTool ? (
+            <p className="text-sm text-muted-foreground">
+              Tool natijasi hali yo‘q.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary">
+                  requestId: {lastTool.requestId}
+                </Badge>
+                <Badge variant="outline">tool: {lastTool.toolName}</Badge>
+                {lastTool.debugLog?.status ? (
+                  <Badge
+                    variant={
+                      lastTool.debugLog.status === "ERROR"
+                        ? "destructive"
+                        : "default"
+                    }
+                  >
+                    {lastTool.debugLog.status}
+                  </Badge>
+                ) : null}
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Result</div>
+                <pre className="max-h-96 overflow-auto rounded-md border bg-muted/30 p-3 text-xs whitespace-pre-wrap">
+                  {JSON.stringify(lastTool.result ?? null, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

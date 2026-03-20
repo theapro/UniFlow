@@ -5,6 +5,12 @@ import { useChatStore } from "@/store/chatStore";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
+  buildChatExportFilename,
+  buildChatExportMarkdown,
+  buildChatExportTxt,
+  downloadTextFile,
+} from "@/lib/chatExport";
+import {
   PlusCircle,
   MessageSquare,
   MoreHorizontal,
@@ -56,6 +62,7 @@ export function ChatSidebar({
   const {
     sessions,
     currentSessionId,
+    messages,
     createSession,
     deleteSession,
     renameSession,
@@ -93,6 +100,45 @@ export function ChatSidebar({
 
   const handleDelete = (sessionId: string, title: string) => {
     setDeleteTarget({ id: sessionId, title });
+  };
+
+  const exportSession = (params: {
+    sessionId: string;
+    title: string;
+    format: "txt" | "md";
+  }) => {
+    const exportedAt = new Date();
+    const sessionMessages = messages[params.sessionId] ?? [];
+
+    const content =
+      params.format === "md"
+        ? buildChatExportMarkdown({
+            title: params.title,
+            sessionId: params.sessionId,
+            messages: sessionMessages,
+            exportedAt,
+          })
+        : buildChatExportTxt({
+            title: params.title,
+            sessionId: params.sessionId,
+            messages: sessionMessages,
+            exportedAt,
+          });
+
+    const filename = buildChatExportFilename({
+      title: params.title,
+      exportedAt,
+      ext: params.format,
+    });
+
+    downloadTextFile({
+      filename,
+      content,
+      mime:
+        params.format === "md"
+          ? "text/markdown;charset=utf-8"
+          : "text/plain;charset=utf-8",
+    });
   };
 
   return (
@@ -185,6 +231,30 @@ export function ChatSidebar({
                                 </SidebarMenuAction>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent side="right" align="start">
+                                <DropdownMenuItem
+                                  onSelect={() =>
+                                    exportSession({
+                                      sessionId: session.id,
+                                      title: session.title,
+                                      format: "txt",
+                                    })
+                                  }
+                                >
+                                  <MessageSquare className="mr-2 h-4 w-4" />
+                                  Export (.txt)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={() =>
+                                    exportSession({
+                                      sessionId: session.id,
+                                      title: session.title,
+                                      format: "md",
+                                    })
+                                  }
+                                >
+                                  <MessageSquare className="mr-2 h-4 w-4" />
+                                  Export (.md)
+                                </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onSelect={() =>
                                     handleRename(session.id, session.title)

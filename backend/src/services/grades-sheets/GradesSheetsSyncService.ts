@@ -177,7 +177,7 @@ export class GradesSheetsSyncService {
     const allowedStudents = await this.prisma.student.findMany({
       where: {
         id: { in: rosterStudentIds },
-        groupId: group.id,
+        studentGroups: { some: { groupId: group.id, leftAt: null } },
       },
       select: { id: true },
     });

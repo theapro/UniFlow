@@ -29,14 +29,53 @@ export class AiToolConfigService {
     const missing = AI_TOOL_NAMES.filter((n) => !existingSet.has(n));
     if (missing.length === 0) return;
 
+    const defaults = (name: AiToolName) => {
+      if (
+        name === "getStudentProfile" ||
+        name === "getStudentScheduleToday" ||
+        name === "getStudentAttendanceRecent" ||
+        name === "getStudentGradesRecent"
+      ) {
+        return {
+          enabledForStudents: true,
+          enabledForTeachers: false,
+          enabledForAdmins: false,
+        };
+      }
+      if (name === "getStudentDashboard") {
+        return {
+          enabledForStudents: true,
+          enabledForTeachers: false,
+          enabledForAdmins: false,
+        };
+      }
+      if (name === "getTeacherDashboard") {
+        return {
+          enabledForStudents: false,
+          enabledForTeachers: true,
+          enabledForAdmins: false,
+        };
+      }
+      if (name === "getSystemStats") {
+        return {
+          enabledForStudents: false,
+          enabledForTeachers: false,
+          enabledForAdmins: true,
+        };
+      }
+
+      return {
+        enabledForStudents: false,
+        enabledForTeachers: false,
+        enabledForAdmins: false,
+      };
+    };
+
     await prisma.aiToolConfig.createMany({
       data: missing.map((name) => ({
         name,
         isEnabled: true,
-        enabledForStudents: name.startsWith("getStudent"),
-        enabledForTeachers:
-          name.startsWith("getStudent") || name.startsWith("getGroup"),
-        enabledForAdmins: true,
+        ...defaults(name),
       })),
       skipDuplicates: true,
     });
@@ -79,12 +118,18 @@ export class AiToolConfigService {
         name: toolName,
         isEnabled: patch.isEnabled ?? true,
         enabledForStudents:
-          patch.enabledForStudents ?? toolName.startsWith("getStudent"),
+          patch.enabledForStudents ??
+          [
+            "getStudentDashboard",
+            "getStudentProfile",
+            "getStudentScheduleToday",
+            "getStudentAttendanceRecent",
+            "getStudentGradesRecent",
+          ].includes(toolName),
         enabledForTeachers:
-          patch.enabledForTeachers ??
-          (toolName.startsWith("getStudent") ||
-            toolName.startsWith("getGroup")),
-        enabledForAdmins: patch.enabledForAdmins ?? true,
+          patch.enabledForTeachers ?? toolName === "getTeacherDashboard",
+        enabledForAdmins:
+          patch.enabledForAdmins ?? toolName === "getSystemStats",
       },
       update: {
         ...(patch.isEnabled !== undefined

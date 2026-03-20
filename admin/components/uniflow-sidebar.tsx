@@ -130,6 +130,11 @@ export function UniFlowSidebar({
       icon: BrainIcon,
     },
     {
+      title: dict?.nav?.aiDebugConsole ?? "AI Debug Console",
+      url: `${dashboardBase}/ai-debug-console`,
+      icon: BrainIcon,
+    },
+    {
       title: dict?.nav?.testAi ?? "Test AI",
       url: `${dashboardBase}/testai`,
       icon: BrainIcon,
@@ -179,6 +184,7 @@ export function UniFlowSidebar({
   const isSheetsActive = pathname.startsWith(`${dashboardBase}/sheets`);
   const isAiActive =
     pathname.startsWith(`${dashboardBase}/ai-monitor`) ||
+    pathname.startsWith(`${dashboardBase}/ai-debug-console`) ||
     pathname.startsWith(`${dashboardBase}/testai`) ||
     pathname.startsWith(`${dashboardBase}/ai-models`);
 

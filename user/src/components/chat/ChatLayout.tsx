@@ -281,11 +281,16 @@ export function ChatLayout() {
               {currentMessages.map((message) => (
                 <ChatMessage key={message.id} message={message} />
               ))}
-              {isLoading && !isStreaming && (
+              {(isLoading || isStreaming) && (
                 <div className="flex items-center gap-4 px-4 py-6">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">
-                    O&apos;ylayapman...
+                    Thinking
+                    <span className="thinking-dots" aria-hidden="true">
+                      <span className="thinking-dot">.</span>
+                      <span className="thinking-dot">.</span>
+                      <span className="thinking-dot">.</span>
+                    </span>
                   </span>
                 </div>
               )}

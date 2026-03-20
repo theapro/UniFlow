@@ -23,6 +23,7 @@
     "attendance": "Davomat",
     "grades": "Baholash",
     "aiMonitor": "AI Monitoring",
+    "aiDebugConsole": "AI Debug Console",
     "aiSettings": "AI Sozlamalari",
     "testAi": "Test AI",
     "aiModels": "AI Modellar",
