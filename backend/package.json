@@ -16,6 +16,7 @@
     "db:reset": "prisma migrate reset --force",
     "db:seed": "prisma db seed",
     "ai:test-models": "tsx src/scripts/test-ai-models.ts",
+    "ai:test-schedule": "tsx src/scripts/test-schedule.ts",
     "students-sheets:worker": "tsx src/scripts/students-sheets-worker.ts",
     "prisma:studio": "prisma studio"
   },

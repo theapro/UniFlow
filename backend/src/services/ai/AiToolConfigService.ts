@@ -83,6 +83,24 @@ export class AiToolConfigService {
       })),
       skipDuplicates: true,
     });
+
+    // Self-heal for older installs: these tools existed in AI_TOOL_NAMES but were
+    // previously default-disabled for students. If they are disabled for everyone,
+    // enable them for students so schedule queries can work.
+    await prisma.aiToolConfig.updateMany({
+      where: {
+        name: {
+          in: ["getTodaySchedule", "getWeeklySchedule", "getMonthlySchedule"],
+        },
+        isEnabled: true,
+        enabledForStudents: false,
+        enabledForTeachers: false,
+        enabledForAdmins: false,
+      },
+      data: {
+        enabledForStudents: true,
+      },
+    });
   }
 
   async listAll(): Promise<AiToolConfigDto[]> {

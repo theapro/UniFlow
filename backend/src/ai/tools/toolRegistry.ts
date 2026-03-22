@@ -32,49 +32,31 @@ export const TOOL_DEFINITIONS: AiToolDefinition[] = [
     argsSchema: {},
   },
   {
-    name: "getStudentScheduleToday",
-    description: "Returns only today's schedule for the current student.",
+    name: "getTodaySchedule",
+    description:
+      "Returns today's schedule for the current user (student), resolved via group membership.",
     allowedRoles: [Role.STUDENT],
     argsSchema: {},
   },
   {
-    name: "getTodaySchedule",
-    description:
-      "Returns today's schedule rows for the current student (Schedule table, filtered by the student's active group(s) and calendarDay.date).",
-    allowedRoles: [Role.STUDENT],
-    argsSchema: {
-      userId: {
-        type: "string",
-        description: "Optional. Defaults to the current authenticated user.",
-        optional: true,
-      },
-    },
-  },
-  {
     name: "getWeeklySchedule",
     description:
-      "Returns this week's schedule rows for the current student (Mon-Sun, Schedule table, filtered by the student's active group(s) and calendarDay.date).",
+      "Returns this week's schedule (Mon..Sun) for the current user (student), resolved via group membership.",
     allowedRoles: [Role.STUDENT],
-    argsSchema: {
-      userId: {
-        type: "string",
-        description: "Optional. Defaults to the current authenticated user.",
-        optional: true,
-      },
-    },
+    argsSchema: {},
   },
   {
     name: "getMonthlySchedule",
     description:
-      "Returns this month's schedule rows for the current student (Schedule table, filtered by the student's active group(s) and calendarDay.date).",
+      "Returns this month's schedule for the current user (student), resolved via group membership.",
     allowedRoles: [Role.STUDENT],
-    argsSchema: {
-      userId: {
-        type: "string",
-        description: "Optional. Defaults to the current authenticated user.",
-        optional: true,
-      },
-    },
+    argsSchema: {},
+  },
+  {
+    name: "getStudentScheduleToday",
+    description: "Returns only today's schedule for the current student.",
+    allowedRoles: [Role.STUDENT],
+    argsSchema: {},
   },
   {
     name: "getStudentAttendanceRecent",
@@ -137,32 +119,14 @@ export async function runTool(params: {
   switch (params.name) {
     case "getStudentProfile":
       return getStudentProfile({ user: params.user });
+    case "getTodaySchedule":
+      return getTodaySchedule({ userId: params.user.id });
+    case "getWeeklySchedule":
+      return getWeeklySchedule({ userId: params.user.id });
+    case "getMonthlySchedule":
+      return getMonthlySchedule({ userId: params.user.id });
     case "getStudentScheduleToday":
       return getStudentScheduleToday({ user: params.user });
-    case "getTodaySchedule": {
-      const userIdArg =
-        typeof (params.args as any)?.userId === "string"
-          ? String((params.args as any).userId)
-          : null;
-      const userId = userIdArg && userIdArg === params.user.id ? userIdArg : params.user.id;
-      return getTodaySchedule({ userId });
-    }
-    case "getWeeklySchedule": {
-      const userIdArg =
-        typeof (params.args as any)?.userId === "string"
-          ? String((params.args as any).userId)
-          : null;
-      const userId = userIdArg && userIdArg === params.user.id ? userIdArg : params.user.id;
-      return getWeeklySchedule({ userId });
-    }
-    case "getMonthlySchedule": {
-      const userIdArg =
-        typeof (params.args as any)?.userId === "string"
-          ? String((params.args as any).userId)
-          : null;
-      const userId = userIdArg && userIdArg === params.user.id ? userIdArg : params.user.id;
-      return getMonthlySchedule({ userId });
-    }
     case "getStudentAttendanceRecent":
       return getStudentAttendanceRecent({
         user: params.user,

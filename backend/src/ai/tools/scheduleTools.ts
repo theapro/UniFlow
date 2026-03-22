@@ -1,32 +1,51 @@
 import { prisma } from "../../config/prisma";
-import { getUTCDayRange } from "../../utils/weekday";
 
-function addUtcDays(date: Date, days: number): Date {
-  return new Date(
-    Date.UTC(
-      date.getUTCFullYear(),
-      date.getUTCMonth(),
-      date.getUTCDate() + days,
-      0,
-      0,
-      0,
-      0,
-    ),
-  );
+function addLocalDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + days);
+  return d;
 }
 
-function startOfUtcMonth(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1, 0, 0, 0, 0));
+function startOfLocalMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1, 0, 0, 0, 0);
 }
 
-function startOfUtcWeekMonday(date: Date): Date {
+function startOfLocalWeekMonday(date: Date): Date {
   // JS: 0=Sun..6=Sat. ISO week: Monday start.
-  const day = date.getUTCDay();
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay();
   const diffToMonday = (day + 6) % 7;
-  return addUtcDays(date, -diffToMonday);
+  d.setDate(d.getDate() - diffToMonday);
+  return d;
 }
 
-async function resolveActiveStudentGroupIdsByUserId(userId: string): Promise<string[]> {
+function getLocalDayRange(date: Date = new Date()): { start: Date; end: Date } {
+  const start = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    0,
+    0,
+    0,
+    0,
+  );
+  const end = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate() + 1,
+    0,
+    0,
+    0,
+    0,
+  );
+  return { start, end };
+}
+
+async function resolveActiveStudentGroupIdsByUserId(
+  userId: string,
+): Promise<string[]> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, studentId: true },
@@ -87,12 +106,15 @@ async function getScheduleByUserGroupsInRange(params: {
       },
     },
     include: scheduleIncludes(),
-    orderBy: [{ calendarDay: { date: "asc" } }, { timeSlot: { slotNumber: "asc" } }],
+    orderBy: [
+      { calendarDay: { date: "asc" } },
+      { timeSlot: { slotNumber: "asc" } },
+    ],
   });
 }
 
 export async function getTodaySchedule(params: { userId: string }) {
-  const { start, end } = getUTCDayRange();
+  const { start, end } = getLocalDayRange();
   return getScheduleByUserGroupsInRange({
     userId: params.userId,
     start,
@@ -102,8 +124,8 @@ export async function getTodaySchedule(params: { userId: string }) {
 
 export async function getWeeklySchedule(params: { userId: string }) {
   const now = new Date();
-  const start = startOfUtcWeekMonday(now);
-  const endExclusive = addUtcDays(start, 7);
+  const start = startOfLocalWeekMonday(now);
+  const endExclusive = addLocalDays(start, 7);
 
   return getScheduleByUserGroupsInRange({
     userId: params.userId,
@@ -114,8 +136,16 @@ export async function getWeeklySchedule(params: { userId: string }) {
 
 export async function getMonthlySchedule(params: { userId: string }) {
   const now = new Date();
-  const start = startOfUtcMonth(now);
-  const nextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
+  const start = startOfLocalMonth(now);
+  const nextMonth = new Date(
+    now.getFullYear(),
+    now.getMonth() + 1,
+    1,
+    0,
+    0,
+    0,
+    0,
+  );
 
   return getScheduleByUserGroupsInRange({
     userId: params.userId,
