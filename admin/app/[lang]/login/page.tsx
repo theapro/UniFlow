@@ -66,6 +66,12 @@ export default function LoginPage({
         <div className="space-y-8">
           {/* Login Card */}
           <div className="rounded-[32px] border border-white/5 bg-zinc-900/20 backdrop-blur-xl p-8 shadow-2xl">
+          <div className="text-center mb-8">
+          <h1 className="text-2xl font-bold tracking-tight text-white/90">Uniflow Staff</h1>
+          <p className="text-[11px] text-muted-foreground/40 uppercase tracking-[0.3em] mt-2 font-semibold">
+           
+          </p>
+        </div>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-5">
                 <div className="space-y-2">

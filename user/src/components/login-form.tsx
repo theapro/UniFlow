@@ -6,10 +6,17 @@ import { useGoogleLogin } from "@react-oauth/google";
 import { cn } from "@/lib/utils";
 import { auth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertCircle } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { 
+  AlertCircle, 
+  Loader2, 
+  KeyRound, 
+  Mail, 
+  ArrowRight, 
+  ShieldCheck 
+} from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
 
 const API_URL =
@@ -161,178 +168,167 @@ export function LoginForm({
   });
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card className="overflow-hidden">
-        <CardContent className="p-0">
-          <form
-            onSubmit={
-              method === "password" ? handleEmailLogin : verifyLoginCode
-            }
-            className="p-6 md:p-8"
-          >
-            <div className="flex flex-col gap-6">
-              <div className="flex flex-col items-center text-center">
-                <h1 className="text-2xl font-bold">Welcome back</h1>
-                <p className="text-balance text-muted-foreground">
-                  {method === "password"
-                    ? "Login to your account"
-                    : "Use a one-time code sent to your email"}
-                </p>
-              </div>
+    <div className={cn("relative w-full max-w-[440px] px-6 animate-in fade-in zoom-in duration-700", className)} {...props}>
+      <div className="rounded-[35px] border border-white/[0.06] bg-zinc-900/40 backdrop-blur-2xl p-8 md:p-10 shadow-xl">
+        
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-bold tracking-tight text-white/90">Uniflow Chat</h1>
+          <p className="text-[11px] text-muted-foreground/40 uppercase tracking-[0.3em] mt-2 font-semibold">
+          </p>
+        </div>
 
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="m@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    autoComplete="email"
-                  />
-                </div>
-
-                {method === "password" ? (
-                  <div className="grid gap-2">
-                    <div className="flex items-center">
-                      <Label htmlFor="password">Password</Label>
-                      <a
-                        href="#"
-                        onClick={(e) => e.preventDefault()}
-                        className="ml-auto text-sm text-muted-foreground underline-offset-2 hover:underline"
-                      >
-                        Forgot your password?
-                      </a>
-                    </div>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      autoComplete="current-password"
-                    />
-                  </div>
-                ) : (
-                  <div className="grid gap-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="code">Code</Label>
-                      <Button
-                        type="button"
-                        variant="link"
-                        className="h-auto p-0 text-sm"
-                        onClick={requestLoginCode}
-                        disabled={!email || codeLoading}
-                      >
-                        {codeRequested ? "Resend code" : "Send code"}
-                      </Button>
-                    </div>
-                    <Input
-                      id="code"
-                      inputMode="numeric"
-                      placeholder="123456"
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                      required
-                      disabled={!codeRequested}
-                    />
-                    {!codeRequested && (
-                      <div className="text-xs text-muted-foreground">
-                        Click &quot;Send code&quot; to receive a one-time code.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {error && (
-                <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              {info && !error && (
-                <div className="rounded-md bg-muted p-3 text-sm text-muted-foreground text-center">
-                  {info}
-                </div>
-              )}
-
-              <div className="flex flex-col gap-2">
-                <div className="flex justify-center">
-                  <Button
-                    type="button"
-                    variant="link"
-                    className="h-auto p-0 text-xs text-muted-foreground hover:text-primary"
-                    onClick={toggleMethod}
-                  >
-                    {method === "password"
-                      ? "Login with code instead"
-                      : "Login with password instead"}
-                  </Button>
-                </div>
-
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={loading || (method === "code" && !codeRequested)}
-                >
-                  {loading
-                    ? "Loading..."
-                    : method === "password"
-                      ? "Login"
-                      : "Verify & login"}
-                </Button>
-              </div>
-
-              <div className="relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t after:border-border">
-                <span className="relative z-10 bg-background px-2 text-muted-foreground">
-                  Or continue with
-                </span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <Button variant="outline" className="w-full" disabled>
-                  <span className="text-base"></span>
-                  <span className="sr-only">Login with Apple</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  type="button"
-                  onClick={() => loginWithGoogle()}
-                  disabled={!googleClientId || googleLoading}
-                >
-                  <FcGoogle
-                    className={cn(
-                      "h-5 w-5",
-                      googleLoading ? "animate-spin" : "",
-                    )}
-                  />
-                  <span className="sr-only">Login with Google</span>
-                </Button>
-                <Button variant="outline" className="w-full" disabled>
-                  <span className="text-base font-semibold">∞</span>
-                  <span className="sr-only">Login with Meta</span>
-                </Button>
-              </div>
-
-              <div className="text-center text-sm">
-                Don&apos;t have an account?{" "}
-                <a href="/signup" className="underline underline-offset-4">
-                  Sign up
-                </a>
+        <form 
+          onSubmit={method === "password" ? handleEmailLogin : verifyLoginCode} 
+          className="space-y-6"
+        >
+          <div className="space-y-4">
+            {/* Email Input */}
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-widest ml-1 text-muted-foreground/50">
+                Institutional Email
+              </Label>
+              <div className="relative group">
+                <Mail className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground/20 group-focus-within:text-primary transition-colors" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="name@university.edu"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="h-12 pl-12 rounded-2xl bg-white/[0.02] border-white/5 focus:border-primary/40 focus:bg-white/[0.04] transition-all text-sm text-white placeholder:text-white/10"
+                  required
+                />
               </div>
             </div>
-          </form>
-        </CardContent>
-      </Card>
 
-      <div className="text-balance text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 hover:[&_a]:text-primary">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
-        and <a href="#">Privacy Policy</a>.
+            {/* Password or Code Field */}
+            {method === "password" ? (
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center justify-between ml-1">
+                  <Label htmlFor="password" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
+                    Security Key
+                  </Label>
+                  <button type="button" className="text-[10px] font-bold uppercase tracking-widest text-primary/40 hover:text-primary transition-colors">
+                    Recovery
+                  </button>
+                </div>
+                <div className="relative group">
+                  <KeyRound className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground/20 group-focus-within:text-primary transition-colors" />
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="h-12 pl-12 rounded-2xl bg-white/[0.02] border-white/5 focus:border-primary/40 focus:bg-white/[0.04] transition-all text-sm text-white"
+                    required
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center justify-between ml-1">
+                  <Label htmlFor="code" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
+                    One-Time Code
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={requestLoginCode}
+                    disabled={!email || codeLoading}
+                    className="text-[10px] font-bold uppercase tracking-widest text-primary hover:text-primary/80 transition-colors disabled:opacity-30"
+                  >
+                    {codeRequested ? "Resend" : "Send Code"}
+                  </button>
+                </div>
+                <div className="relative group">
+                  <ShieldCheck className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground/20 group-focus-within:text-primary transition-colors" />
+                  <Input
+                    id="code"
+                    inputMode="numeric"
+                    placeholder="······"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    className="h-12 pl-12 rounded-2xl bg-white/[0.02] border-white/5 focus:border-primary/40 focus:bg-white/[0.04] transition-all text-sm text-white font-mono tracking-widest"
+                    required
+                    disabled={!codeRequested}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Messages */}
+          {(error || info) && (
+            <div className={cn(
+              "flex items-start gap-3 rounded-2xl border p-4 animate-in slide-in-from-top-1",
+              error ? "bg-red-500/5 border-red-500/10 text-red-500/70" : "bg-primary/5 border-primary/10 text-primary/70"
+            )}>
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <p className="text-[11px] font-bold leading-tight uppercase tracking-tight">
+                {error || info}
+              </p>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="space-y-4">
+            <Button
+              type="submit"
+              className="w-full h-12 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-primary/10 transition-all active:scale-[0.98] border-t border-white/20"
+              disabled={loading || (method === "code" && !codeRequested)}
+            >
+              {loading ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <span className="flex items-center gap-2">
+                  {method === "password" ? "Authorize Access" : "Verify Identity"}
+                  <ArrowRight size={14} className="opacity-50" />
+                </span>
+              )}
+            </Button>
+
+            <button
+              type="button"
+              className="w-full text-center text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/30 hover:text-primary transition-colors"
+              onClick={toggleMethod}
+            >
+              {method === "password" ? "Use Code for Login" : "Return to Password"}
+            </button>
+          </div>
+        </form>
+
+        <div className="mt-8 space-y-6">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <Separator className="bg-white/5" />
+            </div>
+            <div className="relative flex justify-center text-[9px] uppercase tracking-[0.3em]">
+              <span className="bg-[#0e0e10] rounded-full px-4 text-muted-foreground/30 font-bold backdrop-blur-sm">
+                SSO Options
+              </span>
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => loginWithGoogle()}
+            disabled={!googleClientId || googleLoading || loading}
+            className="w-full h-12 rounded-2xl border-white/5 bg-white/[0.03] hover:bg-white/[0.08] text-[10px] font-bold uppercase tracking-widest transition-all text-white/70 hover:text-white"
+          >
+            {googleLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <FcGoogle className="mr-3 h-5 w-5" />
+            )}
+            Continue with Google
+          </Button>
+        </div>
+      </div>
+
+      <div className="mt-6 text-center">
+        <p className="text-[10px] font-bold text-muted-foreground/20 uppercase tracking-[0.2em]">
+          Encrypted Protocol v2.4.0
+        </p>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { prisma } from "../../config/prisma";
 import { formatDbTime } from "../../utils/time";
 import { getWeekdayUTC } from "../../utils/weekday";
 import { syncGroupSubjectDerivedLinks } from "../sync/derivedRelations";
+import { AttendanceSheetsSyncService } from "../attendance-sheets/AttendanceSheetsSyncService";
 
 function pad2(n: number) {
   return String(n).padStart(2, "0");
@@ -315,6 +316,64 @@ async function validateScheduleRefsBulk(inputs: CreateMonthlyScheduleInput[]) {
 }
 
 export class AdminMonthlyScheduleService {
+  private async computeDesiredGradesAssignmentCount(opts: {
+    groupId: string;
+    subjectId: string;
+  }): Promise<number> {
+    const [existingGradeBook, scheduleDistinctDays] = await Promise.all([
+      prisma.gradeBook.findUnique({
+        where: {
+          groupId_subjectId: {
+            groupId: opts.groupId,
+            subjectId: opts.subjectId,
+          },
+        },
+        select: { assignmentCount: true },
+      }),
+      prisma.schedule.findMany({
+        where: { groupId: opts.groupId, subjectId: opts.subjectId },
+        select: { calendarDayId: true },
+        distinct: ["calendarDayId"],
+        take: 100_000,
+      }),
+    ]);
+
+    const existing = existingGradeBook?.assignmentCount ?? 0;
+    const computed = scheduleDistinctDays.length;
+
+    // Guardrails: grades sheet HW columns are capped in GradesSheetsSyncService.
+    // We keep it monotonic (never auto-decrease) to avoid surprising teachers.
+    const desired = Math.max(existing, computed, 1);
+    return Math.min(desired, 200);
+  }
+
+  private triggerSheetsAutoEnsure(opts: {
+    groupId: string;
+    subjectId: string;
+    dates: string[];
+    reason: string;
+  }) {
+    // Fire-and-forget: schedule CRUD should not fail (or block) because Sheets is misconfigured.
+    void (async () => {
+      try {
+        const assignmentCount = await this.computeDesiredGradesAssignmentCount({
+          groupId: opts.groupId,
+          subjectId: opts.subjectId,
+        });
+
+        const attendanceSheets = new AttendanceSheetsSyncService(prisma);
+        await attendanceSheets.ensureTabAndDates({
+          groupId: opts.groupId,
+          subjectId: opts.subjectId,
+          dates: opts.dates,
+          assignmentCount,
+        });
+      } catch {
+        // Non-fatal by design.
+      }
+    })();
+  }
+
   async listMonths() {
     const rows = await prisma.calendarDay.groupBy({
       by: ["year", "month"],
@@ -486,6 +545,13 @@ export class AdminMonthlyScheduleService {
       } catch {
         // Non-fatal
       }
+
+      this.triggerSheetsAutoEnsure({
+        groupId: created.row.groupId,
+        subjectId: created.row.subjectId,
+        dates: [toISODateOnlyUTC(created.row.calendarDay.date)],
+        reason: "schedule_create",
+      });
 
       return {
         ok: true as const,
@@ -691,6 +757,13 @@ export class AdminMonthlyScheduleService {
         // Non-fatal
       }
 
+      this.triggerSheetsAutoEnsure({
+        groupId: updated.row.groupId,
+        subjectId: updated.row.subjectId,
+        dates: [toISODateOnlyUTC(updated.row.calendarDay.date)],
+        reason: "schedule_update",
+      });
+
       return {
         ok: true as const,
         data: {
@@ -876,6 +949,27 @@ export class AdminMonthlyScheduleService {
       } catch {
         // Non-fatal
       }
+    }
+
+    // Ensure Sheets tabs/columns for all created (group,subject) pairs.
+    // We include all created dates for each pair to reduce API calls.
+    const datesByTarget = new Map<string, Set<string>>();
+    for (const it of list) {
+      const key = `${it.groupId}:${it.subjectId}`;
+      const set = datesByTarget.get(key) ?? new Set<string>();
+      set.add(it.date);
+      datesByTarget.set(key, set);
+    }
+
+    for (const [key, dateSet] of datesByTarget.entries()) {
+      const [groupId, subjectId] = key.split(":");
+      if (!groupId || !subjectId) continue;
+      this.triggerSheetsAutoEnsure({
+        groupId,
+        subjectId,
+        dates: Array.from(dateSet),
+        reason: "schedule_bulk_create",
+      });
     }
 
     return {

@@ -14,12 +14,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, ShieldCheck, Mail, Lock, Zap, Loader2, ArrowRight } from "lucide-react";
 import { auth } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
-  "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:3001";
 
 export function LoginClient() {
   const router = useRouter();
@@ -59,9 +58,7 @@ export function LoginClient() {
     try {
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
@@ -141,7 +138,6 @@ export function LoginClient() {
       setError("Google login failed: missing credential");
       return;
     }
-
     setError("");
     setGoogleLoading(true);
     try {
@@ -150,13 +146,11 @@ export function LoginClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken }),
       });
-
       const json = await response.json();
       if (!response.ok || !json?.success) {
         setError(json?.message || "Google login failed");
         return;
       }
-
       auth.storeAuth(json.data.token, json.data.user);
       router.push(from);
     } catch (err: any) {
@@ -166,15 +160,6 @@ export function LoginClient() {
     }
   };
 
-  const toggleMethod = () => {
-    setError("");
-    setInfo("");
-    setPassword("");
-    setCode("");
-    setCodeRequested(false);
-    setMethod((m) => (m === "password" ? "code" : "password"));
-  };
-
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   const googleBtnRef = useRef<HTMLDivElement | null>(null);
   const [googleWidth, setGoogleWidth] = useState<number | undefined>(undefined);
@@ -182,78 +167,56 @@ export function LoginClient() {
   useEffect(() => {
     const el = googleBtnRef.current;
     if (!el) return;
-
     const measure = () => {
       const w = el.clientWidth;
       if (w && w > 0) setGoogleWidth(w);
     };
-
     measure();
-
     const ro = new ResizeObserver(() => measure());
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">UniFlow</h1>
+    <div className="relative flex min-h-screen items-center justify-center bg-[#030711] overflow-hidden p-4">
+      {/* Background Ambient Glows */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 blur-[120px] rounded-full" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full" />
+
+      <div className="relative w-full max-w-[440px] space-y-8 animate-in fade-in zoom-in duration-700">
+        <div className="flex flex-col items-center space-y-2">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/25">
+            <Zap className="h-7 w-7 text-primary-foreground fill-primary-foreground" />
+          </div>
+          <h1 className="text-3xl font-black tracking-tighter text-white">
+            Uni<span className="text-primary">Flow</span>
+          </h1>
+          <p className="text-sm text-muted-foreground/60 font-medium uppercase tracking-[0.2em]">
+            Academic OS
+          </p>
         </div>
 
-        <Card>
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl text-center">Sign in</CardTitle>
-            <CardDescription className="text-center">
+        <Card className="rounded-[40px] border-border/40 bg-muted/10 backdrop-blur-2xl shadow-2xl overflow-hidden border">
+          <CardHeader className="pt-10 pb-6 px-10 space-y-2">
+            <CardTitle className="text-2xl font-bold tracking-tight text-white/90">
+              Welcome back
+            </CardTitle>
+            <CardDescription className="text-muted-foreground/50 font-medium">
               {method === "password"
-                ? "Use your email and password"
-                : "Use a one-time code sent to your email"}
+                ? "Sign in to access your dashboard"
+                : "Enter the verification code sent to your email"}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid gap-4">
-              <div className="flex justify-center">
-                <Button
-                  type="button"
-                  variant="link"
-                  className="h-auto p-0 text-sm"
-                  onClick={toggleMethod}
-                >
-                  {method === "password"
-                    ? "Login with code instead"
-                    : "Login with password instead"}
-                </Button>
-              </div>
 
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <Separator />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
-                    Or continue with
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-11"
-                  disabled
-                  aria-label="Continue with GitHub"
-                >
-                  <span className="text-lg font-semibold">⌁</span>
-                </Button>
-
-                <div
+          <CardContent className="px-10 pb-10 space-y-6">
+            {/* Social Logins */}
+            <div className="grid grid-cols-2 gap-3">
+               <div
                   ref={googleBtnRef}
-                  className={
-                    "h-11 flex items-center justify-center rounded-md border bg-background " +
-                    (googleLoading ? "pointer-events-none opacity-70" : "")
-                  }
+                  className={cn(
+                    "h-12 flex items-center justify-center rounded-2xl border border-white/5 bg-white/5 hover:bg-white/10 transition-all cursor-pointer overflow-hidden",
+                    googleLoading && "pointer-events-none opacity-50"
+                  )}
                 >
                   {googleClientId ? (
                     <GoogleLogin
@@ -262,124 +225,147 @@ export function LoginClient() {
                       theme="outline"
                       size="large"
                       type="icon"
-                      shape="rectangular"
+                      shape="circle"
                       width={googleWidth}
-                      logo_alignment="center"
                     />
                   ) : (
-                    <span className="text-muted-foreground text-sm">G</span>
+                    <span className="text-muted-foreground text-xs font-bold uppercase tracking-widest">G-Cloud</span>
                   )}
                 </div>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-11"
-                  disabled
-                  aria-label="Continue with Apple"
-                >
-                  <span className="text-lg"></span>
+                <Button variant="outline" className="h-12 rounded-2xl border-white/5 bg-white/5 hover:bg-white/10 text-white/40" disabled>
+                   <span className="text-xs font-bold uppercase tracking-widest">SSO</span>
                 </Button>
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <Separator className="bg-white/5" />
+              </div>
+              <div className="relative flex justify-center text-[10px] uppercase tracking-[0.3em]">
+                <span className="bg-transparent px-4 text-muted-foreground/40 font-bold backdrop-blur-md">
+                  Secure Entry
+                </span>
+              </div>
+            </div>
+
+            <form
+              onSubmit={method === "password" ? handleEmailLogin : verifyLoginCode}
+              className="space-y-5"
+            >
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 ml-1">
+                    Work Email
+                  </Label>
+                  <div className="relative group">
+                    <Mail className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="name@university.edu"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="h-12 rounded-2xl border-white/10 bg-white/5 pl-12 focus:ring-primary/20 transition-all text-white placeholder:text-white/10"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {method === "password" ? (
+                  <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                    <div className="flex items-center justify-between ml-1">
+                      <Label htmlFor="password" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                        Security Key
+                      </Label>
+                    </div>
+                    <div className="relative group">
+                      <Lock className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
+                      <Input
+                        id="password"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="h-12 rounded-2xl border-white/10 bg-white/5 pl-12 focus:ring-primary/20 transition-all text-white placeholder:text-white/10"
+                        required
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                    <div className="flex items-center justify-between ml-1">
+                      <Label htmlFor="code" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                        One-Time Passcode
+                      </Label>
+                      <button
+                        type="button"
+                        onClick={requestLoginCode}
+                        disabled={!email || codeLoading}
+                        className="text-[10px] font-bold uppercase tracking-widest text-primary hover:text-primary/80 transition-colors disabled:opacity-40"
+                      >
+                        {codeRequested ? "Resend OTP" : "Send OTP"}
+                      </button>
+                    </div>
+                    <div className="relative group">
+                      <ShieldCheck className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
+                      <Input
+                        id="code"
+                        inputMode="numeric"
+                        placeholder="000 000"
+                        value={code}
+                        onChange={(e) => setCode(e.target.value)}
+                        className="h-12 rounded-2xl border-white/10 bg-white/5 pl-12 focus:ring-primary/20 transition-all text-white tracking-[0.5em] placeholder:text-white/10 font-mono"
+                        required
+                        disabled={!codeRequested}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {googleLoading && (
-                <div className="text-center text-xs text-muted-foreground">
-                  Signing in...
+              {/* Status Messages */}
+              {(error || info) && (
+                <div className={cn(
+                  "rounded-2xl p-4 text-xs font-medium flex items-start gap-3 animate-in fade-in duration-300",
+                  error ? "bg-destructive/10 text-destructive border border-destructive/20" : "bg-primary/10 text-primary border border-primary/20"
+                )}>
+                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <span>{error || info}</span>
                 </div>
               )}
 
-              <form
-                onSubmit={
-                  method === "password" ? handleEmailLogin : verifyLoginCode
-                }
-                className="space-y-4"
+              <Button 
+                type="submit" 
+                className="group relative w-full h-14 rounded-2xl bg-primary text-primary-foreground font-bold uppercase tracking-widest overflow-hidden hover:scale-[1.02] active:scale-[0.98] transition-all"
+                disabled={loading || (method === "code" && !codeRequested)}
               >
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="m@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    autoComplete="email"
-                  />
-                </div>
-
-                {method === "password" ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      autoComplete="current-password"
-                    />
-                  </div>
+                {loading || googleLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
                 ) : (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="code">Code</Label>
-                      <Button
-                        type="button"
-                        variant="link"
-                        className="h-auto p-0 text-sm"
-                        onClick={requestLoginCode}
-                        disabled={!email || codeLoading}
-                      >
-                        {codeRequested ? "Resend code" : "Send code"}
-                      </Button>
-                    </div>
-                    <Input
-                      id="code"
-                      inputMode="numeric"
-                      placeholder="123456"
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                      required
-                      disabled={!codeRequested}
-                    />
-                    {!codeRequested && (
-                      <div className="text-xs text-muted-foreground">
-                        Click &quot;Send code&quot; to receive a one-time code.
-                      </div>
-                    )}
+                  <div className="flex items-center gap-2">
+                    {method === "password" ? "Authorize" : "Verify Session"}
+                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                   </div>
                 )}
+              </Button>
 
-                {info && !error && (
-                  <div className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
-                    {info}
-                  </div>
-                )}
-
-                {error && (
-                  <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive flex items-start gap-2">
-                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <span>{error}</span>
-                  </div>
-                )}
-
-                {method === "password" ? (
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Loading..." : "Login"}
-                  </Button>
-                ) : (
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={loading || !codeRequested}
-                  >
-                    {loading ? "Loading..." : "Verify & login"}
-                  </Button>
-                )}
-              </form>
-            </div>
+              <button
+                type="button"
+                className="w-full text-center text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/40 hover:text-white/60 transition-colors pt-2"
+                onClick={() => {
+                   setError("");
+                   setInfo("");
+                   setMethod(m => m === "password" ? "code" : "password");
+                }}
+              >
+                {method === "password" ? "Switch to Magic Link" : "Back to Password Login"}
+              </button>
+            </form>
           </CardContent>
         </Card>
+
+        <p className="text-center text-[11px] text-muted-foreground/30 font-medium tracking-tight">
+          Protected by AES-256 Encryption & OAuth 2.0 Protocol
+        </p>
       </div>
     </div>
   );
