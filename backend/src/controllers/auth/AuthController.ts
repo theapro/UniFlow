@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { env } from "../../config/env";
 import { OAuth2Client } from "google-auth-library";
 import { ResendEmailService } from "../../services/email/ResendEmailService";
+import { Role } from "@prisma/client";
 
 const LOGIN_CODE_EXPIRES_MINUTES = 10;
 
@@ -22,7 +23,7 @@ function generateLoginCode() {
 function buildUserData(user: {
   id: string;
   email: string;
-  role: any;
+  role: Role;
   student?: { fullName: string; studentNumber: string | null } | null;
   teacher?: { fullName: string; staffNo: string | null } | null;
 }) {
@@ -30,6 +31,7 @@ function buildUserData(user: {
     id: user.id,
     email: user.email,
     role: user.role,
+    permissions: [] as string[],
   };
 
   if (user.student) {
@@ -42,6 +44,20 @@ function buildUserData(user: {
   }
 
   return userData;
+}
+
+async function listPermissionsForRole(role: Role): Promise<string[]> {
+  if (role === Role.ADMIN) {
+    const all = await prisma.permission.findMany({ select: { name: true } });
+    return all.map((p) => p.name);
+  }
+
+  const rows = await prisma.rolePermission.findMany({
+    where: { role },
+    select: { permission: true },
+  });
+
+  return rows.map((r) => r.permission);
 }
 
 export class AuthController {
@@ -79,6 +95,7 @@ export class AuthController {
       }
 
       const userData = buildUserData(user);
+      userData.permissions = await listPermissionsForRole(user.role);
 
       // Generate JWT token
       const token = jwt.sign({ userId: userData.id }, env.jwtSecret, {
@@ -174,6 +191,7 @@ export class AuthController {
       }
 
       const userData = buildUserData(user);
+      userData.permissions = await listPermissionsForRole(user.role);
       const token = jwt.sign({ userId: userData.id }, env.jwtSecret, {
         expiresIn: env.jwtExpiresIn as SignOptions["expiresIn"],
       });
@@ -243,6 +261,7 @@ export class AuthController {
 
       const mailer = new ResendEmailService();
       const userData = buildUserData(user);
+      userData.permissions = await listPermissionsForRole(user.role);
       await mailer.sendLoginCode({
         to: user.email,
         fullName: userData.fullName ?? null,
@@ -335,6 +354,7 @@ export class AuthController {
       });
 
       const userData = buildUserData(user);
+      userData.permissions = await listPermissionsForRole(user.role);
       const token = jwt.sign({ userId: userData.id }, env.jwtSecret, {
         expiresIn: env.jwtExpiresIn as SignOptions["expiresIn"],
       });

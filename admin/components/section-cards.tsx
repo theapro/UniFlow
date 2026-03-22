@@ -1,101 +1,160 @@
-import { TrendingDownIcon, TrendingUpIcon } from "lucide-react"
+"use client";
 
-import { Badge } from "@/components/ui/badge"
+import * as React from "react";
+import { statsApi } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import {
-  Card,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+  Users2,
+  UserMinus,
+  GraduationCap,
+  UserSquare2,
+  Loader2,
+} from "lucide-react";
+
+type SummaryStats = {
+  accounts: {
+    total: number;
+    byRole: {
+      STUDENT: number;
+      TEACHER: number;
+      ADMIN: number;
+    };
+    loggedInByRole: {
+      STUDENT: number;
+      TEACHER: number;
+      ADMIN: number;
+    };
+    neverLoggedInByRole: {
+      STUDENT: number;
+      TEACHER: number;
+      ADMIN: number;
+    };
+  };
+  integrity?: {
+    studentAccountsMissingStudentId: number;
+    teacherAccountsMissingTeacherId: number;
+    studentAccountsWithTeacherId: number;
+    teacherAccountsWithStudentId: number;
+  };
+  entities: {
+    students: number;
+    teachers: number;
+    groups: number;
+    cohorts: number;
+    subjects: number;
+    rooms: number;
+    timeSlots: number;
+    lessons: number;
+    schedules: number;
+  };
+};
 
 export function SectionCards() {
+  const [summary, setSummary] = React.useState<SummaryStats | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let mounted = true;
+    statsApi
+      .summary()
+      .then((res) => {
+        if (!mounted) return;
+        setSummary(res.data.data as SummaryStats);
+        setIsLoading(false);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setIsLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
-    <div className="*:data-[slot=card]:shadow-xs @xl/main:grid-cols-2 @5xl/main:grid-cols-4 grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card lg:px-6">
-      <Card className="@container/card">
-        <CardHeader className="relative">
-          <CardDescription>Total Revenue</CardDescription>
-          <CardTitle className="@[250px]/card:text-3xl text-2xl font-semibold tabular-nums">
-            $1,250.00
-          </CardTitle>
-          <div className="absolute right-4 top-4">
-            <Badge variant="outline" className="flex gap-1 rounded-lg text-xs">
-              <TrendingUpIcon className="size-3" />
-              +12.5%
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Trending up this month <TrendingUpIcon className="size-4" />
-          </div>
-          <div className="text-muted-foreground">
-            Visitors for the last 6 months
-          </div>
-        </CardFooter>
-      </Card>
-      <Card className="@container/card">
-        <CardHeader className="relative">
-          <CardDescription>New Customers</CardDescription>
-          <CardTitle className="@[250px]/card:text-3xl text-2xl font-semibold tabular-nums">
-            1,234
-          </CardTitle>
-          <div className="absolute right-4 top-4">
-            <Badge variant="outline" className="flex gap-1 rounded-lg text-xs">
-              <TrendingDownIcon className="size-3" />
-              -20%
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Down 20% this period <TrendingDownIcon className="size-4" />
-          </div>
-          <div className="text-muted-foreground">
-            Acquisition needs attention
-          </div>
-        </CardFooter>
-      </Card>
-      <Card className="@container/card">
-        <CardHeader className="relative">
-          <CardDescription>Active Accounts</CardDescription>
-          <CardTitle className="@[250px]/card:text-3xl text-2xl font-semibold tabular-nums">
-            45,678
-          </CardTitle>
-          <div className="absolute right-4 top-4">
-            <Badge variant="outline" className="flex gap-1 rounded-lg text-xs">
-              <TrendingUpIcon className="size-3" />
-              +12.5%
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Strong user retention <TrendingUpIcon className="size-4" />
-          </div>
-          <div className="text-muted-foreground">Engagement exceed targets</div>
-        </CardFooter>
-      </Card>
-      <Card className="@container/card">
-        <CardHeader className="relative">
-          <CardDescription>Growth Rate</CardDescription>
-          <CardTitle className="@[250px]/card:text-3xl text-2xl font-semibold tabular-nums">
-            4.5%
-          </CardTitle>
-          <div className="absolute right-4 top-4">
-            <Badge variant="outline" className="flex gap-1 rounded-lg text-xs">
-              <TrendingUpIcon className="size-3" />
-              +4.5%
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Steady performance <TrendingUpIcon className="size-4" />
-          </div>
-          <div className="text-muted-foreground">Meets growth projections</div>
-        </CardFooter>
-      </Card>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 px-1">
+      <StatCard
+        label="Total Accounts"
+        value={summary?.accounts.total}
+        subValue={
+          summary
+            ? `Students ${summary.accounts.byRole.STUDENT} • Teachers ${summary.accounts.byRole.TEACHER} • Admins ${summary.accounts.byRole.ADMIN}`
+            : "..."
+        }
+        icon={Users2}
+        isLoading={isLoading}
+      />
+      <StatCard
+        label="Students Accounts"
+        value={summary?.accounts.byRole.STUDENT}
+        subValue={
+          summary
+            ? `Logged in ${summary.accounts.loggedInByRole.STUDENT} • Never ${summary.accounts.neverLoggedInByRole.STUDENT}${summary.integrity?.studentAccountsMissingStudentId ? ` • Missing student link ${summary.integrity.studentAccountsMissingStudentId}` : ""}`
+            : "..."
+        }
+        icon={UserMinus}
+        isLoading={isLoading}
+      />
+      <StatCard
+        label="Teachers Accounts"
+        value={summary?.accounts.byRole.TEACHER}
+        subValue={
+          summary
+            ? `Logged in ${summary.accounts.loggedInByRole.TEACHER} • Never ${summary.accounts.neverLoggedInByRole.TEACHER}${summary.integrity?.teacherAccountsMissingTeacherId ? ` • Missing teacher link ${summary.integrity.teacherAccountsMissingTeacherId}` : ""}`
+            : "..."
+        }
+        icon={GraduationCap}
+        isLoading={isLoading}
+      />
+      <StatCard
+        label="Admin Accounts"
+        value={summary?.accounts.byRole.ADMIN}
+        subValue={
+          summary
+            ? `Logged in ${summary.accounts.loggedInByRole.ADMIN} • Never ${summary.accounts.neverLoggedInByRole.ADMIN}`
+            : "..."
+        }
+        icon={UserSquare2}
+        isLoading={isLoading}
+      />
     </div>
-  )
+  );
+}
+
+function StatCard({ label, value, subValue, icon: Icon, isLoading }: any) {
+  return (
+    <div className="group relative rounded-[32px] border border-white/5 bg-zinc-900/20 p-8 transition-all duration-500 hover:bg-white/[0.03] overflow-hidden">
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/5 border border-white/10 group-hover:border-primary/20 transition-colors">
+            <Icon className="h-5 w-5 text-muted-foreground/60 group-hover:text-primary transition-colors" />
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/30">
+            Analytics
+          </span>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/40">
+            {label}
+          </p>
+          <div className="flex items-baseline gap-2">
+            {isLoading ? (
+              <Loader2 className="h-8 w-8 animate-spin text-white/5" />
+            ) : (
+              <span className="text-4xl font-light tracking-tighter text-white/90 tabular-nums">
+                {value ?? "—"}
+              </span>
+            )}
+          </div>
+          <p className="text-[10px] font-medium text-muted-foreground/20 uppercase tracking-tight">
+            {subValue}
+          </p>
+        </div>
+      </div>
+
+      {/* Subtle corner glow */}
+      <div className="absolute -right-4 -top-4 h-24 w-24 bg-primary/5 blur-[40px] rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+    </div>
+  );
 }

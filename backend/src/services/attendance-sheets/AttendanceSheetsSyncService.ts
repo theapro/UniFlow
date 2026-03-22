@@ -1,4 +1,4 @@
-import type { AttendanceStatus, PrismaClient, Weekday } from ".prisma/client";
+import type { AttendanceStatus, PrismaClient, Weekday } from "@prisma/client";
 import { randomUUID } from "crypto";
 import { env } from "../../config/env";
 import { AttendanceSheetsClient } from "./AttendanceSheetsClient";

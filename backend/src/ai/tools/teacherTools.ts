@@ -1,6 +1,6 @@
 import { TeacherService } from "../../services/user/TeacherService";
 import { prisma } from "../../config/prisma";
-import { UserRole } from "@prisma/client";
+import { Role } from "@prisma/client";
 
 export async function getTeacherDashboard(params: {
   user: Express.User;
@@ -19,7 +19,7 @@ export async function getTeacherDashboard(params: {
     endsAt: string | null;
   }>;
 }> {
-  if (params.user.role !== UserRole.TEACHER) {
+  if (params.user.role !== Role.TEACHER) {
     throw new Error("Only teachers can use this tool");
   }
   if (!params.user.teacherId) {

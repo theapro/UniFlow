@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { prisma } from "../config/prisma";
 import { fail } from "../utils/responses";
 import { env } from "../config/env";
+import { Role } from "@prisma/client";
 
 type JwtTokenPayload = {
   userId: string;
@@ -49,12 +50,25 @@ export async function authMiddleware(
       return fail(res, 401, "User not found");
     }
 
+    const permissions =
+      user.role === Role.ADMIN
+        ? (await prisma.permission.findMany({ select: { name: true } })).map(
+            (p) => p.name,
+          )
+        : (
+            await prisma.rolePermission.findMany({
+              where: { role: user.role },
+              select: { permission: true },
+            })
+          ).map((r) => r.permission);
+
     req.user = {
       id: user.id,
       email: user.email,
       role: user.role,
       studentId: user.studentId,
       teacherId: user.teacherId,
+      permissions,
       ...(user.student
         ? {
             fullName: user.student.fullName,

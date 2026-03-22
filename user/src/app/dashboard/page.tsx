@@ -51,6 +51,7 @@ async function DashboardWithUser({ token }: { token: string }) {
       email: me.email,
       fullName: me.fullName ?? null,
       role: me.role,
+      permissions: Array.isArray(me.permissions) ? me.permissions : [],
     };
   } catch {
     redirect("/login?from=/dashboard&error=session_expired");

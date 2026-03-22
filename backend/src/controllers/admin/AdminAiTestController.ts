@@ -233,7 +233,7 @@ export class AdminAiTestController {
       return {
         id: u.id,
         email: u.email,
-        role: u.role,
+        role: params.asRole,
         fullName:
           params.asRole === "STUDENT"
             ? (u.student?.fullName ?? null)
@@ -269,7 +269,7 @@ export class AdminAiTestController {
     return {
       id: u.id,
       email: u.email,
-      role: u.role,
+      role: params.asRole,
       fullName:
         params.asRole === "STUDENT"
           ? (u.student?.fullName ?? null)

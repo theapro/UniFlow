@@ -1,4 +1,4 @@
-import type { UserRole } from "@prisma/client";
+import type { Role } from "@prisma/client";
 import { env } from "../../config/env";
 import { OpenAiCompatibleClient } from "../../services/ai/OpenAiCompatibleClient";
 import { AiModelService } from "../../services/ai/AiModelService";
@@ -9,7 +9,7 @@ export class LlmService {
   private readonly models = new AiModelService();
 
   async chatJson(params: {
-    role: UserRole;
+    role: Role;
     requestedModel?: string;
     temperature?: number;
     maxTokens?: number;

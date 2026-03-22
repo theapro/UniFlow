@@ -4,10 +4,12 @@ import userRoutes from "./user.routes";
 import aiRoutes from "./ai.routes";
 import authRoutes from "./auth.routes";
 import webhooksRoutes from "./webhooks.routes";
+import scheduleRoutes from "./schedule.routes";
 
 const router = Router();
 
 router.use("/auth", authRoutes);
+router.use("/schedule", scheduleRoutes);
 router.use("/admin", adminRoutes);
 router.use("/user", userRoutes);
 router.use("/ai", aiRoutes);

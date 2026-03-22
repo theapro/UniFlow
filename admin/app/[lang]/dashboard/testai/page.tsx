@@ -5,6 +5,8 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { aiAdminApi } from "@/lib/api";
+import { authApi } from "@/lib/api";
+import { hasPermission } from "@/lib/permissions";
 
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,6 +51,9 @@ type ToolConfig = {
 };
 
 export default function TestAiPage() {
+  const user = authApi.getStoredUser();
+  const canSee = hasPermission(user, "ACCESS_AI_SETTINGS");
+
   const [asRole, setAsRole] = React.useState<"STUDENT" | "TEACHER" | "ADMIN">(
     "STUDENT",
   );
@@ -190,6 +195,7 @@ export default function TestAiPage() {
 
   const toolsQuery = useQuery({
     queryKey: ["ai-admin", "tools"],
+    enabled: canSee,
     queryFn: async () => {
       const res = await aiAdminApi.tools.list();
       const items = (res.data?.data?.items ?? []) as ToolConfig[];
@@ -238,6 +244,8 @@ export default function TestAiPage() {
       toast.error(msg);
     },
   });
+
+  if (!canSee) return null;
 
   return (
     <div className="container space-y-6">

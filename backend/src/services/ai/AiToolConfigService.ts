@@ -1,4 +1,4 @@
-import { UserRole } from "@prisma/client";
+import { Role } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { AI_TOOL_NAMES, type AiToolName } from "../ai-tools/toolNames";
 
@@ -12,11 +12,12 @@ export type AiToolConfigDto = {
   updatedAt: Date;
 };
 
-function roleAllowed(cfg: AiToolConfigDto, role: UserRole): boolean {
+function roleAllowed(cfg: AiToolConfigDto, role: Role): boolean {
   if (!cfg.isEnabled) return false;
-  if (role === UserRole.ADMIN) return cfg.enabledForAdmins;
-  if (role === UserRole.TEACHER) return cfg.enabledForTeachers;
-  return cfg.enabledForStudents;
+  if (role === Role.ADMIN) return cfg.enabledForAdmins;
+  if (role === Role.TEACHER) return cfg.enabledForTeachers;
+  if (role === Role.STUDENT) return cfg.enabledForStudents;
+  return false;
 }
 
 export class AiToolConfigService {
@@ -33,6 +34,9 @@ export class AiToolConfigService {
       if (
         name === "getStudentProfile" ||
         name === "getStudentScheduleToday" ||
+        name === "getTodaySchedule" ||
+        name === "getWeeklySchedule" ||
+        name === "getMonthlySchedule" ||
         name === "getStudentAttendanceRecent" ||
         name === "getStudentGradesRecent"
       ) {
@@ -98,7 +102,7 @@ export class AiToolConfigService {
     }));
   }
 
-  async listAllowed(role: UserRole): Promise<AiToolConfigDto[]> {
+  async listAllowed(role: Role): Promise<AiToolConfigDto[]> {
     const all = await this.listAll();
     return all.filter((c) => roleAllowed(c, role));
   }
@@ -123,6 +127,9 @@ export class AiToolConfigService {
             "getStudentDashboard",
             "getStudentProfile",
             "getStudentScheduleToday",
+            "getTodaySchedule",
+            "getWeeklySchedule",
+            "getMonthlySchedule",
             "getStudentAttendanceRecent",
             "getStudentGradesRecent",
           ].includes(toolName),
@@ -160,7 +167,7 @@ export class AiToolConfigService {
 
   async isToolAllowed(params: {
     name: AiToolName;
-    role: UserRole;
+    role: Role;
   }): Promise<boolean> {
     await this.ensureDefaults();
     const cfg = await prisma.aiToolConfig.findUnique({

@@ -20,6 +20,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 
+import { hasPermission } from "@/lib/permissions";
+
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
 import {
@@ -121,6 +123,11 @@ export function UniFlowSidebar({
       url: `${dashboardBase}/settings`,
       icon: SettingsIcon,
     },
+    {
+      name: dict?.nav?.accessControl ?? "Access Control",
+      url: `${dashboardBase}/access-control`,
+      icon: SettingsIcon,
+    },
   ];
 
   const aiSubItems = [
@@ -187,6 +194,8 @@ export function UniFlowSidebar({
     pathname.startsWith(`${dashboardBase}/ai-debug-console`) ||
     pathname.startsWith(`${dashboardBase}/testai`) ||
     pathname.startsWith(`${dashboardBase}/ai-models`);
+
+  const canSeeAiSettings = hasPermission(user, "ACCESS_AI_SETTINGS");
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -372,44 +381,46 @@ export function UniFlowSidebar({
               </SidebarMenuItem>
             </Collapsible>
 
-            <Collapsible
-              asChild
-              defaultOpen={isAiActive}
-              className="group/collapsible"
-            >
-              <SidebarMenuItem>
-                <CollapsibleTrigger asChild>
-                  <SidebarMenuButton
-                    tooltip={dict?.nav?.aiSettings ?? "AI Settings"}
-                    isActive={isAiActive}
-                  >
-                    <BrainIcon />
-                    <span>{dict?.nav?.aiSettings ?? "AI Settings"}</span>
-                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                  </SidebarMenuButton>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <SidebarMenuSub>
-                    {aiSubItems.map((subItem) => (
-                      <SidebarMenuSubItem key={subItem.title}>
-                        <SidebarMenuSubButton
-                          asChild
-                          isActive={
-                            pathname === subItem.url ||
-                            pathname.startsWith(subItem.url + "/")
-                          }
-                        >
-                          <Link href={subItem.url}>
-                            <subItem.icon className="h-4 w-4" />
-                            <span>{subItem.title}</span>
-                          </Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    ))}
-                  </SidebarMenuSub>
-                </CollapsibleContent>
-              </SidebarMenuItem>
-            </Collapsible>
+            {canSeeAiSettings && (
+              <Collapsible
+                asChild
+                defaultOpen={isAiActive}
+                className="group/collapsible"
+              >
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                      tooltip={dict?.nav?.aiSettings ?? "AI Settings"}
+                      isActive={isAiActive}
+                    >
+                      <BrainIcon />
+                      <span>{dict?.nav?.aiSettings ?? "AI Settings"}</span>
+                      <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {aiSubItems.map((subItem) => (
+                        <SidebarMenuSubItem key={subItem.title}>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={
+                              pathname === subItem.url ||
+                              pathname.startsWith(subItem.url + "/")
+                            }
+                          >
+                            <Link href={subItem.url}>
+                              <subItem.icon className="h-4 w-4" />
+                              <span>{subItem.title}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+            )}
 
             <Collapsible
               asChild

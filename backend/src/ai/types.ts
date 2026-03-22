@@ -1,4 +1,4 @@
-import type { UserRole } from "@prisma/client";
+import type { Role } from "@prisma/client";
 
 export type AiChatRequest = {
   message: string;
@@ -12,7 +12,7 @@ export type AiLanguage = "uz" | "en" | "ru";
 
 export type AiUserIdentity = {
   userId: string;
-  role: UserRole;
+  role: Role;
   email: string;
   fullName: string | null;
   studentId: string | null;

@@ -1,4 +1,4 @@
-import { UserRole } from "@prisma/client";
+import { Role } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 
 export class AiAccessError extends Error {
@@ -20,14 +20,14 @@ export function assertAuthenticated(
   if (!user?.id) throw new AiAccessError("UNAUTHORIZED", "Unauthorized");
 }
 
-export function assertRole(user: Express.User, roles: UserRole[]): void {
+export function assertRole(user: Express.User, roles: Role[]): void {
   if (!roles.includes(user.role)) {
     throw new AiAccessError("FORBIDDEN", "Forbidden");
   }
 }
 
 export function assertStudentSelf(user: Express.User, studentId: string): void {
-  if (user.role !== UserRole.STUDENT) {
+  if (user.role !== Role.STUDENT) {
     throw new AiAccessError(
       "FORBIDDEN",
       "Only students can access student-self tools",
@@ -48,7 +48,7 @@ export async function assertTeacherGroupAccess(params: {
   user: Express.User;
   groupId: string;
 }): Promise<void> {
-  if (params.user.role !== UserRole.TEACHER) {
+  if (params.user.role !== Role.TEACHER) {
     throw new AiAccessError(
       "FORBIDDEN",
       "Only teachers can access teacher-group tools",
@@ -75,7 +75,7 @@ export async function assertTeacherStudentAccess(params: {
   user: Express.User;
   studentId: string;
 }): Promise<void> {
-  if (params.user.role !== UserRole.TEACHER) {
+  if (params.user.role !== Role.TEACHER) {
     throw new AiAccessError(
       "FORBIDDEN",
       "Only teachers can access teacher-student tools",

@@ -179,6 +179,7 @@ model Subject {
   id              String          @id @default(uuid()) @db.Char(36)
   name            String          @unique
   code            String?         @unique
+  weeklyLessons   Int             @default(0)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   cohortId        String?         @db.Char(36)
@@ -395,7 +396,7 @@ model User {
   id                String           @id @default(uuid()) @db.Char(36)
   email             String           @unique
   passwordHash      String?
-  role              UserRole
+  role              Role
   lastLoginAt       DateTime?
   credentialsSentAt DateTime?
   studentId         String?          @unique @db.Char(36)
@@ -412,6 +413,28 @@ model User {
   aiUsageLogs       AiUsageLog[]
 
   @@map("User")
+}
+
+model Permission {
+  id   String @id @default(uuid()) @db.Char(36)
+  name String @unique
+
+  rolePermissions RolePermission[]
+
+  @@map("Permission")
+}
+
+model RolePermission {
+  id         String @id @default(uuid()) @db.Char(36)
+  role       Role
+  permission String
+
+  permissionRef Permission @relation(fields: [permission], references: [name], onDelete: Cascade)
+
+  @@unique([role, permission])
+  @@index([role])
+  @@index([permission])
+  @@map("RolePermission")
 }
 
 model ChatSession {
@@ -622,7 +645,7 @@ model SheetsSettings {
 model AiUsageLog {
   id               String   @id @default(uuid()) @db.Char(36)
   userId           String?  @db.Char(36)
-  role             UserRole?
+  role             Role?
   requestId        String?
   provider         String?
   model            String?
@@ -781,9 +804,11 @@ enum AttendanceStatus {
   @@map("AttendanceStatus")
 }
 
-enum UserRole {
+enum Role {
   STUDENT
   TEACHER
+  STAFF
+  MANAGER
   ADMIN
 
   @@map("UserRole")

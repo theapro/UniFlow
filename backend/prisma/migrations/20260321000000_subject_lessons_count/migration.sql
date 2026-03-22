@@ -1,0 +1,3 @@
+-- Placeholder migration file.
+-- This folder existed but migration.sql was missing, which blocks Prisma Migrate.
+-- No-op.

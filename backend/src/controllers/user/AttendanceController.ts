@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { AttendanceService } from "../../services/user/AttendanceService";
 import { created, fail, ok } from "../../utils/responses";
-import { UserRole } from "@prisma/client";
+import { Role } from "@prisma/client";
 
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
@@ -9,7 +9,7 @@ export class AttendanceController {
   markAttendance = async (req: Request, res: Response) => {
     try {
       const user = req.user;
-      if (user?.role !== UserRole.TEACHER) {
+      if (user?.role !== Role.TEACHER) {
         return fail(res, 403, "Only teachers can mark attendance");
       }
 
@@ -33,7 +33,7 @@ export class AttendanceController {
   getAttendanceByLesson = async (req: Request, res: Response) => {
     try {
       const user = req.user;
-      if (user?.role !== UserRole.TEACHER) {
+      if (user?.role !== Role.TEACHER) {
         return fail(res, 403, "Only teachers can view lesson attendance");
       }
 

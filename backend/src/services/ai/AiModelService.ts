@@ -1,4 +1,4 @@
-import { AiModality, UserRole } from "@prisma/client";
+import { AiModality, Role } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { env } from "../../config/env";
 
@@ -16,8 +16,8 @@ export type AiModelDto = {
   updatedAt: Date;
 };
 
-function isAdminRole(role: UserRole): boolean {
-  return role === UserRole.ADMIN;
+function isAdminRole(role: Role): boolean {
+  return role === Role.ADMIN;
 }
 
 export class AiModelService {
@@ -28,7 +28,7 @@ export class AiModelService {
   }
 
   async listAllowedForRole(params: {
-    role: UserRole;
+    role: Role;
     modality?: AiModality;
   }): Promise<AiModelDto[]> {
     const modality = params.modality ?? AiModality.CHAT;
@@ -51,7 +51,7 @@ export class AiModelService {
    * - If DB has no models yet, falls back to GROQ_MODEL/env default.
    */
   async resolveChatModel(params: {
-    role: UserRole;
+    role: Role;
     requestedModel?: string;
   }): Promise<{ model: string; source: "requested" | "default" | "env" }> {
     const requestedModel = params.requestedModel?.trim();

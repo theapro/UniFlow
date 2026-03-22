@@ -1,4 +1,4 @@
-import type { PrismaClient } from ".prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import { env } from "../../config/env";
 import { StudentsSheetsClient } from "../students-sheets/StudentsSheetsClient";
 import { GradesSheetsClient } from "./GradesSheetsClient";

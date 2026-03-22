@@ -31,6 +31,19 @@ export function ProtectedRoute({ children, lang }: ProtectedRouteProps) {
         await axios.get("/api/admin/verify");
         setIsAuthenticated(true);
       } catch (error: any) {
+        const status = error?.response?.status;
+
+        // Token is valid but user is not allowed in admin panel (e.g. STUDENT).
+        // Per requirements: redirect them to /chat (do NOT log them out).
+        if (status === 403 && typeof window !== "undefined") {
+          const userAppUrl = process.env.NEXT_PUBLIC_USER_APP_URL;
+          const target = userAppUrl
+            ? `${userAppUrl.replace(/\/$/, "")}/chat`
+            : "/chat";
+          window.location.href = target;
+          return;
+        }
+
         // Token is invalid or expired
         console.error("Authentication failed:", error);
         authApi.logout();

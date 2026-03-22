@@ -10,7 +10,7 @@ declare global {
 
 const basePrisma = global.__prisma ?? new PrismaClient();
 
-export const prisma = basePrisma.$extends({
+const extendedPrisma = basePrisma.$extends({
   query: {
     $allModels: {
       async $allOperations({ model, operation, args, query }) {
@@ -53,6 +53,12 @@ export const prisma = basePrisma.$extends({
     },
   },
 });
+
+// Prisma `$extends()` returns an extended client type that is not assignable to
+// `PrismaClient` in some TS contexts. Most of the codebase expects `PrismaClient`,
+// so we export the extended client with a `PrismaClient` type to keep typing
+// consistent while preserving runtime behavior.
+export const prisma = extendedPrisma as unknown as PrismaClient;
 
 if (process.env.NODE_ENV !== "production") {
   global.__prisma = prisma;

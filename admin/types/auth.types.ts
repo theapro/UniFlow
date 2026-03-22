@@ -1,10 +1,11 @@
 export interface User {
   id: string;
   email: string;
-  role: "ADMIN" | "STUDENT" | "TEACHER";
+  role: "STUDENT" | "TEACHER" | "STAFF" | "MANAGER" | "ADMIN";
   fullName?: string;
   studentNo?: string;
   staffNo?: string;
+  permissions: string[];
 }
 
 export interface LoginRequest {
@@ -16,7 +17,7 @@ export interface SignupRequest {
   email: string;
   password: string;
   fullName: string;
-  role: "STUDENT" | "TEACHER";
+  role: "STUDENT" | "TEACHER" | "STAFF" | "MANAGER";
   studentNo?: string;
   staffNo?: string;
 }

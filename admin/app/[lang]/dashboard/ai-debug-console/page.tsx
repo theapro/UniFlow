@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { aiAdminApi } from "@/lib/api";
+import { authApi } from "@/lib/api";
+import { hasPermission } from "@/lib/permissions";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +29,9 @@ export default function AiDebugConsolePage({
 }: {
   params: { lang: string };
 }) {
+  const user = authApi.getStoredUser();
+  const canSee = hasPermission(user, "ACCESS_AI_SETTINGS");
+
   const [cursor, setCursor] = useState<string | null>(null);
   const [items, setItems] = useState<any[]>([]);
 
@@ -34,6 +39,7 @@ export default function AiDebugConsolePage({
 
   const q = useQuery({
     queryKey,
+    enabled: canSee,
     queryFn: async () => {
       const res = await aiAdminApi.debugTraces.list({ take: 50, cursor });
       return res.data?.data;
@@ -59,6 +65,8 @@ export default function AiDebugConsolePage({
       return next;
     });
   }, [q.isSuccess, q.data, cursor]);
+
+  if (!canSee) return null;
 
   const list = items;
   const nextCursor = (q.data?.nextCursor ?? null) as string | null;

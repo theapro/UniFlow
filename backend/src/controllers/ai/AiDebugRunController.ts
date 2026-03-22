@@ -267,7 +267,7 @@ export class AiDebugRunController {
       return {
         id: u.id,
         email: u.email,
-        role: u.role,
+        role: params.asRole,
         studentId: u.studentId ?? null,
         teacherId: u.teacherId ?? null,
       };
@@ -295,7 +295,7 @@ export class AiDebugRunController {
     return {
       id: u.id,
       email: u.email,
-      role: u.role,
+      role: params.asRole,
       studentId: u.studentId ?? null,
       teacherId: u.teacherId ?? null,
     };

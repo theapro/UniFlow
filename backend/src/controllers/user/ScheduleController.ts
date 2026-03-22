@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { ScheduleService } from "../../services/user/ScheduleService";
 import { fail, ok } from "../../utils/responses";
-import { UserRole } from "@prisma/client";
+import { Role } from "@prisma/client";
 
 export class ScheduleController {
   constructor(private readonly scheduleService: ScheduleService) {}
@@ -16,7 +16,7 @@ export class ScheduleController {
       const weekday =
         typeof req.query.weekday === "string" ? req.query.weekday : undefined;
 
-      if (user.role === UserRole.STUDENT) {
+      if (user.role === Role.STUDENT) {
         if (!user.studentId) {
           return fail(res, 400, "Student profile not linked");
         }
@@ -28,7 +28,7 @@ export class ScheduleController {
         return ok(res, "Schedule fetched", schedule);
       }
 
-      if (user.role === UserRole.TEACHER) {
+      if (user.role === Role.TEACHER) {
         if (!user.teacherId) {
           return fail(res, 400, "Teacher profile not linked");
         }

@@ -1,4 +1,4 @@
-import type { PrismaClient } from ".prisma/client";
+import type { PrismaClient } from "@prisma/client";
 
 function uniqStrings(items: Array<string | null | undefined>): string[] {
   const out: string[] = [];

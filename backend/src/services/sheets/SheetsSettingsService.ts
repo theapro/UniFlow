@@ -1,4 +1,4 @@
-import type { PrismaClient } from ".prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import { env } from "../../config/env";
 
 const SETTINGS_KEY = "default";

@@ -1,6 +1,6 @@
 import { prisma } from "../../config/prisma";
 import { formatDbTime } from "../../utils/time";
-import { getWeekdayUTC } from "../../utils/weekday";
+import { getUTCDayRange } from "../../utils/weekday";
 import { assertStudentSelf } from "./access";
 
 export async function getStudentProfile(params: {
@@ -71,48 +71,40 @@ export async function getStudentScheduleToday(params: {
   if (!studentId) throw new Error("Student profile not linked");
   assertStudentSelf(params.user, studentId);
 
-  const membership = await prisma.studentGroup.findFirst({
-    where: { studentId, leftAt: null },
-    select: { groupId: true },
-    orderBy: [{ joinedAt: "desc" }, { createdAt: "desc" }],
+  const student = await prisma.student.findUnique({
+    where: { id: studentId },
+    select: {
+      id: true,
+      studentGroups: {
+        where: { leftAt: null },
+        select: { groupId: true },
+      },
+    },
   });
 
-  const weekday = getWeekdayUTC();
+  const groupIds = student?.studentGroups.map((g) => g.groupId) ?? [];
+  const { start, end } = getUTCDayRange();
 
-  const scheduleRows = membership?.groupId
-    ? await prisma.scheduleEntry.findMany({
-        where: {
-          groupId: membership.groupId,
-          weekday,
-          OR: [
-            { effectiveFrom: null, effectiveTo: null },
-            {
-              AND: [
-                {
-                  OR: [
-                    { effectiveFrom: null },
-                    { effectiveFrom: { lte: new Date() } },
-                  ],
-                },
-                {
-                  OR: [
-                    { effectiveTo: null },
-                    { effectiveTo: { gte: new Date() } },
-                  ],
-                },
-              ],
-            },
+  const scheduleRows =
+    groupIds.length > 0
+      ? await prisma.schedule.findMany({
+          where: {
+            groupId: { in: groupIds },
+            calendarDay: { date: { gte: start, lt: end } },
+          },
+          include: {
+            subject: { select: { name: true } },
+            teacher: { select: { fullName: true } },
+            room: { select: { name: true } },
+            timeSlot: { select: { startTime: true, endTime: true, slotNumber: true } },
+            calendarDay: { select: { date: true } },
+          },
+          orderBy: [
+            { timeSlot: { slotNumber: "asc" } },
+            { calendarDay: { date: "asc" } },
           ],
-        },
-        orderBy: [{ timeSlot: { slotNumber: "asc" } }],
-        select: {
-          subject: { select: { name: true } },
-          teacher: { select: { fullName: true } },
-          room: { select: { name: true } },
-          timeSlot: { select: { startTime: true, endTime: true } },
-        },
-      })
-    : [];
+        })
+      : [];
 
   return {
     scheduleToday: scheduleRows.slice(0, 12).map((r) => ({
@@ -264,48 +256,40 @@ export async function getStudentDashboard(params: {
   }
   assertStudentSelf(params.user, studentId);
 
-  const membership = await prisma.studentGroup.findFirst({
-    where: { studentId, leftAt: null },
-    select: { groupId: true },
-    orderBy: [{ joinedAt: "desc" }, { createdAt: "desc" }],
+  const student = await prisma.student.findUnique({
+    where: { id: studentId },
+    select: {
+      id: true,
+      studentGroups: {
+        where: { leftAt: null },
+        select: { groupId: true },
+      },
+    },
   });
 
-  const weekday = getWeekdayUTC();
+  const groupIds = student?.studentGroups.map((g) => g.groupId) ?? [];
+  const { start, end } = getUTCDayRange();
 
-  const scheduleRows = membership?.groupId
-    ? await prisma.scheduleEntry.findMany({
-        where: {
-          groupId: membership.groupId,
-          weekday,
-          OR: [
-            { effectiveFrom: null, effectiveTo: null },
-            {
-              AND: [
-                {
-                  OR: [
-                    { effectiveFrom: null },
-                    { effectiveFrom: { lte: new Date() } },
-                  ],
-                },
-                {
-                  OR: [
-                    { effectiveTo: null },
-                    { effectiveTo: { gte: new Date() } },
-                  ],
-                },
-              ],
-            },
+  const scheduleRows =
+    groupIds.length > 0
+      ? await prisma.schedule.findMany({
+          where: {
+            groupId: { in: groupIds },
+            calendarDay: { date: { gte: start, lt: end } },
+          },
+          include: {
+            subject: { select: { name: true } },
+            teacher: { select: { fullName: true } },
+            room: { select: { name: true } },
+            timeSlot: { select: { startTime: true, endTime: true, slotNumber: true } },
+            calendarDay: { select: { date: true } },
+          },
+          orderBy: [
+            { timeSlot: { slotNumber: "asc" } },
+            { calendarDay: { date: "asc" } },
           ],
-        },
-        orderBy: [{ timeSlot: { slotNumber: "asc" } }],
-        select: {
-          subject: { select: { name: true } },
-          teacher: { select: { fullName: true } },
-          room: { select: { name: true } },
-          timeSlot: { select: { startTime: true, endTime: true } },
-        },
-      })
-    : [];
+        })
+      : [];
 
   const scheduleToday = scheduleRows.slice(0, 10).map((r) => ({
     subject: r.subject?.name ?? null,

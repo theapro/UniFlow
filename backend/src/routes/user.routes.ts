@@ -1,7 +1,10 @@
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.middleware";
-import { roleMiddleware } from "../middlewares/role.middleware";
-import { UserRole } from "@prisma/client";
+import {
+  requireRole,
+  requirePermission,
+} from "../middlewares/access-control.middleware";
+import { Role } from "@prisma/client";
 import { StudentController } from "../controllers/user/StudentController";
 import { StudentService } from "../services/user/StudentService";
 import { TeacherController } from "../controllers/user/TeacherController";
@@ -14,7 +17,7 @@ import { AttendanceService } from "../services/user/AttendanceService";
 const router = Router();
 
 router.use(authMiddleware);
-router.use(roleMiddleware([UserRole.STUDENT, UserRole.TEACHER]));
+router.use(requireRole([Role.STUDENT, Role.TEACHER]));
 
 const studentController = new StudentController(new StudentService());
 const teacherController = new TeacherController(new TeacherService());
@@ -29,6 +32,7 @@ router.get("/student/me/attendance", studentController.getAttendance);
 router.get("/teacher/me/lessons/today", teacherController.getTodayLessons);
 router.get(
   "/teacher/me/groups/:groupId/schedule",
+  requirePermission("MANAGE_SCHEDULE"),
   teacherController.getGroupSchedule,
 );
 

@@ -3,6 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { aiModelsApi } from "@/lib/api";
+import { authApi } from "@/lib/api";
+import { hasPermission } from "@/lib/permissions";
 
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,10 +33,14 @@ type AiModel = {
 };
 
 export default function AiModelsPage() {
+  const user = authApi.getStoredUser();
+  const canSee = hasPermission(user, "ACCESS_AI_SETTINGS");
+
   const queryClient = useQueryClient();
 
   const { data: models, isLoading } = useQuery({
     queryKey: ["ai-models"],
+    enabled: canSee,
     queryFn: async () => {
       const res = await aiModelsApi.list();
       return (res.data?.data ?? []) as AiModel[];
@@ -61,6 +67,8 @@ export default function AiModelsPage() {
   const handleUpdate = (id: string, patch: Partial<AiModel>) => {
     updateMutation.mutate({ id, patch });
   };
+
+  if (!canSee) return null;
 
   return (
     <div className="container max-w-7xl py-10 space-y-12">

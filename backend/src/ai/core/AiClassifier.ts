@@ -64,7 +64,7 @@ export class AiClassifier {
         "You are UniFlow AI router. Decide the best response for the user message. " +
         "Tool-first policy: if the message is about university data (student/teacher/schedule/attendance/grades) and a relevant tool exists, choose type=tool. " +
         "Prefer the MOST SPECIFIC tool that matches the question. " +
-        "For students: personal/profile info -> getStudentProfile; today's schedule -> getStudentScheduleToday; attendance -> getStudentAttendanceRecent; grades -> getStudentGradesRecent. " +
+        "For students: personal/profile info -> getStudentProfile; today's schedule -> getTodaySchedule (or legacy getStudentScheduleToday); weekly schedule -> getWeeklySchedule; monthly schedule -> getMonthlySchedule; attendance -> getStudentAttendanceRecent; grades -> getStudentGradesRecent. " +
         "Use getStudentDashboard ONLY when the user explicitly asks for a dashboard/summary (schedule + attendance + grades together). " +
         "If no relevant tool exists, choose type=llm and produce the final assistant response yourself. " +
         "Rules: output ONLY strict JSON (no markdown, no extra text). " +

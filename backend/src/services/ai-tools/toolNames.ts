@@ -1,6 +1,9 @@
 export const AI_TOOL_NAMES = [
   "getStudentProfile",
   "getStudentScheduleToday",
+  "getTodaySchedule",
+  "getWeeklySchedule",
+  "getMonthlySchedule",
   "getStudentAttendanceRecent",
   "getStudentGradesRecent",
   "getStudentDashboard",

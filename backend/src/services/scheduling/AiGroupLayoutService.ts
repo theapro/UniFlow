@@ -1,4 +1,4 @@
-import { UserRole } from "@prisma/client";
+import { Role } from "@prisma/client";
 
 import { env } from "../../config/env";
 import { prisma } from "../../config/prisma";
@@ -309,7 +309,7 @@ export class AiGroupLayoutService {
     if (!settings.isEnabled) return null;
 
     const allowed = await this.models.listAllowedForRole({
-      role: UserRole.ADMIN,
+      role: Role.ADMIN,
     });
     const defaultModelId = settings.defaultAdminChatModelId;
     const chosen =

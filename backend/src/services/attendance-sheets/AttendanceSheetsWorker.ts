@@ -1,4 +1,4 @@
-import type { PrismaClient } from ".prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import { AttendanceSheetsSyncService } from "./AttendanceSheetsSyncService";
 import { SheetsSettingsService } from "../sheets/SheetsSettingsService";
 

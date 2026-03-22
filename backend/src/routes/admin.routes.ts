@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.middleware";
-import { roleMiddleware } from "../middlewares/role.middleware";
-import { UserRole } from "@prisma/client";
+import { requireRole } from "../middlewares/access-control.middleware";
+import { Role } from "@prisma/client";
 import { AdminStudentController } from "../controllers/admin/AdminStudentController";
 import { AdminStudentService } from "../services/admin/AdminStudentService";
 import { AdminTeacherController } from "../controllers/admin/AdminTeacherController";
@@ -45,11 +45,15 @@ import { AdminRoomsController } from "../controllers/admin/AdminRoomsController"
 import { AdminRoomsService } from "../services/admin/AdminRoomsService";
 import { AdminTimeSlotsController } from "../controllers/admin/AdminTimeSlotsController";
 import { AdminTimeSlotsService } from "../services/admin/AdminTimeSlotsService";
+import { AdminStatsController } from "../controllers/admin/AdminStatsController";
+import { AdminStatsService } from "../services/admin/AdminStatsService";
+import { AdminAccessControlController } from "../controllers/admin/AdminAccessControlController";
+import { AdminAccessControlService } from "../services/admin/AdminAccessControlService";
 
 const router = Router();
 
 router.use(authMiddleware);
-router.use(roleMiddleware([UserRole.ADMIN]));
+router.use(requireRole(Role.ADMIN));
 
 // Verify endpoint - validates token and returns user info
 router.get("/verify", (req, res) => {
@@ -121,11 +125,24 @@ const adminRoomsController = new AdminRoomsController(new AdminRoomsService());
 const adminTimeSlotsController = new AdminTimeSlotsController(
   new AdminTimeSlotsService(),
 );
+const adminStatsController = new AdminStatsController(new AdminStatsService());
+const adminAccessControlController = new AdminAccessControlController(
+  new AdminAccessControlService(),
+);
 
 // Inter-service wiring for Subjects <-> TeachersSheets
 adminSubjectController.setSyncService(
   adminTeachersSheetsController.getSyncService(),
 );
+
+// Dashboard statistics
+router.get("/stats/summary", adminStatsController.summary);
+router.get("/stats/user-activity", adminStatsController.userActivity);
+router.get("/stats/login-status", adminStatsController.loginStatus);
+
+// Access control (RBAC)
+router.get("/access-control", adminAccessControlController.getMatrix);
+router.patch("/access-control/toggle", adminAccessControlController.toggle);
 
 // Students
 router.get("/students", adminStudentController.list);

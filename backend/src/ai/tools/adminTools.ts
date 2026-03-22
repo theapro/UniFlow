@@ -1,6 +1,6 @@
 import { prisma } from "../../config/prisma";
 import { assertRole } from "./access";
-import { UserRole } from "@prisma/client";
+import { Role } from "@prisma/client";
 
 export async function getSystemStats(params: { user: Express.User }): Promise<{
   counts: {
@@ -15,7 +15,7 @@ export async function getSystemStats(params: { user: Express.User }): Promise<{
     gradeRecords: number;
   };
 }> {
-  assertRole(params.user, [UserRole.ADMIN]);
+  assertRole(params.user, [Role.ADMIN]);
 
   const [
     users,

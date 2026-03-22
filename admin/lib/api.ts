@@ -55,6 +55,25 @@ export const authApi = {
   },
 };
 
+// Access Control (RBAC) API
+export const accessControlApi = {
+  getMatrix: () => axios.get("/api/admin/access-control"),
+  toggle: (data: {
+    role: "TEACHER" | "STAFF" | "MANAGER";
+    permission: string;
+    enabled: boolean;
+  }) => axios.patch("/api/admin/access-control/toggle", data),
+};
+
+// Dashboard / statistics API
+export const statsApi = {
+  summary: () => axios.get("/api/admin/stats/summary"),
+  userActivity: (range: "7d" | "30d" | "90d") =>
+    axios.get("/api/admin/stats/user-activity", { params: { range } }),
+  loginStatus: (role: "STUDENT" | "TEACHER" | "ADMIN") =>
+    axios.get("/api/admin/stats/login-status", { params: { role } }),
+};
+
 export const studentsApi = {
   list: (params?: {
     q?: string;

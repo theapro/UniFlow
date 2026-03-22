@@ -83,43 +83,74 @@ export function DataTable<TData, TValue>({
   });
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-end">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
-              <Columns className="mr-2 h-4 w-4" />
-              {columnToggleLabel}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            {table
-              .getAllColumns()
-              .filter((column) => column.getCanHide())
-              .map((column) => (
-                <DropdownMenuCheckboxItem
-                  key={column.id}
-                  className="capitalize"
-                  checked={column.getIsVisible()}
-                  onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                >
-                  {typeof column.columnDef.header === "string"
-                    ? column.columnDef.header
-                    : column.id}
-                </DropdownMenuCheckboxItem>
-              ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between px-1 py-1">
+        {/* Row Selection Design */}
+        <div className="flex-1 text-sm font-medium text-muted-foreground/80 bg-muted/20 px-3 py-1.5 rounded-full inline-flex items-center gap-2 max-w-fit">
+          <div className="h-2 w-2 rounded-full bg-primary/60" />
+          <span>
+            {table.getFilteredSelectedRowModel().rows.length} of{" "}
+            <span className="text-foreground">
+              {table.getFilteredRowModel().rows.length}
+            </span>{" "}
+            row(s) selected
+          </span>
+        </div>
+        {/* Customize Columns Design */}
+        <div className="flex items-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-auto h-9 rounded-[34px] border-dashed bg-background hover:bg-accent/50 transition-colors"
+              >
+                <Columns className="mr-2 h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">{columnToggleLabel}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="w-56 p-2 rounded-xl border-border/50 shadow-lg"
+            >
+              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Show/Hide Columns
+              </div>
+              {table
+                .getAllColumns()
+                .filter((column) => column.getCanHide())
+                .map((column) => (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    className="capitalize rounded-md focus:bg-accent/50"
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) =>
+                      column.toggleVisibility(!!value)
+                    }
+                  >
+                    {typeof column.columnDef.header === "string"
+                      ? column.columnDef.header
+                      : column.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
-
-      <div className="rounded-3xl border border-border/40 bg-muted/10 overflow-hidden">
-        <div className="overflow-auto">
+      <div className="rounded-2xl border border-border/40 bg-card/30 backdrop-blur-sm shadow-sm overflow-hidden transition-all hover:border-border/60">
+        <div className="overflow-auto scrollbar-thin">
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-muted/30">
               {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
+                <TableRow
+                  key={headerGroup.id}
+                  className="hover:bg-transparent border-border/50"
+                >
                   {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id}>
+                    <TableHead
+                      key={header.id}
+                      className="h-11 font-semibold text-muted-foreground py-3 px-4 pr-10"
+                    >
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -137,9 +168,10 @@ export function DataTable<TData, TValue>({
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() ? "selected" : undefined}
+                    className="group border-border/40 hover:bg-muted/20 data-[state=selected]:bg-primary/5 transition-colors"
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
+                      <TableCell key={cell.id} className="py-3 px-4 pr-10">
                         {flexRender(
                           cell.column.columnDef.cell,
                           cell.getContext(),
@@ -149,21 +181,28 @@ export function DataTable<TData, TValue>({
                   </TableRow>
                 ))
               ) : isLoading ? (
-                <TableRow>
+                <TableRow className="hover:bg-transparent">
                   <TableCell
                     colSpan={table.getAllLeafColumns().length}
-                    className="h-24 text-center text-muted-foreground"
+                    className="h-32 text-center"
                   >
-                    Loading...
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      <span className="text-sm font-medium">
+                        Loading data...
+                      </span>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
-                <TableRow>
+                <TableRow className="hover:bg-transparent">
                   <TableCell
                     colSpan={table.getAllLeafColumns().length}
-                    className="h-24 text-center"
+                    className="h-32 text-center"
                   >
-                    {emptyLabel}
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <span className="text-sm font-medium">{emptyLabel}</span>
+                    </div>
                   </TableCell>
                 </TableRow>
               )}
@@ -171,44 +210,49 @@ export function DataTable<TData, TValue>({
           </Table>
         </div>
       </div>
-
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length} of{" "}
-          {table.getFilteredRowModel().rows.length} row(s) selected.
+      <div className="flex items-center justify-between px-1 py-1">
+        {/* Rows Per Page Design */}
+        <div className="flex items-center gap-2.5">
+          <p className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+            Rows per page
+          </p>
+          <Select
+            value={`${table.getState().pagination.pageSize}`}
+            onValueChange={(value) => table.setPageSize(Number(value))}
+          >
+            <SelectTrigger className="h-9 w-[70px] border-border/50 bg-background/50 focus:ring-primary/20 rounded-lg">
+              <SelectValue placeholder={table.getState().pagination.pageSize} />
+            </SelectTrigger>
+            <SelectContent side="top" className="rounded-xl border-border/50">
+              {[10, 20, 30, 40, 50].map((pageSize) => (
+                <SelectItem
+                  key={pageSize}
+                  value={`${pageSize}`}
+                  className="rounded-md"
+                >
+                  {pageSize}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium">Rows per page</p>
-            <Select
-              value={`${table.getState().pagination.pageSize}`}
-              onValueChange={(value) => table.setPageSize(Number(value))}
-            >
-              <SelectTrigger className="h-8 w-[70px]">
-                <SelectValue
-                  placeholder={table.getState().pagination.pageSize}
-                />
-              </SelectTrigger>
-              <SelectContent side="top">
-                {[10, 20, 30, 40, 50].map((pageSize) => (
-                  <SelectItem key={pageSize} value={`${pageSize}`}>
-                    {pageSize}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className="flex items-center gap-6 lg:gap-8">
+          <div className="flex items-center text-sm font-medium text-muted-foreground min-w-[100px] justify-center">
+            Page{" "}
+            <span className="text-foreground mx-1">
+              {table.getState().pagination.pageIndex + 1}
+            </span>{" "}
+            of{" "}
+            <span className="text-foreground mx-1">
+              {table.getPageCount() || 1}
+            </span>
           </div>
 
-          <div className="text-sm text-muted-foreground">
-            Page {table.getState().pagination.pageIndex + 1} of{" "}
-            {table.getPageCount()}
-          </div>
-
-          <div className="flex items-center gap-1">
+          {/* Pagination Design */}
+          <div className="flex items-center gap-1.5">
             <Button
               variant="outline"
-              className="h-8 w-8 p-0"
+              className="hidden h-9 w-9 p-0 lg:flex border-border/40 hover:bg-accent/50 rounded-lg transition-all"
               onClick={() => table.setPageIndex(0)}
               disabled={!table.getCanPreviousPage()}
             >
@@ -217,7 +261,7 @@ export function DataTable<TData, TValue>({
             </Button>
             <Button
               variant="outline"
-              className="h-8 w-8 p-0"
+              className="h-9 w-9 p-0 border-border/40 hover:bg-accent/50 rounded-lg transition-all"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
             >
@@ -226,7 +270,7 @@ export function DataTable<TData, TValue>({
             </Button>
             <Button
               variant="outline"
-              className="h-8 w-8 p-0"
+              className="h-9 w-9 p-0 border-border/40 hover:bg-accent/50 rounded-lg transition-all"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
             >
@@ -235,7 +279,7 @@ export function DataTable<TData, TValue>({
             </Button>
             <Button
               variant="outline"
-              className="h-8 w-8 p-0"
+              className="hidden h-9 w-9 p-0 lg:flex border-border/40 hover:bg-accent/50 rounded-lg transition-all"
               onClick={() => table.setPageIndex(table.getPageCount() - 1)}
               disabled={!table.getCanNextPage()}
             >

@@ -3,6 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { aiAdminApi } from "@/lib/api";
+import { authApi } from "@/lib/api";
+import { hasPermission } from "@/lib/permissions";
 import Link from "next/link";
 
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -68,10 +70,14 @@ type AiUsageLog = {
 };
 
 export default function AIMonitorPage() {
+  const user = authApi.getStoredUser();
+  const canSee = hasPermission(user, "ACCESS_AI_SETTINGS");
+
   const queryClient = useQueryClient();
 
   const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: ["ai-admin-settings"],
+    enabled: canSee,
     queryFn: async () => {
       const res = await aiAdminApi.settings.get();
       return res.data?.data as AiSettings;
@@ -80,6 +86,7 @@ export default function AIMonitorPage() {
 
   const { data: tools, isLoading: toolsLoading } = useQuery({
     queryKey: ["ai-admin-tools"],
+    enabled: canSee,
     queryFn: async () => {
       const res = await aiAdminApi.tools.list();
       return (res.data?.data?.items ?? []) as AiToolConfig[];
@@ -88,6 +95,7 @@ export default function AIMonitorPage() {
 
   const { data: logs, isLoading: logsLoading } = useQuery({
     queryKey: ["ai-admin-logs"],
+    enabled: canSee,
     queryFn: async () => {
       const res = await aiAdminApi.logs.list({ take: 50 });
       return (res.data?.data?.items ?? []) as AiUsageLog[];
@@ -137,6 +145,8 @@ export default function AIMonitorPage() {
     for (const t of items) sections[toolSection(t.name)].push(t);
     return sections;
   })();
+
+  if (!canSee) return null;
 
   return (
     <div className="container max-w-7xl py-10 space-y-12">

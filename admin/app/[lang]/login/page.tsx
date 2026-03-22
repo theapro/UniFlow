@@ -7,15 +7,9 @@ import { authApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { GraduationCap, AlertCircle } from "lucide-react";
+import { AlertCircle, Loader2, KeyRound, Mail, ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function LoginPage({
   params: { lang },
@@ -30,7 +24,6 @@ export default function LoginPage({
   const [error, setError] = useState("");
 
   useEffect(() => {
-    // Check for error in URL parameters
     const urlError = searchParams.get("error");
     if (urlError === "session_expired") {
       setError("Your session has expired. Please log in again.");
@@ -49,163 +42,152 @@ export default function LoginPage({
 
       if (response.data.success) {
         authApi.storeAuth(response.data.data.token, response.data.data.user);
-
-        // Check if there's a redirect URL
         const from = searchParams.get("from");
-        if (from && from.startsWith("/")) {
-          router.push(from);
-        } else {
-          router.push(`/${lang}/dashboard`);
-        }
+        router.push(from && from.startsWith("/") ? from : `/${lang}/dashboard`);
       } else {
         setError(response.data.message || "Login failed");
       }
     } catch (err: any) {
-      const errorMessage =
-        err.response?.data?.message || "An error occurred during login";
-      setError(errorMessage);
-      console.error("Login error:", err);
+      setError(err.response?.data?.message || "An error occurred during login");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
-      <div className="w-full max-w-md space-y-8">
-        <div className="flex flex-col items-center space-y-2 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
-            <GraduationCap className="h-6 w-6 text-primary-foreground" />
-          </div>
-          <h1 className="text-2xl font-bold">UniFlow</h1>
-        </div>
+    <div className="relative min-h-screen w-full flex items-center justify-center bg-[#09090b] overflow-hidden">
+      {/* Background Ornaments */}
+      <div className="absolute top-0 left-0 w-full h-full">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/5 blur-[120px] rounded-full" />
+      </div>
 
-        <Card>
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl text-center">Welcome back</CardTitle>
-            <CardDescription className="text-center">
-              Login with your email or university account
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4">
-              <Button variant="outline" className="w-full" disabled>
-                <svg
-                  className="mr-2 h-4 w-4"
-                  aria-hidden="true"
-                  focusable="false"
-                  data-prefix="fab"
-                  data-icon="apple"
-                  role="img"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 384 512"
-                >
-                  <path
-                    fill="currentColor"
-                    d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"
-                  />
-                </svg>
-                Login with Apple
+      <div className="relative w-full max-w-[420px] px-6 animate-in fade-in zoom-in duration-700">
+        <div className="space-y-8">
+          {/* Login Card */}
+          <div className="rounded-[32px] border border-white/5 bg-zinc-900/20 backdrop-blur-xl p-8 shadow-2xl">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="email"
+                    className="text-[10px] font-bold uppercase tracking-widest ml-1 text-muted-foreground/60"
+                  >
+                    Institutional Email
+                  </Label>
+                  <div className="relative group">
+                    <Mail className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground/30 group-focus-within:text-primary transition-colors" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="name@university.edu"
+                      className="h-12 pl-11 rounded-2xl bg-white/[0.03] border-white/5 focus:border-primary/30 focus:ring-primary/20 transition-all text-sm font-medium"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between ml-1">
+                    <Label
+                      htmlFor="password"
+                      className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60"
+                    >
+                      Security Key
+                    </Label>
+                    <Link
+                      href={`/${lang}/forgot-password`}
+                      className="text-[10px] font-bold uppercase tracking-widest text-primary/60 hover:text-primary transition-colors"
+                    >
+                      Recovery
+                    </Link>
+                  </div>
+                  <div className="relative group">
+                    <KeyRound className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground/30 group-focus-within:text-primary transition-colors" />
+                    <Input
+                      id="password"
+                      type="password"
+                      className="h-12 pl-11 rounded-2xl bg-white/[0.03] border-white/5 focus:border-primary/30 focus:ring-primary/20 transition-all text-sm font-medium"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {error && (
+                <div className="flex items-center gap-3 rounded-2xl bg-red-500/5 border border-red-500/10 p-4 animate-in slide-in-from-top-2">
+                  <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
+                  <p className="text-[11px] font-bold text-red-400/80 leading-tight uppercase tracking-tight">
+                    {error}
+                  </p>
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full h-12 rounded-2xl bg-primary hover:bg-primary/90 text-xs font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/20 transition-all active:scale-[0.98]"
+                disabled={loading}
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <span className="flex items-center gap-2">
+                    Authorize Access <ArrowRight size={14} />
+                  </span>
+                )}
               </Button>
+            </form>
 
-              <Button variant="outline" className="w-full" disabled>
-                <svg
-                  className="mr-2 h-4 w-4"
-                  aria-hidden="true"
-                  focusable="false"
-                  data-prefix="fab"
-                  data-icon="google"
-                  role="img"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 488 512"
-                >
-                  <path
-                    fill="currentColor"
-                    d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"
-                  />
-                </svg>
-                Login with Google
-              </Button>
-
+            <div className="mt-8 space-y-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <Separator />
+                  <Separator className="bg-white/5" />
                 </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
-                    Or continue with
+                <div className="relative flex justify-center text-[10px] uppercase tracking-[0.2em]">
+                  <span className="bg-[#121214] px-4 text-muted-foreground/30">
+                    SSO Options
                   </span>
                 </div>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="m@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
+              <Button
+                variant="outline"
+                className="w-full h-12 rounded-2xl border-white/5 bg-white/[0.02] hover:bg-white/[0.05] text-[10px] font-bold uppercase tracking-widest transition-all"
+                disabled
+              >
+                <svg className="mr-3 h-4 w-4 opacity-60" viewBox="0 0 24 24">
+                  <path
+                    fill="currentColor"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
-                    <Link
-                      href={`/${lang}/forgot-password`}
-                      className="text-sm text-primary hover:underline"
-                    >
-                      Forgot your password?
-                    </Link>
-                  </div>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
+                  <path
+                    fill="currentColor"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
                   />
-                </div>
-
-                {error && (
-                  <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive flex items-start gap-2">
-                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <span>{error}</span>
-                  </div>
-                )}
-
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Loading..." : "Login"}
-                </Button>
-              </form>
-
-              <div className="text-center text-sm">
-                Don&apos;t have an account?{" "}
-                <Link
-                  href={`/${lang}/signup`}
-                  className="text-primary hover:underline"
-                >
-                  Sign up
-                </Link>
-              </div>
+                  <path
+                    fill="currentColor"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  />
+                  <path
+                    fill="currentColor"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 12-4.53z"
+                  />
+                </svg>
+                Sign in with Google
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        <p className="text-center text-xs text-muted-foreground">
-          By clicking continue, you agree to our{" "}
-          <Link href="/terms" className="underline hover:text-primary">
-            Terms of Service
-          </Link>{" "}
-          and{" "}
-          <Link href="/privacy" className="underline hover:text-primary">
-            Privacy Policy
-          </Link>
-          .
-        </p>
+          <div className="text-center">
+            <p className="text-[10px] font-medium text-muted-foreground/30 uppercase tracking-[0.1em]">
+              Only for authorized personnel.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

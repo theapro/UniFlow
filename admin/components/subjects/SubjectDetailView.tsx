@@ -6,14 +6,13 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
   ArrowLeft, Pencil, Trash2, BookOpen, 
-  Users, Calendar, Briefcase, Hash, Clock,
-  MoreHorizontal
+  Calendar, Briefcase, Hash, Clock,
+  MoreHorizontal, Presentation, Gauge
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { subjectsApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import {
@@ -30,6 +29,8 @@ type Subject = {
   code: string | null;
   createdAt: string;
   updatedAt: string;
+  weeklyLessons: number; // Yangi
+  totalLessons: number;  // Yangi
   cohort?: { id: string; code: string; year?: number | null } | null;
   parentGroup?: { id: string; name: string } | null;
   _count?: {
@@ -71,7 +72,7 @@ export function SubjectDetailView({ lang, dict, id }: { lang: string; dict: any;
   return (
     <div className="container max-w-7xl py-10 space-y-8 animate-in fade-in duration-700">
       
-      {/* Top Navigation & Breadcrumb Style Header */}
+      {/* Top Navigation */}
       <div className="flex items-center gap-4 px-1">
         <Link
           href={`/${lang}/dashboard/subjects`}
@@ -89,13 +90,13 @@ export function SubjectDetailView({ lang, dict, id }: { lang: string; dict: any;
         </div>
       </div>
 
-      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* LEFT COLUMN: Essential Details (Glassmorphism Card) */}
+        {/* LEFT COLUMN: Essential Details */}
         <div className="lg:col-span-8">
           <Card className="rounded-[32px] border-border/40 bg-muted/10 backdrop-blur-md shadow-none overflow-hidden">
             <CardContent className="p-10">
+              {/* Grid 3 ta ustun bo'lib ko'rinadi (md:grid-cols-2 bo'lgani uchun darslar pastga tushadi) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
                 <InfoBlock 
                   icon={Briefcase} 
@@ -108,6 +109,18 @@ export function SubjectDetailView({ lang, dict, id }: { lang: string; dict: any;
                   label="Enrollment Cohort" 
                   value={subject.cohort?.code ? `Cohort ${subject.cohort.code}` : "Cross-Cohort"} 
                   description="Academic year or group level"
+                />
+                <InfoBlock 
+                  icon={Presentation} 
+                  label="Weekly Intensity" 
+                  value={`${subject.weeklyLessons} Lessons`} 
+                  description="Lessons per academic week"
+                />
+                <InfoBlock 
+                  icon={Gauge} 
+                  label="Total Load" 
+                  value={`${subject.totalLessons} Sessions`} 
+                  description="Full curriculum duration"
                 />
                 <InfoBlock 
                   icon={Hash} 
@@ -130,8 +143,6 @@ export function SubjectDetailView({ lang, dict, id }: { lang: string; dict: any;
 
         {/* RIGHT COLUMN: Statistics & Actions */}
         <div className="lg:col-span-4 space-y-6">
-          
-          {/* Stats Card */}
           <div className="rounded-[32px] border border-border/40 bg-muted/10 p-8 space-y-8">
             <div className="space-y-6">
               <StatItem 
@@ -140,46 +151,32 @@ export function SubjectDetailView({ lang, dict, id }: { lang: string; dict: any;
                 subtext="Active teaching staff"
               />
               <div className="h-px bg-white/[0.05]" />
-              <StatItem 
-                label="Curriculum Scope" 
-                value={subject._count?.lessons ?? 0} 
-                subtext="Total scheduled lessons"
-              />
+              <div className="flex justify-between items-center">
+                 <div className="space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">Scheduled</p>
+                    <p className="text-[11px] text-muted-foreground/30 font-medium">Currently created lessons</p>
+                 </div>
+                 <span className="text-3xl font-light text-white/40">{subject._count?.lessons ?? 0}</span>
+              </div>
             </div>
           </div>
 
-          {/* Action Menu Card */}
           <div className="rounded-[32px] border border-border/40 bg-muted/10 p-4 flex items-center justify-between">
             <span className="ml-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
               Record Settings
             </span>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-12 w-12 rounded-2xl border-border/40 bg-background/50 hover:bg-white/5"
-                >
+                <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl border-border/40 bg-background/50 hover:bg-white/5">
                   <MoreHorizontal className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-56 rounded-2xl border-border/40 p-2 shadow-2xl backdrop-blur-xl"
-              >
-                <DropdownMenuItem
-                  onClick={() => router.push(`/${lang}/dashboard/subjects/${subject.id}/edit`)}
-                  className="rounded-xl p-3 cursor-pointer"
-                >
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit Subject
+              <DropdownMenuContent align="end" className="w-56 rounded-2xl border-border/40 p-2 shadow-2xl backdrop-blur-xl">
+                <DropdownMenuItem onClick={() => router.push(`/${lang}/dashboard/subjects/${subject.id}/edit`)} className="rounded-xl p-3 cursor-pointer">
+                  <Pencil className="mr-2 h-4 w-4" /> Edit Subject
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setDeleteOpen(true)}
-                  className="rounded-xl text-destructive focus:bg-destructive/10 focus:text-destructive p-3 cursor-pointer"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Subject
+                <DropdownMenuItem onClick={() => setDeleteOpen(true)} className="rounded-xl text-destructive focus:bg-destructive/10 focus:text-destructive p-3 cursor-pointer">
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete Subject
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -191,15 +188,13 @@ export function SubjectDetailView({ lang, dict, id }: { lang: string; dict: any;
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title="Confirm Deletion"
-        description="Are you sure you want to remove this subject? All associated lesson plans and teacher assignments will be affected."
-        confirmLabel="Delete Permanent"
+        description="Are you sure you want to remove this subject?"
         onConfirm={() => deleteMutation.mutate()}
       />
     </div>
   );
 }
 
-// Sub-components for cleaner structure
 function InfoBlock({ icon: Icon, label, value, description, isMono = false }: any) {
   return (
     <div className="space-y-4">

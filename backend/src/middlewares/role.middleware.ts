@@ -1,8 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
-import type { UserRole } from "@prisma/client";
+import type { Role } from "@prisma/client";
 import { fail } from "../utils/responses";
 
-export function roleMiddleware(allowed: UserRole[]) {
+export function roleMiddleware(allowed: Role[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     const user = req.user;
     if (!user) {

@@ -1,4 +1,4 @@
-import type { AttendanceStatus } from ".prisma/client";
+import type { AttendanceStatus } from "@prisma/client";
 
 export function parseAttendanceCell(raw: string): AttendanceStatus | null {
   const v = String(raw ?? "")

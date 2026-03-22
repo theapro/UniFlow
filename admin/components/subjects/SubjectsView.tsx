@@ -3,9 +3,16 @@
 import * as React from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { 
-  Plus, Pencil, Eye, Trash2, Search, 
-  BookOpen, LayoutGrid, Layers, MoreVertical 
+import {
+  Plus,
+  Pencil,
+  Eye,
+  Trash2,
+  Search,
+  BookOpen,
+  LayoutGrid,
+  Layers,
+  MoreVertical,
 } from "lucide-react";
 
 import { subjectsApi } from "@/lib/api";
@@ -77,12 +84,16 @@ export function SubjectsView({ lang, dict }: { lang: string; dict: any }) {
 
   const { data: subjects, isLoading } = useQuery({
     queryKey: ["subjects"],
-    queryFn: () => subjectsApi.list({ take: 1000 }).then((r) => r.data.data as Subject[]),
+    queryFn: () =>
+      subjectsApi.list({ take: 1000 }).then((r) => r.data.data as Subject[]),
   });
 
   const updateMutation = useMutation({
     mutationFn: (payload: { id: string; name: string; code?: string | null }) =>
-      subjectsApi.update(payload.id, { name: payload.name, code: payload.code }),
+      subjectsApi.update(payload.id, {
+        name: payload.name,
+        code: payload.code,
+      }),
     onSuccess: async () => {
       setEditOpen(false);
       toast.success(dict?.common?.success ?? "Updated successfully");
@@ -121,13 +132,15 @@ export function SubjectsView({ lang, dict }: { lang: string; dict: any }) {
   const allDepts = React.useMemo(() => {
     const existing = Array.from(subjectsByDept.keys());
     const ordered = FIXED_DEPARTMENTS.filter((n) => existing.includes(n));
-    const others = existing.filter((n) => !FIXED_DEPARTMENTS.includes(n as any)).sort();
+    const others = existing
+      .filter((n) => !FIXED_DEPARTMENTS.includes(n as any))
+      .sort();
     return [...ordered, ...others];
   }, [subjectsByDept]);
 
   const renderCohortGroups = (deptSubjects: Subject[]) => {
     const byCohort = new Map<string, Subject[]>();
-    deptSubjects.forEach(s => {
+    deptSubjects.forEach((s) => {
       const cCode = s.cohort?.code ?? "(No cohort)";
       const list = byCohort.get(cCode) ?? [];
       list.push(s);
@@ -149,56 +162,93 @@ export function SubjectsView({ lang, dict }: { lang: string; dict: any }) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {list.sort((a,b) => a.name.localeCompare(b.name)).map((subject) => (
-                <div
-                  key={subject.id}
-                  className="group relative flex items-center justify-between p-5 rounded-[22px] border border-white/[0.06] bg-white/[0.03] transition-all hover:bg-white/[0.06] hover:border-white/20"
-                >
-                  <div className="space-y-2 min-w-0">
-                    <h4 className="text-[15px] font-bold text-white/90 truncate group-hover:text-white">
-                      {subject.name}
-                    </h4>
-                    <div className="flex items-center gap-3">
-                      {subject.code && (
-                        <Badge variant="outline" className="text-[10px] font-mono border-white/10">
-                          {subject.code}
-                        </Badge>
-                      )}
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <BookOpen className="h-3.5 w-3.5" />
-                        <span>{subject._count?.teachers ?? 0} Teachers</span>
+              {list
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((subject) => (
+                  <div key={subject.id} className="group relative">
+                    {/* Butun kartochka Link hisoblanadi */}
+                    <Link
+                      href={`/${lang}/dashboard/subjects/${subject.id}/view`}
+                      className="flex items-center justify-between p-5 rounded-[22px] border border-white/[0.06] bg-white/[0.03] transition-all hover:bg-white/[0.06] hover:border-white/20 hover:translate-y-[-2px] active:scale-[0.98]"
+                    >
+                      <div className="space-y-2 min-w-0">
+                        <h4 className="text-[15px] font-bold text-white/90 truncate group-hover:text-white">
+                          {subject.name}
+                        </h4>
+                        <div className="flex items-center gap-3">
+                          {subject.code && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] font-mono border-white/10"
+                            >
+                              {subject.code}
+                            </Badge>
+                          )}
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <BookOpen className="h-3.5 w-3.5" />
+                            <span>
+                              {subject._count?.teachers ?? 0} Teachers
+                            </span>
+                          </div>
+                        </div>
                       </div>
+
+                      {/* Dropdown Menu uchun joy qoldiramiz (lekin buni bosganda Link ishlamasligi kerak) */}
+                      <div className="w-8 h-8" />
+                    </Link>
+
+                    {/* DropdownMenu Link ustida turadi, lekin mustaqil ishlaydi */}
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full hover:bg-white/10"
+                            onClick={(e) => e.preventDefault()} // Link ishga tushib ketmasligi uchun
+                          >
+                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="end"
+                          className="w-44 rounded-xl"
+                        >
+                          <DropdownMenuItem asChild>
+                            <Link
+                              href={`/${lang}/dashboard/subjects/${subject.id}/view`}
+                              className="gap-2"
+                            >
+                              <Eye className="h-4 w-4" /> View Details
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation(); // Muhim!
+                              setEditTarget(subject);
+                              setName(subject.name);
+                              setCode(subject.code || "");
+                              setEditOpen(true);
+                            }}
+                            className="gap-2"
+                          >
+                            <Pencil className="h-4 w-4" /> Quick Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation(); // Muhim!
+                              setDeleteId(subject.id);
+                            }}
+                            className="text-destructive focus:text-destructive gap-2"
+                          >
+                            <Trash2 className="h-4 w-4" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-white/10">
-                        <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44 rounded-xl">
-                      <DropdownMenuItem asChild>
-                        <Link href={`/${lang}/dashboard/subjects/${subject.id}/view`} className="gap-2">
-                          <Eye className="h-4 w-4" /> View Details
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => {
-                        setEditTarget(subject);
-                        setName(subject.name);
-                        setCode(subject.code || "");
-                        setEditOpen(true);
-                      }} className="gap-2">
-                        <Pencil className="h-4 w-4" /> Quick Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => setDeleteId(subject.id)} className="text-destructive focus:text-destructive gap-2">
-                        <Trash2 className="h-4 w-4" /> Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              ))}
+                ))}
             </div>
           </div>
         ))}
@@ -222,7 +272,10 @@ export function SubjectsView({ lang, dict }: { lang: string; dict: any }) {
                 className="pl-10 w-[280px] h-11 rounded-2xl bg-[#0A0A0A] border-white/10"
               />
             </div>
-            <Button asChild className="h-11 px-5 rounded-2xl bg-white text-black hover:bg-white/90">
+            <Button
+              asChild
+              className="h-11 px-5 rounded-2xl bg-white text-black hover:bg-white/90"
+            >
               <Link href={`/${lang}/dashboard/subjects/create`}>
                 <Plus className="h-4 w-4 mr-2" /> Add Subject
               </Link>
@@ -265,21 +318,44 @@ export function SubjectsView({ lang, dict }: { lang: string; dict: any }) {
         <DialogContent className="rounded-[28px]">
           <DialogHeader>
             <DialogTitle>Quick Edit Subject</DialogTitle>
-            <DialogDescription>Update subject basic information.</DialogDescription>
+            <DialogDescription>
+              Update subject basic information.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Subject Name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} className="rounded-xl h-11" />
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="rounded-xl h-11"
+              />
             </div>
             <div className="space-y-2">
               <Label>Subject Code</Label>
-              <Input value={code} onChange={(e) => setCode(e.target.value)} className="rounded-xl h-11" />
+              <Input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className="rounded-xl h-11"
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)} className="rounded-xl">Cancel</Button>
-            <Button onClick={() => editTarget && updateMutation.mutate({ id: editTarget.id, name, code })} disabled={updateMutation.isPending} className="rounded-xl">
+            <Button
+              variant="outline"
+              onClick={() => setEditOpen(false)}
+              className="rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                editTarget &&
+                updateMutation.mutate({ id: editTarget.id, name, code })
+              }
+              disabled={updateMutation.isPending}
+              className="rounded-xl"
+            >
               {updateMutation.isPending ? "Saving..." : "Save changes"}
             </Button>
           </DialogFooter>

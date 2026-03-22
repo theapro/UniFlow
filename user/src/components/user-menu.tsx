@@ -20,6 +20,7 @@ export type CurrentUser = {
   email: string;
   fullName?: string | null;
   role?: string;
+  permissions?: string[];
 };
 
 export function UserMenu({ user }: { user: CurrentUser }) {

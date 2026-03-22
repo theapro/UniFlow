@@ -45,10 +45,8 @@ function cohortLabel(c: CohortRow) {
 
 export default function CreateSubjectPage({
   params: { lang },
-  dict, // Lug'at (dictionary) kelayotgan bo'lsa
 }: {
   params: { lang: string };
-  dict?: any;
 }) {
   const [name, setName] = React.useState("");
   const [code, setCode] = React.useState("");
@@ -65,7 +63,8 @@ export default function CreateSubjectPage({
 
   const { data: departments } = useQuery({
     queryKey: ["parent-groups"],
-    queryFn: () => parentGroupsApi.list({ take: 1000 }).then((r) => r.data.data),
+    queryFn: () =>
+      parentGroupsApi.list({ take: 1000 }).then((r) => r.data.data),
     staleTime: 60_000,
   });
 
@@ -124,7 +123,6 @@ export default function CreateSubjectPage({
 
   return (
     <div className="container max-w-7xl py-10 space-y-8 animate-in fade-in duration-500">
-      
       {/* Top Navigation & Breadcrumb Style Header */}
       <div className="flex items-center gap-4 px-1">
         <Button
@@ -137,7 +135,7 @@ export default function CreateSubjectPage({
         </Button>
         <div className="flex flex-col">
           <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 leading-none mb-1">
-             New Registration
+            New Registration
           </span>
           <h1 className="text-2xl font-bold tracking-tight text-white/90 leading-none">
             Create Subject
@@ -148,17 +146,21 @@ export default function CreateSubjectPage({
       <Card className="rounded-[32px] border-border/40 bg-muted/10 backdrop-blur-md shadow-none overflow-hidden">
         <CardContent className="p-8 md:p-12">
           <form onSubmit={handleSubmit} className="space-y-10">
-            
             {/* Form Section: Primary Info */}
             <div className="space-y-6">
               <div className="flex items-center gap-2 mb-2">
                 <BookOpen className="h-4 w-4 text-primary" />
-                <h3 className="text-sm font-bold uppercase tracking-widest text-white/50">Core Information</h3>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-white/50">
+                  Core Information
+                </h3>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2.5">
-                  <Label htmlFor="name" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 ml-1">
+                  <Label
+                    htmlFor="name"
+                    className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 ml-1"
+                  >
                     Subject Name *
                   </Label>
                   <Input
@@ -172,7 +174,10 @@ export default function CreateSubjectPage({
                 </div>
 
                 <div className="space-y-2.5">
-                  <Label htmlFor="code" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 ml-1">
+                  <Label
+                    htmlFor="code"
+                    className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 ml-1"
+                  >
                     Subject Code
                   </Label>
                   <Input
@@ -190,7 +195,9 @@ export default function CreateSubjectPage({
             <div className="space-y-6">
               <div className="flex items-center gap-2 mb-2">
                 <Layers className="h-4 w-4 text-primary" />
-                <h3 className="text-sm font-bold uppercase tracking-widest text-white/50">Academic Placement</h3>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-white/50">
+                  Academic Placement
+                </h3>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -198,13 +205,20 @@ export default function CreateSubjectPage({
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 ml-1">
                     Department *
                   </Label>
-                  <Select value={parentGroupId} onValueChange={setParentGroupId}>
+                  <Select
+                    value={parentGroupId}
+                    onValueChange={setParentGroupId}
+                  >
                     <SelectTrigger className="h-12 rounded-2xl border-border/40 bg-background/40 px-4 transition-all">
                       <SelectValue placeholder="Select department" />
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl border-border/40 backdrop-blur-xl">
                       {sortedDepartments.map((d) => (
-                        <SelectItem key={d.id} value={d.id} className="rounded-xl cursor-pointer">
+                        <SelectItem
+                          key={d.id}
+                          value={d.id}
+                          className="rounded-xl cursor-pointer"
+                        >
                           {d.name}
                         </SelectItem>
                       ))}
@@ -222,7 +236,11 @@ export default function CreateSubjectPage({
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl border-border/40 backdrop-blur-xl">
                       {sortedCohorts.map((c) => (
-                        <SelectItem key={c.id} value={c.id} className="rounded-xl cursor-pointer">
+                        <SelectItem
+                          key={c.id}
+                          value={c.id}
+                          className="rounded-xl cursor-pointer"
+                        >
                           {cohortLabel(c)}
                         </SelectItem>
                       ))}

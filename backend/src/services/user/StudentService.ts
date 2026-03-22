@@ -1,50 +1,43 @@
 import { prisma } from "../../config/prisma";
-import { getUTCDayRange, getWeekdayUTC } from "../../utils/weekday";
+import { getUTCDayRange } from "../../utils/weekday";
 import { formatDbTime } from "../../utils/time";
 
 export class StudentService {
   async getTodaySchedule(studentId: string) {
-    const membership = await prisma.studentGroup.findFirst({
-      where: { studentId, leftAt: null },
-      select: { groupId: true },
-      orderBy: [{ joinedAt: "desc" }, { createdAt: "desc" }],
+    const student = await prisma.student.findUnique({
+      where: { id: studentId },
+      select: {
+        id: true,
+        studentGroups: {
+          where: { leftAt: null },
+          select: { groupId: true },
+        },
+      },
     });
 
-    if (!membership?.groupId) {
+    const groupIds = student?.studentGroups.map((g) => g.groupId) ?? [];
+    if (groupIds.length === 0) {
       return [];
     }
 
-    const weekday = getWeekdayUTC();
+    const { start, end } = getUTCDayRange();
 
-    const rows = await prisma.scheduleEntry.findMany({
+    const rows = await prisma.schedule.findMany({
       where: {
-        groupId: membership.groupId,
-        weekday,
-        OR: [
-          { effectiveFrom: null, effectiveTo: null },
-          {
-            AND: [
-              {
-                OR: [
-                  { effectiveFrom: null },
-                  { effectiveFrom: { lte: new Date() } },
-                ],
-              },
-              {
-                OR: [
-                  { effectiveTo: null },
-                  { effectiveTo: { gte: new Date() } },
-                ],
-              },
-            ],
+        groupId: { in: groupIds },
+        calendarDay: {
+          date: {
+            gte: start,
+            lt: end,
           },
-        ],
+        },
       },
       include: {
         subject: true,
         teacher: true,
         timeSlot: true,
         room: true,
+        calendarDay: true,
       },
       orderBy: [{ timeSlot: { slotNumber: "asc" } }],
     });

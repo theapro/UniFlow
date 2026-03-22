@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole, Weekday } from "@prisma/client";
+import { PrismaClient, Role, Weekday } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -23,15 +23,64 @@ async function upsertAdmin() {
   await prisma.user.upsert({
     where: { email: DEFAULTS.adminEmail },
     update: {
-      role: UserRole.ADMIN,
+      role: Role.ADMIN,
       passwordHash,
     },
     create: {
       email: DEFAULTS.adminEmail,
       passwordHash,
-      role: UserRole.ADMIN,
+      role: Role.ADMIN,
     },
   });
+}
+
+const DEFAULT_PERMISSION_NAMES = [
+  "VIEW_STUDENTS",
+  "EDIT_STUDENTS",
+  "VIEW_TEACHERS",
+  "EDIT_TEACHERS",
+  "MANAGE_SCHEDULE",
+  "ACCESS_AI_SETTINGS",
+] as const;
+
+type PermissionName = (typeof DEFAULT_PERMISSION_NAMES)[number];
+
+const DEFAULT_ROLE_PERMISSIONS: Record<Role, PermissionName[]> = {
+  [Role.ADMIN]: [...DEFAULT_PERMISSION_NAMES],
+  [Role.TEACHER]: ["VIEW_STUDENTS", "MANAGE_SCHEDULE"],
+  [Role.MANAGER]: [
+    "VIEW_STUDENTS",
+    "EDIT_STUDENTS",
+    "VIEW_TEACHERS",
+    "EDIT_TEACHERS",
+    "MANAGE_SCHEDULE",
+  ],
+  [Role.STAFF]: ["VIEW_STUDENTS", "VIEW_TEACHERS"],
+  [Role.STUDENT]: [],
+};
+
+async function seedAccessControl() {
+  await prisma.permission.createMany({
+    data: DEFAULT_PERMISSION_NAMES.map((name) => ({
+      name,
+    })),
+    skipDuplicates: true,
+  });
+
+  const rows: Array<{ role: Role; permission: string }> = [];
+  for (const role of Object.values(Role)) {
+    const perms = DEFAULT_ROLE_PERMISSIONS[role as Role] ?? [];
+    for (const permission of perms) {
+      rows.push({ role: role as Role, permission });
+    }
+  }
+
+  if (rows.length > 0) {
+    await prisma.rolePermission.createMany({
+      data: rows,
+      skipDuplicates: true,
+    });
+  }
 }
 
 async function seedReferenceData() {
@@ -391,6 +440,7 @@ type SeedSubject = {
   name: string;
   parentGroup: AcademicDepartmentName;
   code?: string;
+  weeklyLessons: number;
 };
 
 async function seedSubjectsAndTeachers() {
@@ -403,30 +453,77 @@ async function seedSubjectsAndTeachers() {
 
   const subjects: SeedSubject[] = [
     // IT
-    { name: "Algorithms", parentGroup: "IT", code: "IT-ALG" },
-    { name: "Databases", parentGroup: "IT", code: "IT-DB" },
-    { name: "Web Development", parentGroup: "IT", code: "IT-WEB" },
-    { name: "Backend Engineering", parentGroup: "IT", code: "IT-BE" },
-    { name: "Frontend Engineering", parentGroup: "IT", code: "IT-FE" },
-    { name: "Data Structures", parentGroup: "IT", code: "IT-DS" },
-    { name: "DevOps Basics", parentGroup: "IT", code: "IT-DEVOPS" },
+    { name: "Algorithms", parentGroup: "IT", code: "IT-ALG", weeklyLessons: 5 },
+    { name: "Databases", parentGroup: "IT", code: "IT-DB", weeklyLessons: 4 },
+    {
+      name: "Web Development",
+      parentGroup: "IT",
+      code: "IT-WEB",
+      weeklyLessons: 3,
+    },
+    {
+      name: "Backend Engineering",
+      parentGroup: "IT",
+      code: "IT-BE",
+      weeklyLessons: 4,
+    },
+    {
+      name: "Frontend Engineering",
+      parentGroup: "IT",
+      code: "IT-FE",
+      weeklyLessons: 3,
+    },
+    {
+      name: "Data Structures",
+      parentGroup: "IT",
+      code: "IT-DS",
+      weeklyLessons: 5,
+    },
+    {
+      name: "DevOps Basics",
+      parentGroup: "IT",
+      code: "IT-DEVOPS",
+      weeklyLessons: 3,
+    },
 
     // Japanese
-    { name: "Japanese Grammar", parentGroup: "Japanese", code: "JP-G" },
-    { name: "Kanji", parentGroup: "Japanese", code: "JP-KAN" },
-    { name: "Japanese Conversation", parentGroup: "Japanese", code: "JP-CONV" },
-    { name: "JLPT N5 Prep", parentGroup: "Japanese", code: "JP-N5" },
+    {
+      name: "Japanese Grammar",
+      parentGroup: "Japanese",
+      code: "JP-G",
+      weeklyLessons: 4,
+    },
+    {
+      name: "Kanji",
+      parentGroup: "Japanese",
+      code: "JP-KAN",
+      weeklyLessons: 3,
+    },
+    {
+      name: "Japanese Conversation",
+      parentGroup: "Japanese",
+      code: "JP-CONV",
+      weeklyLessons: 3,
+    },
+    {
+      name: "JLPT N5 Prep",
+      parentGroup: "Japanese",
+      code: "JP-N5",
+      weeklyLessons: 4,
+    },
 
     // Employability/Cowork
     {
       name: "Employability Skills",
       parentGroup: "Employability/Cowork",
       code: "EMP-SK",
+      weeklyLessons: 3,
     },
     {
       name: "Career Coaching",
       parentGroup: "Employability/Cowork",
       code: "EMP-CC",
+      weeklyLessons: 3,
     },
 
     // Partner University / Language
@@ -434,28 +531,43 @@ async function seedSubjectsAndTeachers() {
       name: "Academic Writing",
       parentGroup: "Partner University",
       code: "UNI-AW",
+      weeklyLessons: 3,
     },
     {
       name: "Presentation Skills",
       parentGroup: "Partner University",
       code: "UNI-PS",
+      weeklyLessons: 3,
     },
     {
       name: "Critical Thinking",
       parentGroup: "Partner University",
       code: "UNI-CT",
+      weeklyLessons: 3,
     },
-    { name: "English", parentGroup: "Language University", code: "LANG-EN" },
+    {
+      name: "English",
+      parentGroup: "Language University",
+      code: "LANG-EN",
+      weeklyLessons: 4,
+    },
     {
       name: "Uzbek Language",
       parentGroup: "Language University",
       code: "LANG-UZ",
+      weeklyLessons: 4,
     },
-    { name: "History", parentGroup: "Partner University", code: "UNI-HIS" },
+    {
+      name: "History",
+      parentGroup: "Partner University",
+      code: "UNI-HIS",
+      weeklyLessons: 3,
+    },
     {
       name: "Mathematics",
       parentGroup: "Partner University",
       code: "UNI-MATH",
+      weeklyLessons: 5,
     },
   ];
 
@@ -469,11 +581,13 @@ async function seedSubjectsAndTeachers() {
       update: {
         code: s.code ?? null,
         parentGroupId,
+        weeklyLessons: s.weeklyLessons,
       },
       create: {
         name: s.name,
         code: s.code ?? null,
         parentGroupId,
+        weeklyLessons: s.weeklyLessons,
       },
       select: { id: true, name: true },
     });
@@ -723,6 +837,7 @@ async function seedAiModels() {
 async function main() {
   console.log("Seeding database...");
   await upsertAdmin();
+  await seedAccessControl();
   await seedReferenceData();
   await seedAcademicStructure();
   await seedRooms();

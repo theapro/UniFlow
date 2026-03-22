@@ -1,4 +1,4 @@
-import { UserRole } from "@prisma/client";
+import { Role } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { ChatSender } from "@prisma/client";
 import { StudentService } from "../../services/user/StudentService";
@@ -76,7 +76,7 @@ export async function buildContext(params: {
 
   let today: AiBuiltContext["today"] = null;
 
-  if (identity.role === UserRole.STUDENT && identity.studentId) {
+  if (identity.role === Role.STUDENT && identity.studentId) {
     try {
       const schedule = await params.studentService.getTodaySchedule(
         identity.studentId,
@@ -96,7 +96,7 @@ export async function buildContext(params: {
     }
   }
 
-  if (identity.role === UserRole.TEACHER && identity.teacherId) {
+  if (identity.role === Role.TEACHER && identity.teacherId) {
     try {
       const lessons = await params.teacherService.getTodayLessons(
         identity.teacherId,

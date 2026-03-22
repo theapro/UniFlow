@@ -1,9 +1,20 @@
 import type { AiToolName } from "../../services/ai-tools/toolNames";
+import { formatDbTime, formatTimeRange } from "../../utils/time";
 
 function fmtTimeRange(start: string | null, end: string | null): string {
   if (start && end) return `${start}-${end}`;
   if (start) return start;
   return "";
+}
+
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+function toISODateOnlyUTC(date: Date): string {
+  return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(
+    date.getUTCDate(),
+  )}`;
 }
 
 export class AiResponder {
@@ -45,6 +56,43 @@ export class AiResponder {
           const room = item.room ? ` (${item.room})` : "";
           lines.push(`- ${time} ${subject}${teacher}${room}`.trim());
         }
+      }
+
+      return lines.join("\n").trim();
+    }
+
+    if (
+      tool === "getTodaySchedule" ||
+      tool === "getWeeklySchedule" ||
+      tool === "getMonthlySchedule"
+    ) {
+      const rows = Array.isArray(params.result) ? params.result : [];
+
+      const lines: string[] = [];
+      if (tool === "getTodaySchedule") lines.push("Bugungi jadval:");
+      if (tool === "getWeeklySchedule") lines.push("Haftalik jadval:");
+      if (tool === "getMonthlySchedule") lines.push("Oylik jadval:");
+
+      if (rows.length === 0) {
+        lines.push("- Jadval topilmadi.");
+        return lines.join("\n").trim();
+      }
+
+      for (const r of rows) {
+        const date = r?.calendarDay?.date instanceof Date ? r.calendarDay.date : null;
+        const datePrefix =
+          tool === "getTodaySchedule" || !date ? "" : `${toISODateOnlyUTC(date)} `;
+
+        const time =
+          formatTimeRange(r?.timeSlot?.startTime ?? null, r?.timeSlot?.endTime ?? null) ??
+          formatDbTime(r?.timeSlot?.startTime ?? null) ??
+          "";
+
+        const subject = r?.subject?.name ?? "(Fan noma’lum)";
+        const teacher = r?.teacher?.fullName ? ` — ${r.teacher.fullName}` : "";
+        const room = r?.room?.name ? ` (${r.room.name})` : "";
+
+        lines.push(`- ${datePrefix}${time} ${subject}${teacher}${room}`.trim());
       }
 
       return lines.join("\n").trim();
