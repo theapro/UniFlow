@@ -98,6 +98,12 @@ export const env = {
     Boolean(optional("GOOGLE_SHEETS_GRADES_SPREADSHEET_ID")),
   gradesSheetsSpreadsheetId: optional("GOOGLE_SHEETS_GRADES_SPREADSHEET_ID"),
 
+  // Grades Worker
+  gradesSheetsWorkerEnabled:
+    optionalBool("GOOGLE_SHEETS_GRADES_WORKER_ENABLED") ?? false,
+  gradesSheetsWorkerIntervalMs:
+    optionalNumber("GOOGLE_SHEETS_GRADES_WORKER_INTERVAL_MS") ?? 60_000,
+
   // Teachers Worker
   teachersSheetsWorkerEnabled:
     optionalBool("GOOGLE_SHEETS_TEACHERS_WORKER_ENABLED") ?? false,

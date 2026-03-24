@@ -1,0 +1,18 @@
+sheets pages refactoring
+
+1. hozirgi holatda Sheetsda pagelari deyarli hamma componentlar client side bo'lib qolgan page.tsx faylida hech narsa yo'q bu to'gri emas. Iloji boricha chiroyliroq va ko'proq componentlarga bo'lish kerak masalan:
+
+sheets/students/page.tsx fayli layout sifatida ishlatilishi kerak ya'ni componentlar o'sha yerda
+chaqiriladi ya'ni sheets/componentsdagi SheetsView componentlari ishlatilmasin u yerda faqat kichik componentlar bo'lsin components/sheets/students,teacher va hkz ichida har bir sheets ga tegishli component bo'lsin ammo agar umumiy ishlatiladigan component bo'lsa /components/sheets papkasida bo'lsin masalan synclogs componenti
+
+hozirgi Students componentlari: Tabs, Buttons, SourceSpreadsheet, SyncPerformance, Groups, conflicts, logs bularni hammasini server side componentlarda ishlatish kerak agar client side da ishlatiladiga bo'lsa o'sha holatda qolsin ya'ni o'zgartirma ammo albatta sheets/students/page.tsx layout file sifatida 
+
+2. Teachers, Attendance, Grades sheets larini ham huddi shunday qil. Va agar mos kelsa hammasida bir xil component ishlat masalan hozirgi holatda SourceSpreadsheet component hammasida ishlatilgan va code ham bir xil bo'lsin ya'ni componentlar
+
+components/sheets/SyncLogs
+components/sheets/SourceSpreadsheet
+components/sheets/SyncPerformance
+
+va boshqalar va bular boshqa hamma componentlarda ishlatilsin
+
+3. SourceSpreadsheet componenti Students sheetsdagi kabi designda bo'lsin imagedagi kabi

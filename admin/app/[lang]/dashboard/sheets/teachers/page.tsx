@@ -1,5 +1,6 @@
 import { getDictionary, type Locale } from "@/lib/i18n";
-import { TeachersSheetsView } from "@/components/sheets/TeachersSheetsView";
+import { TeachersSheetsHeader } from "@/components/sheets/teachers/TeachersSheetsHeader";
+import { TeachersSheetsTabs } from "@/components/sheets/teachers/TeachersSheetsTabs";
 
 export default async function TeachersSheetsPage({
   params: { lang },
@@ -8,5 +9,10 @@ export default async function TeachersSheetsPage({
 }) {
   const dict = await getDictionary(lang);
 
-  return <TeachersSheetsView lang={lang} dict={dict} />;
+  return (
+    <div className="container max-w-7xl py-10 space-y-12">
+      <TeachersSheetsHeader dict={dict} />
+      <TeachersSheetsTabs dict={dict} />
+    </div>
+  );
 }

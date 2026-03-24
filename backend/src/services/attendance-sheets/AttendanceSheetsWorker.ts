@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { AttendanceSheetsSyncService } from "./AttendanceSheetsSyncService";
 import { SheetsSettingsService } from "../sheets/SheetsSettingsService";
+import { env } from "../../config/env";
 
 export class AttendanceSheetsWorker {
   private timer: NodeJS.Timeout | null = null;
@@ -18,6 +19,7 @@ export class AttendanceSheetsWorker {
 
     const runOnce = async () => {
       if (this.running) return;
+      if (!env.attendanceSheetsWorkerEnabled) return;
       if (Date.now() < this.nextAllowedRunAt) return;
       this.running = true;
 

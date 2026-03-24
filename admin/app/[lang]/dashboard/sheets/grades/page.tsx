@@ -1,5 +1,6 @@
 import { getDictionary, type Locale } from "@/lib/i18n";
-import { GradesSheetsView } from "@/components/sheets/GradesSheetsView";
+import { GradesSheetsHeader } from "@/components/sheets/grades/GradesSheetsHeader";
+import { GradesSheetsTabs } from "@/components/sheets/grades/GradesSheetsTabs";
 
 export default async function GradesSheetsPage({
   params: { lang },
@@ -8,5 +9,10 @@ export default async function GradesSheetsPage({
 }) {
   const dict = await getDictionary(lang);
 
-  return <GradesSheetsView lang={lang} dict={dict} />;
+  return (
+    <div className="container max-w-7xl py-10 space-y-12">
+      <GradesSheetsHeader dict={dict} />
+      <GradesSheetsTabs dict={dict} />
+    </div>
+  );
 }

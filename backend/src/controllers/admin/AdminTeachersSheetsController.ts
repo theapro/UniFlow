@@ -29,7 +29,11 @@ export class AdminTeachersSheetsController {
   }
 
   patchConfig = async (req: Request, res: Response) => {
-    const { spreadsheetId } = req.body ?? {};
+    const { spreadsheetId, workerEnabled } = req.body ?? {};
+
+    if (typeof workerEnabled === "boolean") {
+      env.teachersSheetsWorkerEnabled = workerEnabled;
+    }
 
     const settings = await this.sheetsSettings.patch(prisma, {
       teachersSpreadsheetId: spreadsheetId,
@@ -40,6 +44,7 @@ export class AdminTeachersSheetsController {
       spreadsheetIdMasked: maskSpreadsheetId(
         settings.effective.teachersSpreadsheetId,
       ),
+      workerEnabled: env.teachersSheetsWorkerEnabled,
     });
   };
 
@@ -49,6 +54,8 @@ export class AdminTeachersSheetsController {
 
     const config = {
       enabled: env.teachersSheetsEnabled,
+      workerEnabled: env.teachersSheetsWorkerEnabled,
+      workerIntervalMs: env.teachersSheetsWorkerIntervalMs,
       spreadsheetId: effectiveSpreadsheetId,
       spreadsheetIdMasked: maskSpreadsheetId(effectiveSpreadsheetId),
       clientEmail: maskEmail(env.googleSheetsClientEmail),
@@ -118,6 +125,17 @@ export class AdminTeachersSheetsController {
         })
       : null;
 
+    const worker = await prisma.teachersSheetsWorkerState.findUnique({
+      where: { key: "teachers" },
+    });
+
+    const heartbeatMs = worker?.lastHeartbeatAt
+      ? Date.now() - worker.lastHeartbeatAt.getTime()
+      : null;
+    const workerRunning =
+      typeof heartbeatMs === "number" &&
+      heartbeatMs <= Math.max(env.teachersSheetsWorkerIntervalMs * 2, 60_000);
+
     const recentLogs = spreadsheetId
       ? await prisma.teachersSheetsSyncLog.findMany({
           where: { spreadsheetId },
@@ -138,6 +156,13 @@ export class AdminTeachersSheetsController {
       lastSyncAt: state?.lastSyncAt ?? null,
       lastSuccessAt: state?.lastSuccessAt ?? null,
       lastError: state?.lastError ?? null,
+      worker: {
+        enabled: env.teachersSheetsWorkerEnabled,
+        intervalMs: env.teachersSheetsWorkerIntervalMs,
+        lastHeartbeatAt: worker?.lastHeartbeatAt ?? null,
+        running: workerRunning,
+        lastError: worker?.lastError ?? null,
+      },
       recentLogs: recentLogs.map((l) => ({
         createdAt: l.createdAt,
         level: l.level,
@@ -155,10 +180,25 @@ export class AdminTeachersSheetsController {
       await this.sheetsSettings.getEffectiveTeachersSpreadsheetId(prisma);
     try {
       const result = await this.syncService.syncOnce({
-        reason: "admin_force",
+        reason: "admin_sync",
         spreadsheetId: spreadsheetId ?? undefined,
       });
       return ok(res, "Teachers Sheets sync completed", result);
+    } catch (e: any) {
+      await this.syncService.recordFailure(e, spreadsheetId ?? undefined);
+      return fail(res, 500, "Teachers Sheets sync failed: " + e.message);
+    }
+  };
+
+  forceSyncNow = async (_req: Request, res: Response) => {
+    const spreadsheetId =
+      await this.sheetsSettings.getEffectiveTeachersSpreadsheetId(prisma);
+    try {
+      const result = await this.syncService.syncOnce({
+        reason: "admin_force",
+        spreadsheetId: spreadsheetId ?? undefined,
+      });
+      return ok(res, "Teachers Sheets force sync completed", result);
     } catch (e: any) {
       await this.syncService.recordFailure(e, spreadsheetId ?? undefined);
       return fail(res, 500, "Teachers Sheets sync failed: " + e.message);

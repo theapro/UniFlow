@@ -32,6 +32,8 @@ export class AdminGradesSheetsController {
 
     const config = {
       enabled: env.gradesSheetsEnabled,
+      workerEnabled: env.gradesSheetsWorkerEnabled,
+      workerIntervalMs: env.gradesSheetsWorkerIntervalMs,
       spreadsheetId: spreadsheetId ?? null,
       spreadsheetIdMasked: maskSpreadsheetId(spreadsheetId),
       clientEmail: maskEmail(env.googleSheetsClientEmail),
@@ -93,6 +95,10 @@ export class AdminGradesSheetsController {
   };
 
   patchConfig = async (req: Request, res: Response) => {
+    if (typeof req.body?.workerEnabled === "boolean") {
+      env.gradesSheetsWorkerEnabled = req.body.workerEnabled;
+    }
+
     const spreadsheetIdRaw = req.body?.spreadsheetId;
     const spreadsheetId =
       spreadsheetIdRaw === null || spreadsheetIdRaw === undefined
@@ -107,6 +113,7 @@ export class AdminGradesSheetsController {
     return ok(res, "Grades Sheets config updated", {
       gradesSpreadsheetId: updated.gradesSpreadsheetId ?? null,
       gradesSpreadsheetIdMasked: maskSpreadsheetId(updated.gradesSpreadsheetId),
+      workerEnabled: env.gradesSheetsWorkerEnabled,
     });
   };
 

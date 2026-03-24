@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { StudentsSheetsSyncService } from "./StudentsSheetsSyncService";
 import { SheetsSettingsService } from "../sheets/SheetsSettingsService";
+import { env } from "../../config/env";
 
 export class StudentsSheetsWorker {
   private timer: NodeJS.Timeout | null = null;
@@ -21,6 +22,7 @@ export class StudentsSheetsWorker {
 
     const runOnce = async () => {
       if (this.running) return;
+      if (!env.studentsSheetsWorkerEnabled) return;
       if (Date.now() < this.nextAllowedRunAt) return;
       this.running = true;
 

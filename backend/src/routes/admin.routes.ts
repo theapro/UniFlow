@@ -277,6 +277,10 @@ router.patch(
 );
 router.get("/students-sheets/status", adminStudentsSheetsController.getStatus);
 router.post("/students-sheets/sync", adminStudentsSheetsController.syncNow);
+router.post(
+  "/students-sheets/force-sync",
+  adminStudentsSheetsController.forceSyncNow,
+);
 router.get(
   "/students-sheets/groups/status",
   adminStudentsSheetsController.getGroupsStatus,
@@ -307,6 +311,10 @@ router.patch(
 router.get("/teachers-sheets/status", adminTeachersSheetsController.getStatus);
 router.post("/teachers-sheets/sync", adminTeachersSheetsController.syncNow);
 router.post(
+  "/teachers-sheets/force-sync",
+  adminTeachersSheetsController.forceSyncNow,
+);
+router.post(
   "/teachers-sheets/sync-to-sheets",
   adminTeachersSheetsController.syncDbToSheetsNow,
 );
@@ -325,6 +333,10 @@ router.get(
   adminAttendanceSheetsController.getStatus,
 );
 router.post("/attendance-sheets/sync", adminAttendanceSheetsController.syncNow);
+router.post(
+  "/attendance-sheets/force-sync",
+  adminAttendanceSheetsController.forceSyncNow,
+);
 router.get("/attendance-sheets/tabs", adminAttendanceSheetsController.listTabs);
 router.post(
   "/attendance-sheets/tabs",

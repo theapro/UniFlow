@@ -88,6 +88,11 @@ export class AdminAttendanceSheetsController {
   };
 
   patchConfig = async (req: Request, res: Response) => {
+    const workerEnabledRaw = req.body?.workerEnabled;
+    if (typeof workerEnabledRaw === "boolean") {
+      env.attendanceSheetsWorkerEnabled = workerEnabledRaw;
+    }
+
     const spreadsheetIdRaw = req.body?.spreadsheetId;
     const spreadsheetId =
       spreadsheetIdRaw === null || spreadsheetIdRaw === undefined
@@ -104,6 +109,7 @@ export class AdminAttendanceSheetsController {
       attendanceSpreadsheetIdMasked: maskSpreadsheetId(
         updated.attendanceSpreadsheetId,
       ),
+      workerEnabled: env.attendanceSheetsWorkerEnabled,
     });
   };
 
@@ -181,10 +187,30 @@ export class AdminAttendanceSheetsController {
       const spreadsheetId =
         await settings.getEffectiveAttendanceSpreadsheetId(prisma);
       const result = await svc.syncOnce({
-        reason: "admin_force",
+        reason: "admin_sync",
         spreadsheetId: spreadsheetId ?? undefined,
       });
       return ok(res, "Attendance Sheets sync completed", result);
+    } catch (e) {
+      const settings = new SheetsSettingsService();
+      const spreadsheetId =
+        await settings.getEffectiveAttendanceSpreadsheetId(prisma);
+      await svc.recordFailure(e, spreadsheetId ?? undefined);
+      throw e;
+    }
+  };
+
+  forceSyncNow = async (_req: Request, res: Response) => {
+    const svc = new AttendanceSheetsSyncService(prisma);
+    try {
+      const settings = new SheetsSettingsService();
+      const spreadsheetId =
+        await settings.getEffectiveAttendanceSpreadsheetId(prisma);
+      const result = await svc.syncOnce({
+        reason: "admin_force",
+        spreadsheetId: spreadsheetId ?? undefined,
+      });
+      return ok(res, "Attendance Sheets force sync completed", result);
     } catch (e) {
       const settings = new SheetsSettingsService();
       const spreadsheetId =

@@ -22,7 +22,11 @@ export class AdminStudentsSheetsController {
   private readonly sheetsSettings = new SheetsSettingsService();
 
   patchConfig = async (req: Request, res: Response) => {
-    const { spreadsheetId } = req.body ?? {};
+    const { spreadsheetId, workerEnabled } = req.body ?? {};
+
+    if (typeof workerEnabled === "boolean") {
+      env.studentsSheetsWorkerEnabled = workerEnabled;
+    }
 
     const settings = await this.sheetsSettings.patch(prisma, {
       studentsSpreadsheetId: spreadsheetId,
@@ -33,6 +37,7 @@ export class AdminStudentsSheetsController {
       spreadsheetIdMasked: maskSpreadsheetId(
         settings.effective.studentsSpreadsheetId,
       ),
+      workerEnabled: env.studentsSheetsWorkerEnabled,
     });
   };
 
@@ -176,10 +181,26 @@ export class AdminStudentsSheetsController {
       await this.sheetsSettings.getEffectiveStudentsSpreadsheetId(prisma);
     try {
       const result = await svc.syncOnce({
-        reason: "admin_force",
+        reason: "admin_sync",
         spreadsheetId: spreadsheetId ?? undefined,
       });
       return ok(res, "Students Sheets sync completed", result);
+    } catch (e) {
+      await svc.recordFailure(e, spreadsheetId ?? undefined);
+      throw e;
+    }
+  };
+
+  forceSyncNow = async (_req: Request, res: Response) => {
+    const svc = new StudentsSheetsSyncService(prisma);
+    const spreadsheetId =
+      await this.sheetsSettings.getEffectiveStudentsSpreadsheetId(prisma);
+    try {
+      const result = await svc.syncOnce({
+        reason: "admin_force",
+        spreadsheetId: spreadsheetId ?? undefined,
+      });
+      return ok(res, "Students Sheets force sync completed", result);
     } catch (e) {
       await svc.recordFailure(e, spreadsheetId ?? undefined);
       throw e;
