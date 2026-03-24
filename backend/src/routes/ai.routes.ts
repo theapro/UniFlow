@@ -50,6 +50,7 @@ router.post("/chat/sessions", aiController.createChatSession);
 router.patch("/chat/sessions/:sessionId", aiController.renameChatSession);
 router.delete("/chat/sessions/:sessionId", aiController.deleteChatSession);
 router.get("/chat/sessions/:sessionId/messages", aiController.listChatMessages);
+router.post("/chat/sessions/:sessionId/messages", aiController.addChatMessage);
 router.get(
   "/chat/sessions/:sessionId/messages/export",
   aiController.exportChatMessages,

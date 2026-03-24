@@ -17,6 +17,29 @@ export type UseVoiceChatOptions = {
   // Called after backend pipeline finishes
   onResult?: (result: VoiceChatResult) => void;
   onError?: (message: string) => void;
+
+  // Optional integration hooks (for premium visualizers / external analyzers)
+  onInputStream?: (stream: MediaStream | null) => void;
+  onOutputAudioElement?: (el: HTMLAudioElement | null) => void;
+};
+
+export type VoiceChatDebugInfo = {
+  lastEvent: string;
+  lastStartAt: number | null;
+  lastStopAt: number | null;
+  lastStopReason:
+    | "manual"
+    | "silence"
+    | "maxDuration"
+    | "recorderError"
+    | "streamEnded"
+    | "unknown";
+  recorderState: string;
+  recorderMimeType: string;
+  streamActive: boolean;
+  trackStates: Array<{ kind: string; enabled: boolean; readyState: string }>;
+  chunks: number;
+  lastBlobBytes: number;
 };
 
 function pickMimeType(): string | undefined {
@@ -48,15 +71,56 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
     silenceMs = 2500,
     onResult,
     onError,
+    onInputStream,
+    onOutputAudioElement,
   } = options;
+
+  // IMPORTANT: keep option callbacks stable across renders.
+  // In React, inline callbacks passed from the UI change every render.
+  // If internal callbacks depend on them, effect cleanups can run and stop recording.
+  const onResultRef = useRef<typeof onResult>(onResult);
+  const onErrorRef = useRef<typeof onError>(onError);
+  const onInputStreamRef = useRef<typeof onInputStream>(onInputStream);
+  const onOutputAudioElementRef =
+    useRef<typeof onOutputAudioElement>(onOutputAudioElement);
+
+  useEffect(() => {
+    onResultRef.current = onResult;
+  }, [onResult]);
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
+  useEffect(() => {
+    onInputStreamRef.current = onInputStream;
+  }, [onInputStream]);
+  useEffect(() => {
+    onOutputAudioElementRef.current = onOutputAudioElement;
+  }, [onOutputAudioElement]);
 
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [response, setResponse] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [speakingLevel, setSpeakingLevel] = useState(0);
+  const [listeningLevel, setListeningLevel] = useState(0);
+
+  const [debugInfo, setDebugInfo] = useState<VoiceChatDebugInfo>({
+    lastEvent: "init",
+    lastStartAt: null,
+    lastStopAt: null,
+    lastStopReason: "unknown",
+    recorderState: "inactive",
+    recorderMimeType: "",
+    streamActive: false,
+    trackStates: [],
+    chunks: 0,
+    lastBlobBytes: 0,
+  });
+
+  const stopReasonRef = useRef<VoiceChatDebugInfo["lastStopReason"]>("unknown");
 
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -66,8 +130,6 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
   const silenceTimerRef = useRef<number | null>(null);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
-  const outputAudioContextRef = useRef<AudioContext | null>(null);
-  const outputRafRef = useRef<number | null>(null);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -76,7 +138,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
 
   const sendOnStopRef = useRef(false);
   const sendParamsRef = useRef<{
-    sessionId: string;
+    sessionId?: string;
     chatModel?: string;
   } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -93,6 +155,25 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
     }
   }, []);
 
+  const snapshotDebug = useCallback((event: string) => {
+    const s = streamRef.current;
+    const r = recorderRef.current;
+    const tracks = s?.getTracks() ?? [];
+    setDebugInfo((prev) => ({
+      ...prev,
+      lastEvent: event,
+      recorderState: r?.state ?? "inactive",
+      recorderMimeType: r?.mimeType ?? "",
+      streamActive: Boolean(s?.active),
+      trackStates: tracks.map((t) => ({
+        kind: t.kind,
+        enabled: (t as MediaStreamTrack).enabled,
+        readyState: (t as MediaStreamTrack).readyState,
+      })),
+      chunks: chunksRef.current.length,
+    }));
+  }, []);
+
   const stopSpeaking = useCallback(() => {
     const a = audioElRef.current;
     if (a) {
@@ -105,6 +186,12 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
     }
     audioElRef.current = null;
 
+    try {
+      onOutputAudioElementRef.current?.(null);
+    } catch {
+      // ignore
+    }
+
     if (audioUrlRef.current) {
       try {
         URL.revokeObjectURL(audioUrlRef.current);
@@ -112,21 +199,6 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
         // ignore
       }
       audioUrlRef.current = null;
-    }
-
-    if (typeof window !== "undefined" && outputRafRef.current) {
-      window.cancelAnimationFrame(outputRafRef.current);
-      outputRafRef.current = null;
-    }
-
-    const ctx = outputAudioContextRef.current;
-    outputAudioContextRef.current = null;
-    if (ctx) {
-      try {
-        ctx.close();
-      } catch {
-        // ignore
-      }
     }
 
     setSpeakingLevel(0);
@@ -176,7 +248,39 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
         // ignore
       }
     }
+
+    try {
+      onInputStreamRef.current?.(null);
+    } catch {
+      // ignore
+    }
+
+    setDebugInfo((prev) => ({
+      ...prev,
+      streamActive: false,
+      trackStates: [],
+    }));
   }, []);
+
+  const applyMuteToStream = useCallback((muted: boolean) => {
+    const s = streamRef.current;
+    if (!s) return;
+    for (const t of s.getAudioTracks()) {
+      try {
+        t.enabled = !muted;
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
+
+  const toggleMute = useCallback(() => {
+    setIsMuted((prev) => {
+      const next = !prev;
+      applyMuteToStream(next);
+      return next;
+    });
+  }, [applyMuteToStream]);
 
   const stop = useCallback(() => {
     clearTimers();
@@ -193,14 +297,23 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
     }
   }, [clearTimers]);
 
+  const stopWithReason = useCallback(
+    (reason: VoiceChatDebugInfo["lastStopReason"]) => {
+      stopReasonRef.current = reason;
+      snapshotDebug(`stop:${reason}`);
+      stop();
+    },
+    [snapshotDebug, stop],
+  );
+
   const cancel = useCallback(() => {
     sendOnStopRef.current = false;
     sendParamsRef.current = null;
     stopProcessing();
-    stop();
+    stopWithReason("manual");
     stopSpeaking();
     stopTracks();
-  }, [stop, stopProcessing, stopSpeaking, stopTracks]);
+  }, [stopProcessing, stopSpeaking, stopTracks, stopWithReason]);
 
   const playAudio = useCallback(
     async (result: VoiceChatResult) => {
@@ -217,6 +330,12 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
       const a = new Audio(url);
       audioElRef.current = a;
 
+      try {
+        onOutputAudioElementRef.current?.(a);
+      } catch {
+        // ignore
+      }
+
       a.onended = () => {
         stopSpeaking();
         setIsSpeaking(false);
@@ -225,39 +344,12 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
         setIsSpeaking(false);
         const msg = "Failed to play audio";
         setError(msg);
-        onError?.(msg);
+        onErrorRef.current?.(msg);
       };
 
       try {
         setIsSpeaking(true);
         setSpeakingLevel(0);
-
-        // Try to measure output level for sphere syncing (best-effort).
-        try {
-          const ctx = new AudioContext();
-          outputAudioContextRef.current = ctx;
-          const srcNode = ctx.createMediaElementSource(a);
-          const analyser = ctx.createAnalyser();
-          analyser.fftSize = 1024;
-          srcNode.connect(analyser);
-          analyser.connect(ctx.destination);
-
-          const data = new Uint8Array(analyser.fftSize);
-          const tick = () => {
-            analyser.getByteTimeDomainData(data);
-            let sum = 0;
-            for (let i = 0; i < data.length; i++)
-              sum += Math.abs(data[i] - 128);
-            const level = sum / data.length;
-            // normalize loosely into 0..1
-            const norm = Math.max(0, Math.min(1, (level - 2) / 20));
-            setSpeakingLevel(norm);
-            outputRafRef.current = window.requestAnimationFrame(tick);
-          };
-          outputRafRef.current = window.requestAnimationFrame(tick);
-        } catch {
-          // ignore; audio still plays
-        }
 
         await a.play();
       } catch (e) {
@@ -265,20 +357,21 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
         setIsSpeaking(false);
         const msg = "Audio playback was blocked by the browser";
         setError(msg);
-        onError?.(msg);
+        onErrorRef.current?.(msg);
       }
     },
-    [onError, stopSpeaking],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stopSpeaking],
   );
 
   const sendBlob = useCallback(
-    async (blob: Blob, params: { sessionId: string; chatModel?: string }) => {
+    async (blob: Blob, params: { sessionId?: string; chatModel?: string }) => {
       if (typeof window === "undefined") return;
 
       if (blob.size < 1024) {
         const msg = "No speech detected";
         setError(msg);
-        onError?.(msg);
+        onErrorRef.current?.(msg);
         return;
       }
 
@@ -291,7 +384,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
       try {
         const form = new FormData();
         form.set("audio", blob, "voice.webm");
-        form.set("sessionId", params.sessionId);
+        if (params.sessionId) form.set("sessionId", params.sessionId);
         if (params.chatModel) form.set("chatModel", params.chatModel);
         form.set("sttModel", "whisper-large-v3-turbo");
 
@@ -312,7 +405,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
         if (!res.ok) {
           const msg = String(json?.error ?? res.statusText);
           setError(msg);
-          onError?.(msg);
+          onErrorRef.current?.(msg);
           return;
         }
 
@@ -332,33 +425,33 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
         if (!result.transcript || !result.text || !result.audioBase64) {
           const msg = "Voice chat returned an incomplete response";
           setError(msg);
-          onError?.(msg);
+          onErrorRef.current?.(msg);
           return;
         }
 
         setTranscript(result.transcript);
         setResponse(result.text);
-        onResult?.(result);
+        onResultRef.current?.(result);
         await playAudio(result);
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") {
           const msg = "Voice chat request was aborted";
           console.warn("[voice] aborted", e);
           setError(msg);
-          onError?.(msg);
+          onErrorRef.current?.(msg);
           return;
         }
 
         console.error("Voice chat failed", e);
         const msg = "Voice chat failed";
         setError(msg);
-        onError?.(msg);
+        onErrorRef.current?.(msg);
       } finally {
         abortRef.current = null;
         setIsProcessing(false);
       }
     },
-    [onError, onResult, playAudio],
+    [playAudio],
   );
 
   const start = useCallback(async () => {
@@ -369,24 +462,68 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
       setError(null);
       stopSpeaking();
 
+      // Safety: ensure no stale timers from a previous turn can stop us instantly.
+      clearTimers();
+      stopReasonRef.current = "unknown";
+      setDebugInfo((prev) => ({
+        ...prev,
+        lastEvent: "start:begin",
+        lastStartAt: Date.now(),
+        lastStopAt: null,
+        lastStopReason: "unknown",
+        chunks: 0,
+        lastBlobBytes: 0,
+      }));
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
+
+      // If a track ends immediately, capture it.
+      for (const t of stream.getTracks()) {
+        t.onended = () => {
+          stopReasonRef.current = "streamEnded";
+          snapshotDebug("track:onended");
+        };
+      }
+
+      snapshotDebug("stream:acquired");
+
+      try {
+        onInputStreamRef.current?.(stream);
+      } catch {
+        // ignore
+      }
+
+      applyMuteToStream(isMuted);
       chunksRef.current = [];
 
       const mimeType = pickMimeType();
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
       recorderRef.current = recorder;
 
+      snapshotDebug("recorder:created");
+
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+        // keep lightweight debug up to date
+        setDebugInfo((prev) => ({ ...prev, chunks: chunksRef.current.length }));
       };
 
-      recorder.onstart = () => {
+      let started = false;
+      const markStarted = () => {
+        if (started) return;
+        started = true;
+
         setIsRecording(true);
         lastVoiceActivityAtRef.current = Date.now();
 
+        snapshotDebug("recorder:onstart");
+
         // hard stop
-        maxTimerRef.current = window.setTimeout(() => stop(), maxDurationMs);
+        maxTimerRef.current = window.setTimeout(
+          () => stopWithReason("maxDuration"),
+          maxDurationMs,
+        );
 
         // silence detect (simple amplitude monitor)
         try {
@@ -413,6 +550,10 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
             }
             const level = sum / data.length;
 
+            // Normalize loosely into 0..1 for UI waveform (best-effort)
+            const norm = Math.max(0, Math.min(1, (level - 2) / 20));
+            setListeningLevel(norm);
+
             if (level > threshold) {
               lastVoiceActivityAtRef.current = Date.now();
               if (silenceTimerRef.current) {
@@ -422,7 +563,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
             } else {
               if (!silenceTimerRef.current) {
                 silenceTimerRef.current = window.setTimeout(() => {
-                  stop();
+                  stopWithReason("silence");
                 }, silenceMs);
               }
             }
@@ -436,7 +577,12 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
         }
       };
 
+      recorder.onstart = markStarted;
+
       recorder.onstop = async () => {
+        const stopAt = Date.now();
+        const stopReason = stopReasonRef.current;
+
         try {
           await teardownAudioAnalysis();
         } catch {
@@ -444,12 +590,22 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
         } finally {
           clearTimers();
           setIsRecording(false);
+          setListeningLevel(0);
           stopTracks();
         }
+
+        snapshotDebug("recorder:onstop");
 
         const blob = new Blob(chunksRef.current, {
           type: recorder.mimeType || "audio/webm",
         });
+
+        setDebugInfo((prev) => ({
+          ...prev,
+          lastStopAt: stopAt,
+          lastStopReason: stopReason,
+          lastBlobBytes: blob.size,
+        }));
 
         // If `cancel()` was used, do nothing further.
         if (!sendOnStopRef.current || !sendParamsRef.current) {
@@ -467,39 +623,70 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
       recorder.onerror = () => {
         const msg = "Microphone recording error";
         setError(msg);
-        onError?.(msg);
+        onErrorRef.current?.(msg);
+        stopReasonRef.current = "recorderError";
+        snapshotDebug("recorder:onerror");
         sendOnStopRef.current = false;
         sendParamsRef.current = null;
         stopTracks();
         setIsRecording(false);
+        setListeningLevel(0);
       };
 
-      recorder.start(250);
+      // Some browsers/drivers can throw on timeslice.
+      try {
+        recorder.start(250);
+        markStarted();
+      } catch {
+        try {
+          recorder.start();
+          markStarted();
+        } catch (e) {
+          console.error("Failed to start MediaRecorder", e);
+          const msg = "Failed to start recording";
+          setError(msg);
+          onErrorRef.current?.(msg);
+          snapshotDebug("recorder:start:failed");
+          sendOnStopRef.current = false;
+          sendParamsRef.current = null;
+          stopTracks();
+          setIsRecording(false);
+          setListeningLevel(0);
+          return;
+        }
+      }
     } catch (e) {
       console.error("Failed to start recording", e);
-      const msg = "Microphone permission denied";
+      const msg =
+        e instanceof DOMException && e.name === "NotAllowedError"
+          ? "Microphone permission denied"
+          : "Failed to access microphone";
       setError(msg);
-      onError?.(msg);
+      onErrorRef.current?.(msg);
+      snapshotDebug("getUserMedia:failed");
       sendOnStopRef.current = false;
       sendParamsRef.current = null;
       stopTracks();
       setIsRecording(false);
+      setListeningLevel(0);
     }
   }, [
     isProcessing,
     maxDurationMs,
-    onError,
     silenceMs,
-    stop,
+    stopWithReason,
     stopSpeaking,
     stopTracks,
     teardownAudioAnalysis,
     clearTimers,
+    applyMuteToStream,
+    isMuted,
     sendBlob,
+    snapshotDebug,
   ]);
 
   const beginTurn = useCallback(
-    async (params: { sessionId: string; chatModel?: string }) => {
+    async (params: { sessionId?: string; chatModel?: string }) => {
       if (isProcessing) return;
       if (isRecording) return;
 
@@ -516,11 +703,11 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
   );
 
   const stopListening = useCallback(() => {
-    stop();
-  }, [stop]);
+    stopWithReason("manual");
+  }, [stopWithReason]);
 
   const toggle = useCallback(
-    async (params: { sessionId: string; chatModel?: string }) => {
+    async (params: { sessionId?: string; chatModel?: string }) => {
       if (isProcessing) return;
       if (isSpeaking) {
         stopSpeaking();
@@ -541,6 +728,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
 
   useEffect(() => {
     return () => {
+      snapshotDebug("cleanup:unmount");
       clearTimers();
       cancel();
       teardownAudioAnalysis();
@@ -552,7 +740,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
       recorderRef.current = null;
       stopTracks();
     };
-  }, [cancel, clearTimers, stopTracks, teardownAudioAnalysis]);
+  }, [cancel, clearTimers, snapshotDebug, stopTracks, teardownAudioAnalysis]);
 
   return {
     // Required state names (aliases)
@@ -563,6 +751,9 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
     response,
     error,
     speakingLevel,
+    listeningLevel,
+    isMuted,
+    toggleMute,
 
     // Primary modal-friendly API
     beginTurn,
@@ -576,5 +767,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
     stop,
     toggle,
     stopSpeaking,
+
+    debugInfo,
   };
 }

@@ -105,6 +105,12 @@ export class ChatService {
     sender: ChatSender;
     message: string;
   }) {
+    const session = await prisma.chatSession.findFirst({
+      where: { id: params.sessionId, userId: params.userId },
+      select: { id: true },
+    });
+    if (!session) return null;
+
     const row = await prisma.chat.create({
       data: {
         userId: params.userId,

@@ -1,18 +1,6 @@
 import { create } from "zustand";
 import { ChatStore, ChatSession, Message, AllowedAiModel } from "@/types/chat";
 import { generateId, generateChatTitle } from "@/lib/utils";
-import { auth } from "@/lib/auth";
-
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  process.env.BACKEND_URL ||
-  "http://localhost:3001";
-
-function requireToken(): string {
-  const token = auth.getStoredToken();
-  if (!token) throw new Error("Missing auth token");
-  return token;
-}
 
 function toDate(value: unknown): Date {
   if (value instanceof Date) return value;
@@ -34,9 +22,8 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
   selectedModelId: null,
 
   loadSessions: async () => {
-    const token = requireToken();
-    const response = await fetch(`${BACKEND_URL}/api/ai/chat/sessions`, {
-      headers: { Authorization: `Bearer ${token}` },
+    const response = await fetch(`/api/chat/sessions`, {
+      cache: "no-store",
     });
     if (!response.ok) throw new Error("Failed to load sessions");
     const json = await response.json();
@@ -57,9 +44,8 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
   },
 
   loadModels: async () => {
-    const token = requireToken();
-    const response = await fetch(`${BACKEND_URL}/api/ai/models`, {
-      headers: { Authorization: `Bearer ${token}` },
+    const response = await fetch(`/api/models`, {
+      cache: "no-store",
     });
     if (!response.ok) throw new Error("Failed to load models");
     const json = await response.json();
@@ -95,10 +81,9 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
   },
 
   loadMessages: async (sessionId: string) => {
-    const token = requireToken();
     const response = await fetch(
-      `${BACKEND_URL}/api/ai/chat/sessions/${encodeURIComponent(sessionId)}/messages?limit=200`,
-      { headers: { Authorization: `Bearer ${token}` } },
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}/messages?limit=200`,
+      { cache: "no-store" },
     );
     if (!response.ok) throw new Error("Failed to load messages");
     const json = await response.json();
@@ -139,13 +124,9 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
       return existingDraft.id;
     }
 
-    const token = requireToken();
-    const response = await fetch(`${BACKEND_URL}/api/ai/chat/sessions`, {
+    const response = await fetch(`/api/chat/sessions`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: "New Chat" }),
     });
     if (!response.ok) throw new Error("Failed to create session");
@@ -168,10 +149,9 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
   },
 
   deleteSession: async (sessionId: string) => {
-    const token = requireToken();
     const response = await fetch(
-      `${BACKEND_URL}/api/ai/chat/sessions/${encodeURIComponent(sessionId)}`,
-      { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}`,
+      { method: "DELETE" },
     );
     if (!response.ok) throw new Error("Failed to delete session");
 
@@ -194,15 +174,11 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
   },
 
   renameSession: async (sessionId: string, newTitle: string) => {
-    const token = requireToken();
     const response = await fetch(
-      `${BACKEND_URL}/api/ai/chat/sessions/${encodeURIComponent(sessionId)}`,
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}`,
       {
         method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: newTitle }),
       },
     );

@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useChatStore } from "@/store/chatStore";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -12,12 +14,13 @@ import {
 } from "@/lib/chatExport";
 import {
   PlusCircle,
-  MessageSquare,
+  MessageCircleMore,
   MoreHorizontal,
   Pencil,
   Trash2,
   Check,
   X,
+  Mic,
 } from "lucide-react";
 
 import {
@@ -59,6 +62,7 @@ export function ChatSidebar({
   user,
   ...props
 }: React.ComponentProps<typeof Sidebar> & { user?: CurrentUser | null }) {
+  const pathname = usePathname();
   const {
     sessions,
     currentSessionId,
@@ -164,6 +168,45 @@ export function ChatSidebar({
 
         <SidebarContent>
           <SidebarGroup>
+            <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname?.startsWith("/dashboard/chat")}
+                    tooltip="Chat"
+                  >
+                    <Link
+                      href="/dashboard/chat"
+                      className="flex items-center gap-2"
+                    >
+                      <MessageCircleMore className="h-4 w-4" />
+                      <span>Chat</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname?.startsWith("/dashboard/voice")}
+                    tooltip="Voice Chat"
+                  >
+                    <Link
+                      href="/dashboard/voice"
+                      className="flex items-center gap-2"
+                    >
+                      <Mic className="h-4 w-4" />
+                      <span>Voice Chat</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup>
             <SidebarGroupLabel>Chats</SidebarGroupLabel>
             <SidebarGroupAction onClick={handleNewChat} title="New chat">
               <PlusCircle />
@@ -240,7 +283,7 @@ export function ChatSidebar({
                                     })
                                   }
                                 >
-                                  <MessageSquare className="mr-2 h-4 w-4" />
+                                  <MessageCircleMore className="mr-2 h-4 w-4" />
                                   Export (.txt)
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
@@ -252,7 +295,7 @@ export function ChatSidebar({
                                     })
                                   }
                                 >
-                                  <MessageSquare className="mr-2 h-4 w-4" />
+                                  <MessageCircleMore className="mr-2 h-4 w-4" />
                                   Export (.md)
                                 </DropdownMenuItem>
                                 <DropdownMenuItem

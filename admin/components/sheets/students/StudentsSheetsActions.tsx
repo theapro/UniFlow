@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCcw, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,17 @@ export function StudentsSheetsActions({ dict }: { dict: any }) {
     onSuccess: invalidateAll,
   });
 
+  const [autoSyncChecked, setAutoSyncChecked] = useState(false);
+  useEffect(() => {
+    if (healthLoading) return;
+    if (autoSyncMutation.isPending) return;
+    setAutoSyncChecked(Boolean(health?.config?.workerEnabled));
+  }, [
+    healthLoading,
+    health?.config?.workerEnabled,
+    autoSyncMutation.isPending,
+  ]);
+
   const isAnySyncing = syncMutation.isPending || forceSyncMutation.isPending;
 
   return (
@@ -48,8 +60,14 @@ export function StudentsSheetsActions({ dict }: { dict: any }) {
           Auto
         </span>
         <Switch
-          checked={Boolean(health?.config?.workerEnabled)}
-          onCheckedChange={(checked) => autoSyncMutation.mutate(checked)}
+          checked={autoSyncChecked}
+          onCheckedChange={(checked) => {
+            const prev = autoSyncChecked;
+            setAutoSyncChecked(checked);
+            autoSyncMutation.mutate(checked, {
+              onError: () => setAutoSyncChecked(prev),
+            });
+          }}
           disabled={healthLoading || autoSyncMutation.isPending}
           className="data-[state=checked]:bg-emerald-500/80 scale-90"
         />
@@ -66,7 +84,7 @@ export function StudentsSheetsActions({ dict }: { dict: any }) {
         <RefreshCcw
           className={cn(
             "h-3.5 w-3.5 mr-2 text-zinc-500",
-            syncMutation.isPending && "animate-spin text-primary"
+            syncMutation.isPending && "animate-spin text-primary",
           )}
         />
         {syncMutation.isPending ? "Process..." : "Sync"}
@@ -79,17 +97,19 @@ export function StudentsSheetsActions({ dict }: { dict: any }) {
         onClick={() => forceSyncMutation.mutate()}
         disabled={isAnySyncing}
         className={cn(
-          "h-10 rounded-full px-5 font-bold text-[11px] uppercase tracking-wider hover:bg-zinc-100 dark:hover:bg-white/5 bg-zinc-900/40 transition-all active:scale-95"
+          "h-10 rounded-full px-5 font-bold text-[11px] uppercase tracking-wider hover:bg-zinc-100 dark:hover:bg-white/5 bg-zinc-900/40 transition-all active:scale-95",
         )}
       >
         <Zap
           className={cn(
             "h-3.5 w-3.5 mr-2",
-            forceSyncMutation.isPending ? "animate-pulse text-yellow-500" : "text-zinc-500 group-hover:text-primary"
+            forceSyncMutation.isPending
+              ? "animate-pulse text-yellow-500"
+              : "text-zinc-500 group-hover:text-primary",
           )}
         />
         {forceSyncMutation.isPending ? "Re-syncing..." : "Force Re-sync"}
       </Button>
     </div>
   );
-}   
+}

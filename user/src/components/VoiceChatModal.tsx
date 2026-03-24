@@ -15,7 +15,7 @@ export type VoiceChatModalVoice = {
   error: string | null;
   speakingLevel: number;
   beginTurn: (params: {
-    sessionId: string;
+    sessionId?: string;
     chatModel?: string;
   }) => Promise<void>;
   stopListening: () => void;

@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "edge";
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:3001";
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
+  process.env.BACKEND_URL?.replace(/\/$/, "") ||
+  "http://localhost:3001";
 
 export async function POST(req: NextRequest) {
   try {

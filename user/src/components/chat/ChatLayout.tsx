@@ -2,17 +2,18 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useChatStore } from "@/store/chatStore";
-import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { generateId } from "@/lib/utils";
 import { Message } from "@/types/chat";
-import { Loader2, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
-import { useVoiceChat } from "@/hooks/use-voice-chat";
-import { VoiceChatModal } from "@/components/VoiceChatModal";
+import { QuickActions } from "@/components/chat/QuickActions";
+import { MessageList } from "@/components/chat/MessageList";
+import { auth } from "@/lib/auth";
+import { useRouter } from "next/navigation";
 
 export function ChatLayout() {
+  const router = useRouter();
   const {
     sessions,
     currentSessionId,
@@ -39,43 +40,7 @@ export function ChatLayout() {
   const inputRef = useRef<HTMLDivElement>(null);
   const [inputHeight, setInputHeight] = useState<number>(160);
   const [showWarning, setShowWarning] = useState(false);
-  const [emptyGreeting, setEmptyGreeting] = useState<string>(
-    "Qanday yordam bera olaman?",
-  );
-  const [greetingLoaded, setGreetingLoaded] = useState(false);
-
-  const [voiceModalOpen, setVoiceModalOpen] = useState(false);
-
-  const voice = useVoiceChat({
-    onResult: async (result) => {
-      let sessionId = currentSessionId;
-      if (!sessionId) {
-        sessionId = await createSession();
-        setCurrentSession(sessionId);
-      }
-
-      // Add user + assistant messages (no redesign; behaves like a normal chat turn)
-      addMessage(sessionId, {
-        id: generateId(),
-        role: "user",
-        content: result.transcript,
-        createdAt: new Date(),
-      });
-
-      addMessage(sessionId, {
-        id: generateId(),
-        role: "assistant",
-        content: result.text,
-        createdAt: new Date(),
-      });
-    },
-    onError: (msg) => {
-      console.warn(msg);
-      toast.error(msg);
-    },
-    maxDurationMs: 10000,
-    silenceMs: 2500,
-  });
+  const [userFirstName, setUserFirstName] = useState<string>("there");
 
   const currentMessages = currentSessionId
     ? messages[currentSessionId] || []
@@ -97,30 +62,13 @@ export function ChatLayout() {
     : null;
 
   useEffect(() => {
-    if (greetingLoaded) return;
-    if (currentMessages.length > 0) return;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/greeting", { cache: "no-store" });
-        if (!res.ok) return;
-        const json = (await res.json()) as any;
-        const greeting = String(json?.data?.greeting ?? "").trim();
-        if (!cancelled && greeting.length > 0) {
-          setEmptyGreeting(greeting);
-        }
-      } catch {
-        // ignore
-      } finally {
-        if (!cancelled) setGreetingLoaded(true);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentMessages.length, greetingLoaded]);
+    // Best-effort: show user's first name in empty state.
+    const u = auth.getStoredUser();
+    const nameRaw = String(u?.fullName ?? u?.name ?? u?.email ?? "").trim();
+    if (!nameRaw) return;
+    const first = nameRaw.split(/\s+/).filter(Boolean)[0];
+    if (first) setUserFirstName(first);
+  }, []);
 
   // Load messages when session changes
   useEffect(() => {
@@ -307,88 +255,72 @@ export function ChatLayout() {
     return sessionId;
   };
 
-  const handleOpenVoiceModal = () => {
+  const handleOpenVoicePage = () => {
     if (isLoading || isStreaming) return;
-    setVoiceModalOpen(true);
+    router.push("/dashboard/voice");
   };
+
+  if (currentMessages.length === 0) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 py-10 text-center">
+          <h2 className="text-3xl font-bold tracking-tight text-foreground">
+            Hi {userFirstName}, Where should we start?
+          </h2>
+
+          <QuickActions
+            className="mt-6"
+            disabled={isLoading || isStreaming}
+            onAction={(prompt) => handleSendMessage(prompt)}
+          />
+
+          <div className="mt-8 w-full">
+            <div ref={inputRef}>
+              <ChatInput
+                onSendMessage={handleSendMessage}
+                onStopGeneration={handleStopGeneration}
+                isLoading={isLoading}
+                isStreaming={isStreaming}
+                onToggleVoice={handleOpenVoicePage}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent">
-      <ScrollArea
-        ref={scrollAreaRef}
-        className="min-h-0 flex-1 scrollbar-thin mb-20"
-      >
-        <div className={currentMessages.length > 0 ? "pb-32" : ""}>
-          {currentMessages.length === 0 ? (
-            <div className="flex h-[70vh] flex-col items-center justify-center p-8 text-center">
-              <h2 className="text-3xl mb-10 font-bold tracking-tight text-foreground">
-                {emptyGreeting}
-              </h2>
-            </div>
-          ) : (
-            <div className="mx-auto max-w-3xl px-4 pt-8">
-              {currentMessages.map((message) => (
-                <ChatMessage key={message.id} message={message} />
-              ))}
-              {(isLoading || isStreaming) && (
-                <div className="flex items-center gap-4 px-4 py-6">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
-                    Thinking
-                    <span className="thinking-dots" aria-hidden="true">
-                      <span className="thinking-dot">.</span>
-                      <span className="thinking-dot">.</span>
-                      <span className="thinking-dot">.</span>
-                    </span>
-                  </span>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-          )}
+      <ScrollArea ref={scrollAreaRef} className="min-h-0 flex-1 scrollbar-thin">
+        <div className="pb-32">
+          <MessageList
+            messages={currentMessages}
+            isLoading={isLoading}
+            isStreaming={isStreaming}
+          />
+          <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
 
-      {/* Fade effekti */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-32 bg-gradient-to-t from-background via-background to-transparent" />
 
-      {/* Chat Input Konteyneri */}
-      <div
-        className={`
-          absolute inset-x-0 transition-all duration-500 ease-in-out z-20
-          ${currentMessages.length === 0 ? "bottom-1/2 translate-y-1/2" : "bottom-6"}
-        `}
-      >
-        <div className="mx-auto w-full -ml-1 px-4">
+      <div className="absolute inset-x-0 bottom-6 z-20">
+        <div className="mx-auto w-full px-4">
           <div ref={inputRef}>
             <ChatInput
               onSendMessage={handleSendMessage}
               onStopGeneration={handleStopGeneration}
               isLoading={isLoading}
               isStreaming={isStreaming}
-              onToggleVoice={handleOpenVoiceModal}
-              isVoiceRecording={voice.isRecording}
-              isVoiceProcessing={voice.isProcessing}
-              isVoiceSpeaking={voice.isSpeaking}
+              onToggleVoice={handleOpenVoicePage}
             />
           </div>
         </div>
       </div>
 
-      <VoiceChatModal
-        open={voiceModalOpen}
-        onOpenChange={(open) => {
-          setVoiceModalOpen(open);
-          if (!open) voice.cancel();
-        }}
-        voice={voice}
-        ensureSessionId={ensureVoiceSessionId}
-        chatModel={selectedModel?.model}
-      />
-
-      {/* DOIMIY PASTDA TURUVCHI YOZUV */}
       {showWarning && (
-        <div className="absolute bottom-1  inset-x-0 z-30 flex items-center justify-center pointer-events-none animate-in fade-in duration-700">
+        <div className="absolute inset-x-0 bottom-1 z-30 flex items-center justify-center pointer-events-none animate-in fade-in duration-700">
           <p className="text-[11px] text-muted-foreground py-1 px-2 rounded-md">
             Uniflow can make mistakes. Check important info.
           </p>

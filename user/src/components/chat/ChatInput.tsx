@@ -147,7 +147,7 @@ export function ChatInput({
                       <DropdownMenuRadioItem 
                         key={m.id} 
                         value={m.id}
-                        className="rounded-[12px] py-2 px-3 text-xs text-zinc-400 focus:bg-white/5 focus:text-white transition-colors cursor-pointer"
+                        className="rounded-[12px] pl-7 py-2 text-xs text-zinc-400 focus:bg-white/5 focus:text-white transition-colors cursor-pointer"
                       >
                         {m.displayName}
                       </DropdownMenuRadioItem>

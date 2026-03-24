@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCcw } from "lucide-react";
 
@@ -43,13 +44,30 @@ export function GradesSheetsActions({ dict }: { dict: any }) {
     },
   });
 
+  const [autoSyncChecked, setAutoSyncChecked] = useState(false);
+  useEffect(() => {
+    if (healthLoading) return;
+    if (autoSyncMutation.isPending) return;
+    setAutoSyncChecked(Boolean(health?.config?.workerEnabled));
+  }, [
+    healthLoading,
+    health?.config?.workerEnabled,
+    autoSyncMutation.isPending,
+  ]);
+
   return (
     <>
       <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2">
         <span className="text-sm font-medium">Auto Sync</span>
         <Switch
-          checked={Boolean(health?.config?.workerEnabled)}
-          onCheckedChange={(checked) => autoSyncMutation.mutate(checked)}
+          checked={autoSyncChecked}
+          onCheckedChange={(checked) => {
+            const prev = autoSyncChecked;
+            setAutoSyncChecked(checked);
+            autoSyncMutation.mutate(checked, {
+              onError: () => setAutoSyncChecked(prev),
+            });
+          }}
           disabled={healthLoading || autoSyncMutation.isPending}
         />
       </div>

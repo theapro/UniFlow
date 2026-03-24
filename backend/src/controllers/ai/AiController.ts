@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { AiModality } from "@prisma/client";
+import { AiModality, ChatSender } from "@prisma/client";
 import { StudentService } from "../../services/user/StudentService";
 import { TeacherService } from "../../services/user/TeacherService";
 import { AiDataService } from "../../services/ai/AiDataService";
@@ -306,6 +306,48 @@ export class AiController {
     } catch (error) {
       console.error("listChatMessages failed:", error);
       return fail(res, 500, "Failed to list messages");
+    }
+  };
+
+  addChatMessage = async (req: Request, res: Response) => {
+    try {
+      const user = req.user;
+      if (!user) return fail(res, 401, "Unauthorized");
+
+      const sessionId = String(req.params.sessionId ?? "");
+
+      const senderRaw = (req.body?.sender ?? "") as unknown;
+      const messageRaw = (req.body?.message ?? "") as unknown;
+
+      const senderStr =
+        typeof senderRaw === "string" ? senderRaw.trim().toUpperCase() : "";
+      const sender: ChatSender | null =
+        senderStr === "USER"
+          ? ChatSender.USER
+          : senderStr === "ASSISTANT"
+            ? ChatSender.ASSISTANT
+            : null;
+
+      if (!sender) return fail(res, 400, "sender must be USER or ASSISTANT");
+      if (typeof messageRaw !== "string" || messageRaw.trim().length === 0) {
+        return fail(res, 400, "message is required");
+      }
+
+      const message = messageRaw.trim().slice(0, 20000);
+
+      const row = await this.chatService.addMessage({
+        userId: user.id,
+        sessionId,
+        sender,
+        message,
+      });
+
+      if (!row) return fail(res, 404, "Session not found");
+
+      return ok(res, "OK", row);
+    } catch (error) {
+      console.error("addChatMessage failed:", error);
+      return fail(res, 500, "Failed to add message");
     }
   };
 

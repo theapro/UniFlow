@@ -7,7 +7,10 @@ const GROQ_BASE_URL =
   process.env.GROQ_BASE_URL?.replace(/\/$/, "") ||
   "https://api.groq.com/openai/v1";
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:3001";
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
+  process.env.BACKEND_URL?.replace(/\/$/, "") ||
+  "http://localhost:3001";
 
 async function readTextSafe(res: Response): Promise<string> {
   return await res.text().catch(() => "");
