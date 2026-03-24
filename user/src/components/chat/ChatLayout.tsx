@@ -9,6 +9,8 @@ import { generateId } from "@/lib/utils";
 import { Message } from "@/types/chat";
 import { Loader2, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
+import { useVoiceChat } from "@/hooks/use-voice-chat";
+import { VoiceChatModal } from "@/components/VoiceChatModal";
 
 export function ChatLayout() {
   const {
@@ -41,6 +43,39 @@ export function ChatLayout() {
     "Qanday yordam bera olaman?",
   );
   const [greetingLoaded, setGreetingLoaded] = useState(false);
+
+  const [voiceModalOpen, setVoiceModalOpen] = useState(false);
+
+  const voice = useVoiceChat({
+    onResult: async (result) => {
+      let sessionId = currentSessionId;
+      if (!sessionId) {
+        sessionId = await createSession();
+        setCurrentSession(sessionId);
+      }
+
+      // Add user + assistant messages (no redesign; behaves like a normal chat turn)
+      addMessage(sessionId, {
+        id: generateId(),
+        role: "user",
+        content: result.transcript,
+        createdAt: new Date(),
+      });
+
+      addMessage(sessionId, {
+        id: generateId(),
+        role: "assistant",
+        content: result.text,
+        createdAt: new Date(),
+      });
+    },
+    onError: (msg) => {
+      console.warn(msg);
+      toast.error(msg);
+    },
+    maxDurationMs: 10000,
+    silenceMs: 2500,
+  });
 
   const currentMessages = currentSessionId
     ? messages[currentSessionId] || []
@@ -263,6 +298,20 @@ export function ChatLayout() {
     }
   };
 
+  const ensureVoiceSessionId = async (): Promise<string> => {
+    let sessionId = currentSessionId;
+    if (!sessionId) {
+      sessionId = await createSession();
+      setCurrentSession(sessionId);
+    }
+    return sessionId;
+  };
+
+  const handleOpenVoiceModal = () => {
+    if (isLoading || isStreaming) return;
+    setVoiceModalOpen(true);
+  };
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent">
       <ScrollArea
@@ -317,10 +366,25 @@ export function ChatLayout() {
               onStopGeneration={handleStopGeneration}
               isLoading={isLoading}
               isStreaming={isStreaming}
+              onToggleVoice={handleOpenVoiceModal}
+              isVoiceRecording={voice.isRecording}
+              isVoiceProcessing={voice.isProcessing}
+              isVoiceSpeaking={voice.isSpeaking}
             />
           </div>
         </div>
       </div>
+
+      <VoiceChatModal
+        open={voiceModalOpen}
+        onOpenChange={(open) => {
+          setVoiceModalOpen(open);
+          if (!open) voice.cancel();
+        }}
+        voice={voice}
+        ensureSessionId={ensureVoiceSessionId}
+        chatModel={selectedModel?.model}
+      />
 
       {/* DOIMIY PASTDA TURUVCHI YOZUV */}
       {showWarning && (
