@@ -43,13 +43,45 @@ function clampConfidence(value: unknown): number {
 export class AiClassifier {
   private readonly llm = new LlmService();
 
+  private buildConversationHistoryMessages(params: {
+    recentMessages: Array<{ role: "user" | "assistant"; content: string }>;
+    maxMessages: number;
+  }): LlmMessage[] {
+    const maxMessages = Math.min(Math.max(params.maxMessages, 0), 20);
+    const recent = Array.isArray(params.recentMessages)
+      ? params.recentMessages
+      : [];
+
+    const trimmed = recent
+      .map((m) => ({
+        role: m.role,
+        content: String(m.content ?? "")
+          .trim()
+          .slice(0, 1_200),
+      }))
+      .filter((m) => m.content.length > 0);
+
+    const slice = maxMessages > 0 ? trimmed.slice(-maxMessages) : [];
+    return slice.map((m) => ({ role: m.role, content: m.content }));
+  }
+
+  private fallbackUnknown(lang: "en" | "ja" | "uz"): string {
+    if (lang === "ja")
+      return "すみません、うまく理解できませんでした。短く言い換えてください。";
+    if (lang === "uz")
+      return "Uzr, so‘rovni tushunmadim. Qisqaroq qilib qayta yozing.";
+    return "Sorry, I didn't understand that. Could you rephrase briefly?";
+  }
+
   async decide(params: {
     message: string;
     context: AiBuiltContext;
     tools: AiToolDefinition[];
     allowedToolNames: AiToolName[];
     requestedModel?: string;
+    lang?: "en" | "ja" | "uz";
   }): Promise<AiToolDecision> {
+    const lang = params.lang ?? "en";
     const toolsForPrompt = params.tools
       .filter((t) => params.allowedToolNames.includes(t.name))
       .map((t) => ({
@@ -69,7 +101,9 @@ export class AiClassifier {
         "If no relevant tool exists, choose type=llm and produce the final assistant response yourself. " +
         "Rules: output ONLY strict JSON (no markdown, no extra text). " +
         "Do not include hidden reasoning. " +
-        "Never invent private data. If you cannot answer safely, ask one short clarifying question in the user's language." +
+        "Conversation memory: previous messages are provided in the chat history; use them to resolve follow-ups (e.g., 'tomorrow', 'that one', pronouns) and keep continuity. " +
+        `Never invent private data. User language: ${lang}. If you cannot answer safely, ask one short clarifying question in that language. ` +
+        "When type=llm, write the response in the user's language. " +
         "\n\nJSON schema:\n" +
         JSON.stringify(
           {
@@ -87,6 +121,13 @@ export class AiClassifier {
         "\n\nWhen type=llm: tool must be null and response must be a non-empty string. Always set reason (1 short sentence).",
     };
 
+    const history = this.buildConversationHistoryMessages({
+      recentMessages: Array.isArray(params.context?.recentMessages)
+        ? (params.context.recentMessages as any)
+        : [],
+      maxMessages: 12,
+    });
+
     const user: LlmMessage = {
       role: "user",
       content: [
@@ -101,7 +142,7 @@ export class AiClassifier {
       requestedModel: params.requestedModel,
       temperature: 0,
       maxTokens: 700,
-      messages: [system, user],
+      messages: [system, ...history, user],
     });
 
     const parsed = extractFirstJsonObject(out.content);
@@ -111,8 +152,7 @@ export class AiClassifier {
         tool: null,
         args: null,
         confidence: 0,
-        response:
-          "Uzr, so‘rovni tushunmadim. Qisqaroq qilib qayta yozib bera olasizmi?",
+        response: this.fallbackUnknown(lang),
       };
     }
 
@@ -153,7 +193,7 @@ export class AiClassifier {
       response:
         response && response.trim().length > 0
           ? response.trim().slice(0, 6_000)
-          : "Uzr, bu savolga javob berish uchun ko‘proq ma’lumot kerak. Qaysi guruh yoki davr haqida so‘rayapsiz?",
+          : this.fallbackUnknown(lang),
     };
   }
 }

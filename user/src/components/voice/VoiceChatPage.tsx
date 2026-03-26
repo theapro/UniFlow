@@ -19,8 +19,6 @@ import {
   Mic,
   Settings2,
   Square,
-  Volume2,
-  VolumeX,
   X,
   Loader2,
 } from "lucide-react";
@@ -53,7 +51,20 @@ export function VoiceChatPage() {
 
   const [sphereType, setSphereType] = useState<SphereType>("particle");
   const [lastLatencyMs, setLastLatencyMs] = useState(0);
-  const [debugOpen, setDebugOpen] = useState(true);
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [sessionActive, setSessionActive] = useState(false);
+  const sessionActiveRef = useRef(false);
+
+  const DEBUG_KEY = "uniflow.voice.debug";
+
+  const setDebugOpenPersist = useCallback((next: boolean) => {
+    setDebugOpen(next);
+    try {
+      localStorage.setItem(DEBUG_KEY, next ? "true" : "false");
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const cycleSphereType = useCallback(() => {
     setSphereType((prev) => {
@@ -72,6 +83,16 @@ export function VoiceChatPage() {
     if (sessions.length === 0) loadSessions().catch(console.error);
     if (models.length === 0) loadModels().catch(console.error);
   }, [loadModels, loadSessions, models.length, sessions.length]);
+
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(DEBUG_KEY);
+      if (v === "true") setDebugOpen(true);
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const ensureSessionId = useCallback(async (): Promise<string> => {
     let sessionId = currentSessionId;
@@ -99,6 +120,7 @@ export function VoiceChatPage() {
   );
 
   const voice = useVoiceChat({
+    keepStreamAlive: true,
     onInputStream: (stream) => {
       analyzer.setInputStream(stream);
       analyzer.start();
@@ -106,6 +128,22 @@ export function VoiceChatPage() {
     onOutputAudioElement: (el) => {
       analyzer.setOutputElement(el);
       analyzer.start();
+    },
+    onSpeakingEnded: async () => {
+      // Continuous conversation mode: after AI finishes speaking, start listening again.
+      if (!sessionActiveRef.current) return;
+      if (voice.isProcessing || voice.isRecording || voice.isListening) return;
+
+      try {
+        await new Promise((r) => setTimeout(r, 120));
+        const sessionId = await ensureSessionId();
+        await voice.beginTurn({
+          sessionId,
+          chatModel: selectedModel?.model,
+        });
+      } catch {
+        // If restart fails, keep sessionActive true; user can tap to resume.
+      }
     },
     onResult: async (result) => {
       const startedAt = turnStartedAtRef.current;
@@ -137,9 +175,74 @@ export function VoiceChatPage() {
       }
     },
     onError: (msg) => toast.error(msg),
-    maxDurationMs: 15000,
+    maxDurationMs: 60000,
     silenceMs: 2000,
   });
+
+  // Barge-in: if user starts speaking while AI is speaking, interrupt immediately.
+  useEffect(() => {
+    if (!sessionActive) return;
+    if (!voice.isSpeaking) return;
+
+    let raf: number | null = null;
+    let aboveSince: number | null = null;
+
+    const threshold = 0.14; // tuned for analyzer's 0..1 level
+    const requiredMs = 180;
+
+    const tick = async () => {
+      if (!sessionActiveRef.current) return;
+      if (!voice.isSpeaking) return;
+      if (voice.isProcessing || voice.isRecording || voice.isListening) return;
+
+      const level = analyzer.inputLevelRef.current;
+      const now = Date.now();
+
+      if (level >= threshold) {
+        if (aboveSince == null) aboveSince = now;
+        if (now - aboveSince >= requiredMs) {
+          // Interrupt
+          try {
+            voice.stopSpeaking();
+            const sessionId = await ensureSessionId();
+            await voice.beginTurn({
+              sessionId,
+              chatModel: selectedModel?.model,
+            });
+          } catch {
+            // ignore
+          }
+          return;
+        }
+      } else {
+        aboveSince = null;
+      }
+
+      raf = window.requestAnimationFrame(() => {
+        void tick();
+      });
+    };
+
+    raf = window.requestAnimationFrame(() => {
+      void tick();
+    });
+
+    return () => {
+      if (raf) window.cancelAnimationFrame(raf);
+    };
+  }, [
+    analyzer.inputLevelRef,
+    ensureSessionId,
+    selectedModel?.model,
+    sessionActive,
+    voice,
+    voice.beginTurn,
+    voice.isListening,
+    voice.isProcessing,
+    voice.isRecording,
+    voice.isSpeaking,
+    voice.stopSpeaking,
+  ]);
 
   const isAnyActive =
     voice.isListening ||
@@ -161,9 +264,15 @@ export function VoiceChatPage() {
     try {
       turnStartedAtRef.current = Date.now();
 
-      // IMPORTANT: keep microphone start in the same user gesture.
-      // Do NOT await network/session creation before calling getUserMedia.
-      lastTurnSessionIdRef.current = currentSessionId;
+      sessionActiveRef.current = true;
+      setSessionActive(true);
+
+      // Must happen under user interaction to satisfy autoplay policies.
+      await voice.unlockPlayback();
+
+      // Ensure we have a stable sessionId for conversation memory.
+      const sessionId = await ensureSessionId();
+      lastTurnSessionIdRef.current = sessionId;
 
       // Kick audio context resume, but don't block microphone start.
       void analyzer
@@ -174,14 +283,24 @@ export function VoiceChatPage() {
         });
 
       await voice.beginTurn({
-        sessionId: currentSessionId ?? undefined,
+        sessionId,
         chatModel: selectedModel?.model,
       });
     } catch (e) {
       console.error("[voice] failed to start", e);
       toast.error("Failed to start recording");
     }
-  }, [analyzer, currentSessionId, selectedModel?.model, voice]);
+  }, [analyzer, ensureSessionId, selectedModel?.model, voice]);
+
+  const stopSession = useCallback(() => {
+    sessionActiveRef.current = false;
+    setSessionActive(false);
+    try {
+      voice.cancel();
+    } catch {
+      // ignore
+    }
+  }, [voice]);
 
   const vizMode = useMemo(() => {
     if (voice.isProcessing) return "processing" as const;
@@ -292,48 +411,43 @@ export function VoiceChatPage() {
         <div className="mt-8 flex items-center justify-center gap-3">
           <Button
             type="button"
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-12 w-12 rounded-full",
-              "border border-white/10 bg-white/5 backdrop-blur-xl",
-              "text-zinc-200 hover:bg-white/10",
-            )}
-            onClick={() => voice.toggleMute()}
-            aria-label={voice.isMuted ? "Unmute" : "Mute"}
-          >
-            {voice.isMuted ? (
-              <VolumeX className="size-5" />
-            ) : (
-              <Volume2 className="size-5" />
-            )}
-          </Button>
-
-          <Button
-            type="button"
             onClick={async () => {
-              if (voice.isProcessing) return;
+              // Stop is the only way to end the session.
+              if (voice.isProcessing) {
+                stopSession();
+                return;
+              }
+
               if (voice.isSpeaking) {
-                voice.stopSpeaking();
+                // While speaking, tapping stops the session.
+                stopSession();
                 return;
               }
+
+              // If we're already listening/recording, treat this as "Stop" (end session).
               if (voice.isListening || voice.isRecording) {
-                voice.stopListening();
+                stopSession();
                 return;
               }
+
+              // Idle -> start session.
               await start();
             }}
+            disabled={voice.isProcessing && !sessionActive}
             className={cn(
               "h-20 w-20 rounded-full",
               "border border-white/10 bg-white text-black",
               "shadow-[0_20px_70px_rgba(0,0,0,0.6)]",
               "transition-transform active:scale-95",
               "hover:bg-zinc-100",
+              voice.isProcessing && !sessionActive ? "opacity-70" : "",
             )}
             aria-label={
-              voice.isListening || voice.isRecording || voice.isSpeaking
+              voice.isListening || voice.isRecording
                 ? "Stop"
-                : "Start voice"
+                : voice.isSpeaking
+                  ? "Interrupt"
+                  : "Start voice"
             }
           >
             {voice.isProcessing ? (
@@ -343,25 +457,6 @@ export function VoiceChatPage() {
             ) : (
               <Mic className="size-8" />
             )}
-          </Button>
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-12 w-12 rounded-full",
-              "border border-white/10 bg-white/5 backdrop-blur-xl",
-              "text-zinc-200 hover:bg-white/10",
-            )}
-            disabled={!isAnyActive}
-            onClick={() => {
-              voice.stopListening();
-              voice.stopSpeaking();
-            }}
-            aria-label="Stop all"
-          >
-            <Square className="size-4" />
           </Button>
         </div>
       </div>
@@ -386,7 +481,7 @@ export function VoiceChatPage() {
             </div>
             <button
               type="button"
-              onClick={() => setDebugOpen(false)}
+              onClick={() => setDebugOpenPersist(false)}
               className={cn(
                 "rounded-full p-1.5",
                 "text-zinc-300 hover:bg-white/10",
@@ -494,7 +589,7 @@ export function VoiceChatPage() {
       ) : (
         <button
           type="button"
-          onClick={() => setDebugOpen(true)}
+          onClick={() => setDebugOpenPersist(true)}
           className={cn(
             "fixed bottom-4 right-4 z-30",
             "rounded-full border border-white/10 bg-white/5 backdrop-blur-xl",

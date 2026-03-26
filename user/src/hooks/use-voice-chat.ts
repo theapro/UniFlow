@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+// ~100ms silent WAV for autoplay priming.
+const SILENT_WAV_DATA_URL =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=";
+
 export type VoiceChatResult = {
   transcript: string;
   text: string;
@@ -14,6 +18,10 @@ export type VoiceChatResult = {
 export type UseVoiceChatOptions = {
   maxDurationMs?: number;
   silenceMs?: number;
+  // Keep microphone stream alive across turns (enables barge-in / continuous mode UX).
+  keepStreamAlive?: boolean;
+  // If provided, called after audio playback finishes (or after a text-only turn completes).
+  onSpeakingEnded?: () => void;
   // Called after backend pipeline finishes
   onResult?: (result: VoiceChatResult) => void;
   onError?: (message: string) => void;
@@ -29,7 +37,7 @@ export type VoiceChatDebugInfo = {
   lastStopAt: number | null;
   lastStopReason:
     | "manual"
-    | "silence"
+    | "endOfSpeech"
     | "maxDuration"
     | "recorderError"
     | "streamEnded"
@@ -69,6 +77,8 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
   const {
     maxDurationMs = 10000,
     silenceMs = 2500,
+    keepStreamAlive = false,
+    onSpeakingEnded,
     onResult,
     onError,
     onInputStream,
@@ -80,6 +90,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
   // If internal callbacks depend on them, effect cleanups can run and stop recording.
   const onResultRef = useRef<typeof onResult>(onResult);
   const onErrorRef = useRef<typeof onError>(onError);
+  const onSpeakingEndedRef = useRef<typeof onSpeakingEnded>(onSpeakingEnded);
   const onInputStreamRef = useRef<typeof onInputStream>(onInputStream);
   const onOutputAudioElementRef =
     useRef<typeof onOutputAudioElement>(onOutputAudioElement);
@@ -90,6 +101,9 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
   useEffect(() => {
     onErrorRef.current = onError;
   }, [onError]);
+  useEffect(() => {
+    onSpeakingEndedRef.current = onSpeakingEnded;
+  }, [onSpeakingEnded]);
   useEffect(() => {
     onInputStreamRef.current = onInputStream;
   }, [onInputStream]);
@@ -131,10 +145,13 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
 
+  const playbackUnlockedRef = useRef(false);
+
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const rafRef = useRef<number | null>(null);
   const lastVoiceActivityAtRef = useRef<number>(0);
+  const heardSpeechThisTurnRef = useRef<boolean>(false);
 
   const sendOnStopRef = useRef(false);
   const sendParamsRef = useRef<{
@@ -174,24 +191,30 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
     }));
   }, []);
 
-  const stopSpeaking = useCallback(() => {
-    const a = audioElRef.current;
-    if (a) {
-      try {
-        a.pause();
-        a.src = "";
-      } catch {
-        // ignore
-      }
-    }
-    audioElRef.current = null;
+  const ensureOutputAudioElement = useCallback((): HTMLAudioElement | null => {
+    if (typeof window === "undefined") return null;
 
+    if (audioElRef.current) return audioElRef.current;
+
+    const a = new Audio();
+    (a as any).playsInline = true;
+    audioElRef.current = a;
+
+    // IMPORTANT: connect analyzer once. A media element can only be connected once per AudioContext.
     try {
-      onOutputAudioElementRef.current?.(null);
+      onOutputAudioElementRef.current?.(a);
     } catch {
       // ignore
     }
 
+    return a;
+  }, []);
+
+  const primeSilentLoop = useCallback(async () => {
+    const a = ensureOutputAudioElement();
+    if (!a) return;
+
+    // Clean up old object URL if any.
     if (audioUrlRef.current) {
       try {
         URL.revokeObjectURL(audioUrlRef.current);
@@ -201,9 +224,82 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
       audioUrlRef.current = null;
     }
 
+    try {
+      a.pause();
+    } catch {
+      // ignore
+    }
+
+    a.src = SILENT_WAV_DATA_URL;
+    a.loop = true;
+    a.muted = true;
+    a.volume = 0;
+
+    try {
+      // Best-effort: if this is outside a gesture, it may be blocked.
+      // That's OK — unlockPlayback will prime it under user interaction.
+      await a.play();
+    } catch {
+      // ignore
+    }
+  }, [ensureOutputAudioElement]);
+
+  const stopSpeaking = useCallback(() => {
+    const a = audioElRef.current;
+    if (a) {
+      try {
+        a.pause();
+      } catch {
+        // ignore
+      }
+      try {
+        a.currentTime = 0;
+      } catch {
+        // ignore
+      }
+    }
+
     setSpeakingLevel(0);
     setIsSpeaking(false);
   }, []);
+
+  const unlockPlayback = useCallback(async (): Promise<boolean> => {
+    if (typeof window === "undefined") return false;
+    if (playbackUnlockedRef.current) return true;
+
+    // Attempt to unlock audio playback under a user gesture.
+    // 1) Resume an AudioContext (some browsers gate it)
+    // 2) Play a tiny silent wav (unlocks HTMLAudioElement playback)
+    try {
+      const Ctx = (window.AudioContext ||
+        (window as any).webkitAudioContext) as typeof AudioContext | undefined;
+      if (Ctx) {
+        const ctx = new Ctx();
+        try {
+          if (ctx.state === "suspended") await ctx.resume();
+        } catch {
+          // ignore
+        }
+        try {
+          await ctx.close();
+        } catch {
+          // ignore
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    try {
+      // Prime a persistent audio element under the user gesture.
+      await primeSilentLoop();
+      playbackUnlockedRef.current = true;
+      return true;
+    } catch (e) {
+      console.warn("[voice] playback unlock failed", e);
+      return false;
+    }
+  }, [primeSilentLoop]);
 
   const stopProcessing = useCallback(() => {
     const ac = abortRef.current;
@@ -299,6 +395,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
 
   const stopWithReason = useCallback(
     (reason: VoiceChatDebugInfo["lastStopReason"]) => {
+      console.log("STOP TRIGGERED:", reason);
       stopReasonRef.current = reason;
       snapshotDebug(`stop:${reason}`);
       stop();
@@ -316,52 +413,110 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
   }, [stopProcessing, stopSpeaking, stopTracks, stopWithReason]);
 
   const playAudio = useCallback(
-    async (result: VoiceChatResult) => {
-      if (typeof window === "undefined") return;
+    async (result: VoiceChatResult): Promise<boolean> => {
+      if (typeof window === "undefined") return false;
 
       stopSpeaking();
 
-      const mime = result.mime || result.audioMime || "audio/mpeg";
+      const a = ensureOutputAudioElement();
+      if (!a) {
+        const msg = "Failed to initialize audio playback";
+        setError(msg);
+        onErrorRef.current?.(msg);
+        return false;
+      }
+
+      // Clean up old object URL if any (avoid leaks and stale src).
+      if (audioUrlRef.current) {
+        try {
+          URL.revokeObjectURL(audioUrlRef.current);
+        } catch {
+          // ignore
+        }
+        audioUrlRef.current = null;
+      }
+
+      const mime = "audio/mpeg";
       const dataUrl = `data:${mime};base64,${result.audioBase64}`;
       const blob = await fetch(dataUrl).then((r) => r.blob());
       const url = URL.createObjectURL(blob);
       audioUrlRef.current = url;
+      console.log("AUDIO DEBUG:", {
+        mime,
+        base64Length: result.audioBase64?.length,
+      });
 
-      const a = new Audio(url);
-      audioElRef.current = a;
+      a.src = url;
+      a.loop = false;
+      a.muted = false;
+      a.volume = 1;
 
-      try {
-        onOutputAudioElementRef.current?.(a);
-      } catch {
-        // ignore
-      }
+      // IMPORTANT: do not use onerror to display failures.
+      // Some browsers fire error events during src swaps even if playback succeeds.
+      a.onerror = null;
 
-      a.onended = () => {
-        stopSpeaking();
-        setIsSpeaking(false);
-      };
-      a.onerror = () => {
-        setIsSpeaking(false);
-        const msg = "Failed to play audio";
-        setError(msg);
-        onErrorRef.current?.(msg);
-      };
+      const didPlayRef = { value: false };
+
+      const waitForEnd = () =>
+        new Promise<void>((resolve) => {
+          const finish = () => resolve();
+          a.onended = finish;
+          // If user interrupts, stopSpeaking() will pause the element.
+          // We treat that as "ended" for the purpose of continuing the session.
+          a.onpause = () => {
+            // Only resolve if we actually started playing and then got paused.
+            if (didPlayRef.value) resolve();
+          };
+        });
 
       try {
         setIsSpeaking(true);
         setSpeakingLevel(0);
 
-        await a.play();
-      } catch (e) {
-        console.warn("Audio play blocked", e);
+        try {
+          await a.play();
+          didPlayRef.value = true;
+        } catch (e) {
+          console.warn("Audio play blocked (first try)", e);
+          // Retry once (some browsers need a short delay after src assignment)
+          try {
+            await new Promise((r) => setTimeout(r, 80));
+            await a.play();
+            didPlayRef.value = true;
+          } catch (e2) {
+            console.warn("Audio play blocked (second try)", e2);
+            setIsSpeaking(false);
+            // Fallback to text-only: do not stop conversation.
+            const msg = "Audio playback was blocked by the browser";
+            setError(msg);
+            onErrorRef.current?.(msg);
+            void primeSilentLoop();
+            return false;
+          }
+        }
+
+        // Wait until playback actually ends (or is interrupted).
+        await waitForEnd();
+
         setIsSpeaking(false);
-        const msg = "Audio playback was blocked by the browser";
-        setError(msg);
-        onErrorRef.current?.(msg);
+        void primeSilentLoop();
+        return true;
+      } catch (e) {
+        console.warn("Audio play failed", e);
+        setIsSpeaking(false);
+        // Only show an error if playback truly never started.
+        if (!didPlayRef.value) {
+          const msg = "Audio playback failed";
+          setError(msg);
+          onErrorRef.current?.(msg);
+        }
+        void primeSilentLoop();
+        return false;
       }
     },
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [stopSpeaking],
+    [ensureOutputAudioElement, primeSilentLoop, stopSpeaking],
   );
 
   const sendBlob = useCallback(
@@ -372,6 +527,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
         const msg = "No speech detected";
         setError(msg);
         onErrorRef.current?.(msg);
+        onSpeakingEndedRef.current?.();
         return;
       }
 
@@ -406,6 +562,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
           const msg = String(json?.error ?? res.statusText);
           setError(msg);
           onErrorRef.current?.(msg);
+          onSpeakingEndedRef.current?.();
           return;
         }
 
@@ -422,23 +579,32 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
           audioMime: String(json?.audioMime ?? ""),
         };
 
-        if (!result.transcript || !result.text || !result.audioBase64) {
+        if (!result.transcript || !result.text) {
           const msg = "Voice chat returned an incomplete response";
           setError(msg);
           onErrorRef.current?.(msg);
+          onSpeakingEndedRef.current?.();
           return;
         }
 
         setTranscript(result.transcript);
         setResponse(result.text);
         onResultRef.current?.(result);
-        await playAudio(result);
+
+        // Text-only fallback is allowed (e.g., TTS generation failed).
+        if (result.audioBase64) {
+          await playAudio(result);
+          onSpeakingEndedRef.current?.();
+        } else {
+          onSpeakingEndedRef.current?.();
+        }
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") {
           const msg = "Voice chat request was aborted";
           console.warn("[voice] aborted", e);
           setError(msg);
           onErrorRef.current?.(msg);
+          // Do not auto-restart on abort; user likely pressed stop.
           return;
         }
 
@@ -446,6 +612,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
         const msg = "Voice chat failed";
         setError(msg);
         onErrorRef.current?.(msg);
+        onSpeakingEndedRef.current?.();
       } finally {
         abortRef.current = null;
         setIsProcessing(false);
@@ -475,7 +642,18 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
         lastBlobBytes: 0,
       }));
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const existing = streamRef.current;
+      const canReuse =
+        keepStreamAlive &&
+        Boolean(existing?.active) &&
+        (existing?.getAudioTracks?.() ?? []).some(
+          (t) => t.readyState === "live",
+        );
+
+      const stream = canReuse
+        ? existing!
+        : await navigator.mediaDevices.getUserMedia({ audio: true });
+
       streamRef.current = stream;
 
       // If a track ends immediately, capture it.
@@ -516,19 +694,23 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
 
         setIsRecording(true);
         lastVoiceActivityAtRef.current = Date.now();
+        heardSpeechThisTurnRef.current = false;
 
         snapshotDebug("recorder:onstart");
 
-        // hard stop
-        maxTimerRef.current = window.setTimeout(
-          () => stopWithReason("maxDuration"),
-          maxDurationMs,
-        );
+        // CRITICAL FAILSAFE: always stop after maxDurationMs (no re-arming loops).
+        maxTimerRef.current = window.setTimeout(() => {
+          stopWithReason("maxDuration");
+        }, maxDurationMs);
 
         // silence detect (simple amplitude monitor)
         try {
           const ctx = new AudioContext();
           audioContextRef.current = ctx;
+          // Some browsers start in "suspended".
+          void ctx.resume().catch(() => {
+            // ignore
+          });
           const src = ctx.createMediaStreamSource(stream);
           const analyser = ctx.createAnalyser();
           analyser.fftSize = 2048;
@@ -536,7 +718,15 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
           src.connect(analyser);
 
           const data = new Uint8Array(analyser.fftSize);
-          const threshold = 6; // minimal sensitivity
+
+          // Lower + adaptive threshold: many mics sit around ~1-3.
+          const baseThreshold = 2;
+          let noiseFloor = 0; // EMA of background noise
+          let smoothed = 0; // EMA smoothing for stability
+
+          // Debug logging (throttled to avoid devtools spam)
+          let logCounter = 0;
+          const logEvery = 10;
 
           const tick = () => {
             const a = analyserRef.current;
@@ -550,20 +740,39 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
             }
             const level = sum / data.length;
 
+            // Log raw input level so we can tune threshold.
+            if (logCounter++ % logEvery === 0) {
+              console.log("LEVEL:", level);
+            }
+
+            // Smooth level + estimate noise floor before speech is detected.
+            const alpha = 0.18;
+            smoothed = smoothed ? smoothed + alpha * (level - smoothed) : level;
+            if (!heardSpeechThisTurnRef.current) {
+              const nfAlpha = 0.08;
+              noiseFloor = noiseFloor
+                ? noiseFloor + nfAlpha * (smoothed - noiseFloor)
+                : smoothed;
+            }
+
+            const threshold = Math.max(baseThreshold, noiseFloor + 1.2);
+
             // Normalize loosely into 0..1 for UI waveform (best-effort)
-            const norm = Math.max(0, Math.min(1, (level - 2) / 20));
+            const norm = Math.max(0, Math.min(1, (smoothed - 2) / 20));
             setListeningLevel(norm);
 
-            if (level > threshold) {
+            if (smoothed > threshold) {
               lastVoiceActivityAtRef.current = Date.now();
+              heardSpeechThisTurnRef.current = true;
               if (silenceTimerRef.current) {
                 window.clearTimeout(silenceTimerRef.current);
                 silenceTimerRef.current = null;
               }
             } else {
-              if (!silenceTimerRef.current) {
+              // Only consider silence as end-of-utterance AFTER we have heard speech.
+              if (heardSpeechThisTurnRef.current && !silenceTimerRef.current) {
                 silenceTimerRef.current = window.setTimeout(() => {
-                  stopWithReason("silence");
+                  stopWithReason("endOfSpeech");
                 }, silenceMs);
               }
             }
@@ -591,7 +800,17 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
           clearTimers();
           setIsRecording(false);
           setListeningLevel(0);
-          stopTracks();
+          const shouldStopStream =
+            !keepStreamAlive ||
+            stopReason === "manual" ||
+            stopReason === "recorderError" ||
+            stopReason === "streamEnded";
+          if (shouldStopStream) {
+            stopTracks();
+          } else {
+            // Keep stream alive for continuous session / barge-in.
+            snapshotDebug("stream:kept");
+          }
         }
 
         snapshotDebug("recorder:onstop");
@@ -681,6 +900,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
     clearTimers,
     applyMuteToStream,
     isMuted,
+    keepStreamAlive,
     sendBlob,
     snapshotDebug,
   ]);
@@ -754,6 +974,9 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
     listeningLevel,
     isMuted,
     toggleMute,
+
+    // Autoplay policy helper (must be called from a user gesture)
+    unlockPlayback,
 
     // Primary modal-friendly API
     beginTurn,

@@ -12,6 +12,45 @@ import { MessageList } from "@/components/chat/MessageList";
 import { auth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 
+function normalizeUserInput(input: string): string {
+  return String(input ?? "")
+    .trim()
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isIgnorableUserInput(input: string): boolean {
+  const s = normalizeUserInput(input).toLowerCase();
+  if (!s) return true;
+  if (s.length < 1) return true;
+  const noise = new Set([".", "..", "...", "000", "00", "0", "uh", "um", "ah"]);
+  if (noise.has(s)) return true;
+  if (/^(\.|0)+$/.test(s)) return true;
+  const noPunct = s
+    .replace(/[.\-_,!?:;"'`~()\[\]{}<>\\/|@#$%^&*=+]/g, "")
+    .trim();
+  if (!noPunct) return true;
+  return false;
+}
+
+function detectLangForUi(input: string): "en" | "ja" | "uz" {
+  const s = String(input ?? "");
+  if (/[\u3040-\u30FF\u4E00-\u9FFF]/.test(s)) return "ja";
+  if (/[ЎўҚқҒғҲҳ]/.test(s)) return "uz";
+  const lower = s.toLowerCase();
+  if (/(\bjadval\b|\bdavomat\b|\bbaho\b|\bdars\b)/.test(lower)) return "uz";
+  return "en";
+}
+
+function nonRepeatingFallback(lang: "en" | "ja" | "uz"): string {
+  if (lang === "ja")
+    return "すみません、同じ返答になってしまいました。もう少し詳しく教えてください。";
+  if (lang === "uz")
+    return "Uzr, bir xil javob qaytarilib qoldi. Iltimos, biroz batafsil yozing.";
+  return "Sorry — I’m repeating myself. Could you add a bit more detail?";
+}
+
 export function ChatLayout() {
   const router = useRouter();
   const {
@@ -114,6 +153,14 @@ export function ChatLayout() {
   }, []);
 
   const handleSendMessage = async (content: string) => {
+    if (isLoading || isStreaming) return;
+
+    const cleaned = normalizeUserInput(content);
+    if (isIgnorableUserInput(cleaned)) {
+      // Ignore noise/ghost inputs: do not create a session, do not call backend.
+      return;
+    }
+
     let sessionId = currentSessionId;
 
     // Create new session if none exists
@@ -126,9 +173,18 @@ export function ChatLayout() {
     const userMessage: Message = {
       id: generateId(),
       role: "user",
-      content,
+      content: cleaned,
       createdAt: new Date(),
     };
+
+    // Track previous assistant message to avoid repeated responses.
+    const prevAssistant = (messages[sessionId] || [])
+      .slice()
+      .reverse()
+      .find(
+        (m) =>
+          m.role === "assistant" && String(m.content || "").trim().length > 0,
+      );
 
     addMessage(sessionId, userMessage);
 
@@ -156,9 +212,10 @@ export function ChatLayout() {
         },
         body: JSON.stringify({
           sessionId,
-          message: content,
+          message: cleaned,
           model: selectedModel?.model,
           temperature: 0.7,
+          contextLimit: 12,
         }),
         signal: controller.signal,
       });
@@ -219,6 +276,15 @@ export function ChatLayout() {
 
       if (!accumulatedContent) {
         throw new Error("No response from AI");
+      }
+
+      // Final de-dupe: if assistant replied with the exact same text twice in a row, replace it.
+      if (
+        prevAssistant?.content &&
+        String(prevAssistant.content).trim() === accumulatedContent.trim()
+      ) {
+        const lang = detectLangForUi(cleaned);
+        updateLastMessage(sessionId, nonRepeatingFallback(lang));
       }
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -293,7 +359,7 @@ export function ChatLayout() {
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent">
       <ScrollArea ref={scrollAreaRef} className="min-h-0 flex-1 scrollbar-thin">
-        <div className="pb-32">
+        <div className="pb-32 mb-[100px]">
           <MessageList
             messages={currentMessages}
             isLoading={isLoading}
@@ -306,7 +372,7 @@ export function ChatLayout() {
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-32 bg-gradient-to-t from-background via-background to-transparent" />
 
       <div className="absolute inset-x-0 bottom-6 z-20">
-        <div className="mx-auto w-full px-4">
+        <div className="mx-auto w-full px-4 -ml-1">
           <div ref={inputRef}>
             <ChatInput
               onSendMessage={handleSendMessage}

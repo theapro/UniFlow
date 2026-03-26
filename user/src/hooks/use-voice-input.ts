@@ -2,6 +2,59 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+function normalizeTranscript(input: string): string {
+  return String(input ?? "")
+    .trim()
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isNoiseTranscript(input: string): boolean {
+  const s = normalizeTranscript(input).toLowerCase();
+  if (!s) return true;
+
+  const shortAllowed = new Set([
+    "ok",
+    "okay",
+    "hi",
+    "hey",
+    "yo",
+    "yes",
+    "no",
+    "yeah",
+    "yep",
+    "sure",
+    // Uzbek
+    "ha",
+    "yo'q",
+    "yoq",
+    // Japanese
+    "はい",
+    "いいえ",
+    "うん",
+  ]);
+  if (s.length < 3 && !shortAllowed.has(s)) return true;
+
+  const noise = new Set([".", "..", "...", "000", "00", "0", "uh", "um", "ah"]);
+  if (noise.has(s)) return true;
+  if (/^(\.|0)+$/.test(s)) return true;
+
+  const noPunct = s
+    .replace(/[.\-_,!?:;"'`~()\[\]{}<>\\/|@#$%^&*=+]/g, "")
+    .trim();
+  if (!noPunct) return true;
+
+  return false;
+}
+
+function getConfidence(result: any): number {
+  const c =
+    typeof result?.[0]?.confidence === "number" ? result[0].confidence : NaN;
+  if (!Number.isFinite(c)) return 0;
+  return Math.max(0, Math.min(1, c));
+}
+
 export type VoiceInputError =
   | "not-supported"
   | "permission-denied"
@@ -14,6 +67,7 @@ export type VoiceInputError =
 export type UseVoiceInputOptions = {
   lang?: string;
   silenceMs?: number; // optional auto-stop after silence
+  debounceMs?: number; // debounce final transcript emission
   onFinalTranscript?: (text: string) => void;
   onError?: (message: string, code: VoiceInputError) => void;
 };
@@ -54,6 +108,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
   const {
     lang = "en-US",
     silenceMs = 2500,
+    debounceMs = 400,
     onFinalTranscript,
     onError,
   } = options;
@@ -65,7 +120,11 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
 
   const recognitionRef = useRef<any | null>(null);
   const finalTranscriptRef = useRef<string>("");
+  const finalConfidenceRef = useRef<number>(0);
   const silenceTimerRef = useRef<number | null>(null);
+  const debounceTimerRef = useRef<number | null>(null);
+  const lastSentRef = useRef<string>("");
+  const lastSentAtRef = useRef<number>(0);
 
   const clearSilenceTimer = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -75,12 +134,21 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     }
   }, []);
 
+  const clearDebounceTimer = useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (debounceTimerRef.current) {
+      window.clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     setIsSupported(getSpeechRecognitionConstructor() != null);
   }, []);
 
   const stop = useCallback(() => {
     clearSilenceTimer();
+    clearDebounceTimer();
 
     const rec = recognitionRef.current;
     if (!rec) {
@@ -97,7 +165,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
         // ignore
       }
     }
-  }, [clearSilenceTimer]);
+  }, [clearDebounceTimer, clearSilenceTimer]);
 
   const start = useCallback(() => {
     const Ctor = getSpeechRecognitionConstructor();
@@ -112,6 +180,8 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     setError(null);
     setTranscript("");
     finalTranscriptRef.current = "";
+    finalConfidenceRef.current = 0;
+    clearDebounceTimer();
 
     const rec = new Ctor();
     recognitionRef.current = rec;
@@ -140,16 +210,27 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
 
       let interim = "";
       let final = finalTranscriptRef.current;
+      let bestFinalConfidence = finalConfidenceRef.current;
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const res = event.results[i];
         const text = String(res?.[0]?.transcript ?? "");
-        if (res?.isFinal) final += text;
-        else interim += text;
+        const conf = getConfidence(res);
+        if (res?.isFinal) {
+          const cleaned = normalizeTranscript(text);
+          // Ignore ghost / random / low-confidence transcripts
+          if (conf >= 0.7 && !isNoiseTranscript(cleaned)) {
+            final += (final ? " " : "") + cleaned;
+            bestFinalConfidence = Math.max(bestFinalConfidence, conf);
+          }
+        } else {
+          interim += text;
+        }
       }
 
       finalTranscriptRef.current = final;
-      setTranscript((final + interim).trim());
+      finalConfidenceRef.current = bestFinalConfidence;
+      setTranscript(normalizeTranscript(final + " " + interim));
     };
 
     rec.onspeechend = () => {
@@ -169,10 +250,36 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
       clearSilenceTimer();
       setIsRecording(false);
 
-      const final = finalTranscriptRef.current.trim();
-      if (final.length > 0) {
+      const final = normalizeTranscript(finalTranscriptRef.current);
+      const conf = finalConfidenceRef.current;
+
+      // Allow short meaningful utterances with slightly lower confidence.
+      const minConf = final.length < 4 ? 0.4 : 0.55;
+
+      if (final.length > 0 && conf >= minConf && !isNoiseTranscript(final)) {
         setTranscript(final);
-        onFinalTranscript?.(final);
+
+        const now = Date.now();
+        const normalized = final.toLowerCase();
+        const isDuplicate =
+          normalized === lastSentRef.current &&
+          now - lastSentAtRef.current < 2500;
+
+        if (!isDuplicate) {
+          clearDebounceTimer();
+          if (typeof window !== "undefined") {
+            debounceTimerRef.current = window.setTimeout(
+              () => {
+                lastSentRef.current = normalized;
+                lastSentAtRef.current = Date.now();
+                onFinalTranscript?.(final);
+              },
+              Math.min(Math.max(debounceMs, 300), 500),
+            );
+          } else {
+            onFinalTranscript?.(final);
+          }
+        }
       }
 
       recognitionRef.current = null;
@@ -188,7 +295,16 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
       setIsRecording(false);
       recognitionRef.current = null;
     }
-  }, [clearSilenceTimer, lang, onError, onFinalTranscript, silenceMs, stop]);
+  }, [
+    clearDebounceTimer,
+    clearSilenceTimer,
+    debounceMs,
+    lang,
+    onError,
+    onFinalTranscript,
+    silenceMs,
+    stop,
+  ]);
 
   const toggle = useCallback(() => {
     if (isRecording) stop();
@@ -198,6 +314,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
   useEffect(() => {
     return () => {
       clearSilenceTimer();
+      clearDebounceTimer();
       try {
         recognitionRef.current?.abort?.();
       } catch {
@@ -205,7 +322,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
       }
       recognitionRef.current = null;
     };
-  }, [clearSilenceTimer]);
+  }, [clearDebounceTimer, clearSilenceTimer]);
 
   return {
     isRecording,

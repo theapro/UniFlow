@@ -12,6 +12,205 @@ const BACKEND_URL =
   process.env.BACKEND_URL?.replace(/\/$/, "") ||
   "http://localhost:3001";
 
+function normalizeText(input: string): string {
+  return String(input ?? "")
+    .trim()
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isNoiseInput(input: string): boolean {
+  const s = normalizeText(input).toLowerCase();
+  if (!s) return true;
+
+  const shortAllowed = new Set([
+    "ok",
+    "okay",
+    "hi",
+    "hey",
+    "yo",
+    "yes",
+    "no",
+    "yeah",
+    "yep",
+    "sure",
+    // Uzbek
+    "ha",
+    "yo'q",
+    "yoq",
+    // Japanese
+    "はい",
+    "いいえ",
+    "うん",
+  ]);
+  if (s.length < 3 && !shortAllowed.has(s)) return true;
+  const noise = new Set([".", "..", "...", "000", "00", "0", "uh", "um", "ah"]);
+  if (noise.has(s)) return true;
+  if (/^(\.|0)+$/.test(s)) return true;
+
+  const noPunct = s
+    .replace(/[.\-_,!?:;"'`~()\[\]{}<>\\/|@#$%^&*=+]/g, "")
+    .trim();
+  if (!noPunct) return true;
+
+  return false;
+}
+
+function looksLikeBulletList(chatText: string): boolean {
+  return /^\s*[-•*]\s+/m.test(String(chatText ?? ""));
+}
+
+function parseScheduleBullets(chatText: string): Array<{
+  start?: string;
+  end?: string;
+  subject: string;
+}> {
+  const lines = String(chatText ?? "")
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("- "));
+
+  const out: Array<{ start?: string; end?: string; subject: string }> = [];
+
+  for (const l of lines) {
+    const raw = l.replace(/^[-•*]+\s+/, "").trim();
+    // Typical: "11:50-13:05 Algorithms — Teacher (Room)"
+    const m = raw.match(
+      /^(?<start>\d{1,2}:\d{2})\s*[-–]\s*(?<end>\d{1,2}:\d{2})\s+(?<rest>.+)$/,
+    );
+    if (m?.groups?.rest) {
+      const rest = String(m.groups.rest);
+      const subject = rest
+        .split(/[—–]/)[0]
+        .replace(/\s*\([^)]*\)\s*$/g, "")
+        .trim();
+      out.push({ start: m.groups.start, end: m.groups.end, subject });
+      continue;
+    }
+
+    // Fallback: no time range
+    const subject = raw
+      .split(/[—–]/)[0]
+      .replace(/\s*\([^)]*\)\s*$/g, "")
+      .trim();
+    if (subject) out.push({ subject });
+  }
+
+  return out;
+}
+
+function buildSpeechText(chatText: string): string {
+  const raw = String(chatText ?? "").trim();
+  if (!raw) return "";
+
+  const lower = raw.toLowerCase();
+  const isSchedule =
+    lower.startsWith("today") ||
+    lower.includes("schedule") ||
+    lower.includes("jadval") ||
+    raw.startsWith("今日") ||
+    raw.startsWith("今週") ||
+    raw.startsWith("今月");
+
+  if (isSchedule && looksLikeBulletList(raw)) {
+    const items = parseScheduleBullets(raw);
+    if (items.length === 0) return raw;
+
+    const intro = (() => {
+      if (raw.startsWith("Bugungi")) return "Xo‘p. Bugun sizda:";
+      if (raw.startsWith("Haftalik")) return "Xo‘p. Bu hafta sizda:";
+      if (raw.startsWith("Oylik")) return "Xo‘p. Bu oy sizda:";
+      if (raw.startsWith("今日")) return "わかりました。今日の予定は:";
+      if (raw.startsWith("今週")) return "わかりました。今週の予定は:";
+      if (raw.startsWith("今月")) return "わかりました。今月の予定は:";
+      if (raw.toLowerCase().startsWith("today"))
+        return "Alright. Today you have:";
+      if (raw.toLowerCase().startsWith("weekly"))
+        return "Alright. This week you have:";
+      if (raw.toLowerCase().startsWith("monthly"))
+        return "Alright. This month you have:";
+      return "Alright. Here is your schedule:";
+    })();
+
+    const parts: string[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const time = it.start
+        ? it.end
+          ? `from ${it.start} to ${it.end}`
+          : `at ${it.start}`
+        : "";
+      const core = time ? `${it.subject} ${time}` : `${it.subject}`;
+
+      if (i === 0) parts.push(core);
+      else if (i === items.length - 1) parts.push(`and later ${core}`);
+      else parts.push(`then ${core}`);
+    }
+
+    return `${intro} ${parts.join(", ")}.`;
+  }
+
+  // Generic fallback: keep it conversational.
+  return raw;
+}
+
+function preprocessTtsText(input: string): string {
+  let s = String(input ?? "");
+
+  // Abbreviation expansion / pronunciation fixes
+  s = s.replace(/\be\.g\./gi, "for example");
+  s = s.replace(/\bi\.e\./gi, "that is");
+  s = s.replace(/\bA\.?I\.?\b/g, "A I");
+
+  // Avoid symbol-heavy text in speech
+  s = s.replace(/[•]/g, "");
+  s = s.replace(/[—–]/g, ", ");
+
+  // Remove common bullet prefixes if any remain
+  s = s
+    .split(/\r?\n/)
+    .map((l) => l.replace(/^\s*[-•*]+\s+/, "").trim())
+    .filter(Boolean)
+    .join(". ");
+
+  s = normalizeText(s);
+
+  // Break long sentences into shorter ones (best-effort, TTS-friendly)
+  const maxLen = 140;
+  const pieces: string[] = [];
+  const rough = s
+    .replace(/\s*([;:])\s*/g, ". ")
+    .replace(/\s*\n+\s*/g, ". ")
+    .split(/(?<=[.!?])\s+/);
+
+  for (const part of rough) {
+    const p = part.trim();
+    if (!p) continue;
+    if (p.length <= maxLen) {
+      pieces.push(p);
+      continue;
+    }
+
+    // Split long parts on commas first
+    const commaSplit = p.split(/\s*,\s*/);
+    let current = "";
+    for (const seg of commaSplit) {
+      const next = current ? `${current}, ${seg}` : seg;
+      if (next.length > maxLen && current) {
+        pieces.push(current.endsWith(".") ? current : `${current}.`);
+        current = seg;
+      } else {
+        current = next;
+      }
+    }
+    if (current) pieces.push(current.endsWith(".") ? current : `${current}.`);
+  }
+
+  // Add slight pauses by ensuring punctuation spacing
+  return normalizeText(pieces.join(" "));
+}
+
 async function readTextSafe(res: Response): Promise<string> {
   return await res.text().catch(() => "");
 }
@@ -104,6 +303,7 @@ async function backendAiChatToText(params: {
       message: params.message,
       model: params.model,
       temperature: 0.7,
+      contextLimit: 12,
     }),
   });
 
@@ -212,7 +412,7 @@ export async function POST(req: NextRequest) {
         : undefined;
 
     const transcript = await groqStt({ audio, model: sttModel, apiKey });
-    if (!transcript) {
+    if (!transcript || isNoiseInput(transcript)) {
       return NextResponse.json(
         { error: "No speech detected" },
         { status: 422 },
@@ -235,22 +435,37 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log("AI RESPONSE:", assistantText);
+    const chatText = assistantText;
+    const speechText = preprocessTtsText(buildSpeechText(chatText));
 
-    const tts = await groqTts({ text: assistantText, apiKey });
+    console.log("AI RESPONSE:", chatText);
+    let ttsAudioBase64 = "";
+    let ttsMime = "";
+    let ttsError: string | null = null;
 
-    console.log("TTS GENERATED", {
-      bytes: tts.audio.byteLength,
-      mime: tts.contentType,
-    });
+    try {
+      const tts = await groqTts({ text: speechText, apiKey });
+      ttsAudioBase64 = arrayBufferToBase64(tts.audio);
+      ttsMime = tts.contentType;
+
+      console.log("TTS GENERATED", {
+        bytes: tts.audio.byteLength,
+        mime: tts.contentType,
+      });
+    } catch (e) {
+      ttsError = e instanceof Error ? e.message : "TTS_FAILED";
+      console.error("TTS failed (text-only fallback)", ttsError);
+    }
 
     return NextResponse.json(
       {
         transcript,
-        text: assistantText,
-        audioBase64: arrayBufferToBase64(tts.audio),
-        mime: tts.contentType,
-        audioMime: tts.contentType,
+        text: chatText,
+        speechText,
+        audioBase64: ttsAudioBase64,
+        mime: ttsMime || "audio/mpeg",
+        audioMime: ttsMime || "audio/mpeg",
+        ttsError,
       },
       { headers: { "Cache-Control": "no-store" } },
     );
