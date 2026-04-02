@@ -56,9 +56,9 @@ export function GradesTabEditView({
     refetchInterval: 60_000,
   });
 
-  const rows = data?.rows ?? [];
-  const header = rows[0] ?? [];
-  const body = rows.slice(1);
+  const rows = React.useMemo(() => data?.rows ?? [], [data?.rows]);
+  const header = React.useMemo(() => rows[0] ?? [], [rows]);
+  const body = React.useMemo(() => rows.slice(1), [rows]);
 
   const initialAssignmentCount = React.useMemo(
     () => detectAssignmentCountFromHeader(header),

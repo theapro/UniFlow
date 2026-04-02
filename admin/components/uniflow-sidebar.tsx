@@ -430,11 +430,11 @@ export function UniFlowSidebar({
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
                   <SidebarMenuButton
-                    tooltip={dict?.nav?.sheets ?? "Sheets"}
+                    tooltip={"Sheets Tools"}
                     isActive={isSheetsActive}
                   >
                     <FileSpreadsheet />
-                    <span>{dict?.nav?.sheets ?? "Sheets"}</span>
+                    <span>{"Sheets Tools"}</span>
                     <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                   </SidebarMenuButton>
                 </CollapsibleTrigger>

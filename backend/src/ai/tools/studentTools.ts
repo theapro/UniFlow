@@ -96,7 +96,9 @@ export async function getStudentScheduleToday(params: {
             subject: { select: { name: true } },
             teacher: { select: { fullName: true } },
             room: { select: { name: true } },
-            timeSlot: { select: { startTime: true, endTime: true, slotNumber: true } },
+            timeSlot: {
+              select: { startTime: true, endTime: true, slotNumber: true },
+            },
             calendarDay: { select: { date: true } },
           },
           orderBy: [
@@ -247,7 +249,7 @@ export async function getStudentDashboard(params: {
   };
   gradesSummary: {
     recentCount: number;
-    avgScore: number | null;
+    averageScore: number | null;
   };
 }> {
   const studentId = params.user.studentId;
@@ -281,7 +283,9 @@ export async function getStudentDashboard(params: {
             subject: { select: { name: true } },
             teacher: { select: { fullName: true } },
             room: { select: { name: true } },
-            timeSlot: { select: { startTime: true, endTime: true, slotNumber: true } },
+            timeSlot: {
+              select: { startTime: true, endTime: true, slotNumber: true },
+            },
             calendarDay: { select: { date: true } },
           },
           orderBy: [
@@ -364,7 +368,7 @@ export async function getStudentDashboard(params: {
 
   const gradesSummary = {
     recentCount: gradesRecent.length,
-    avgScore:
+    averageScore:
       scored.length > 0
         ? Math.round(
             (scored.reduce((a, c) => a + c, 0) / scored.length) * 100,

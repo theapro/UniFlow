@@ -14,7 +14,9 @@ import { StudentsSheetsOverview } from "./StudentsSheetsOverview";
 
 export function StudentsSheetsTabs({ dict }: { dict: any }) {
   const queryClient = useQueryClient();
-  const [selectedConflictId, setSelectedConflictId] = React.useState<string | null>(null);
+  const [selectedConflictId, setSelectedConflictId] = React.useState<
+    string | null
+  >(null);
   const [spreadsheetIdDraft, setSpreadsheetIdDraft] = React.useState("");
 
   // --- Queries ---
@@ -38,19 +40,28 @@ export function StudentsSheetsTabs({ dict }: { dict: any }) {
 
   const { data: conflicts } = useQuery({
     queryKey: ["sheets", "conflicts", "open"],
-    queryFn: () => sheetsApi.conflicts.list({ status: "OPEN", take: 25 }).then((r) => r.data.data),
+    queryFn: () =>
+      sheetsApi.conflicts
+        .list({ status: "OPEN", take: 25 })
+        .then((r) => r.data.data),
     refetchInterval: 15_000,
   });
 
   const { data: conflictDetail } = useQuery({
     queryKey: ["sheets", "conflicts", selectedConflictId],
-    queryFn: () => selectedConflictId ? sheetsApi.conflicts.getById(selectedConflictId).then((r) => r.data.data) : null,
+    queryFn: () =>
+      selectedConflictId
+        ? sheetsApi.conflicts
+            .getById(selectedConflictId)
+            .then((r) => r.data.data)
+        : null,
     enabled: Boolean(selectedConflictId),
   });
 
   // --- Mutations ---
   const connectMutation = useMutation({
-    mutationFn: (data: { spreadsheetId: string | null }) => sheetsApi.patchConfig(data),
+    mutationFn: (data: { spreadsheetId: string | null }) =>
+      sheetsApi.patchConfig(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sheets"] });
     },
@@ -65,7 +76,10 @@ export function StudentsSheetsTabs({ dict }: { dict: any }) {
   });
 
   const resolveMutation = useMutation({
-    mutationFn: (data: any) => selectedConflictId ? sheetsApi.conflicts.resolve(selectedConflictId, data) : Promise.reject(),
+    mutationFn: (data: any) =>
+      selectedConflictId
+        ? sheetsApi.conflicts.resolve(selectedConflictId, data)
+        : Promise.reject(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sheets"] });
       setSelectedConflictId(null);
@@ -75,31 +89,41 @@ export function StudentsSheetsTabs({ dict }: { dict: any }) {
   // Spreadsheet ID sinxronizatsiyasi
   React.useEffect(() => {
     if (spreadsheetIdDraft.trim()) return;
-    const initial = status?.spreadsheetId ?? health?.config?.spreadsheetId ?? "";
+    const initial =
+      status?.spreadsheetId ?? health?.config?.spreadsheetId ?? "";
     if (initial) setSpreadsheetIdDraft(initial);
-  }, [status?.spreadsheetId, health?.config?.spreadsheetId]);
+  }, [
+    status?.spreadsheetId,
+    health?.config?.spreadsheetId,
+    spreadsheetIdDraft,
+  ]);
 
-  const openConflictsCount = status?.openConflicts ?? conflicts?.items?.length ?? 0;
+  const openConflictsCount =
+    status?.openConflicts ?? conflicts?.items?.length ?? 0;
 
   return (
     <Tabs defaultValue="overview" className="w-full space-y-10">
-      
       {/* 1. TABS HEADER: Minimalist Center-aligned Bar */}
-      <div className="flex w-full"> 
+      <div className="flex w-full">
         <TabsList className="h-10 inline-flex items-center justify-center p-1 bg-zinc-100/50 dark:bg-zinc-900/40 backdrop-blur-xl border border-zinc-200/50 dark:border-white/5 rounded-full shadow-inner">
-          <TabsTrigger 
-            value="overview" 
+          <TabsTrigger
+            value="overview"
             className="h-8 px-6 rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-950 dark:data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-200 gap-2 font-bold text-[13px]"
           >
             <LayoutGrid className="h-4 w-4" />
             Overview
           </TabsTrigger>
 
-          <TabsTrigger 
-            value="conflicts" 
+          <TabsTrigger
+            value="conflicts"
             className="h-8 px-6 rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-950 dark:data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-200 gap-2 font-bold text-[13px]"
           >
-            <AlertTriangle className={cn("h-4 w-4", openConflictsCount > 0 ? "text-orange-500" : "text-zinc-400")} />
+            <AlertTriangle
+              className={cn(
+                "h-4 w-4",
+                openConflictsCount > 0 ? "text-orange-500" : "text-zinc-400",
+              )}
+            />
             Conflicts
             {openConflictsCount > 0 && (
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-[10px] font-black text-white ml-1 animate-in zoom-in">
@@ -108,8 +132,8 @@ export function StudentsSheetsTabs({ dict }: { dict: any }) {
             )}
           </TabsTrigger>
 
-          <TabsTrigger 
-            value="logs" 
+          <TabsTrigger
+            value="logs"
             className="h-8 px-6 rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-950 dark:data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-200 gap-2 font-bold text-[13px]"
           >
             <Terminal className="h-4 w-4" />
@@ -120,7 +144,10 @@ export function StudentsSheetsTabs({ dict }: { dict: any }) {
 
       {/* 2. CONTENT SECTIONS */}
       <div className="animate-in fade-in slide-in-from-bottom-3 duration-700">
-        <TabsContent value="overview" className="mt-0 outline-none focus-visible:ring-0">
+        <TabsContent
+          value="overview"
+          className="mt-0 outline-none focus-visible:ring-0"
+        >
           <StudentsSheetsOverview
             dict={dict}
             healthLoading={healthLoading}
@@ -142,7 +169,10 @@ export function StudentsSheetsTabs({ dict }: { dict: any }) {
           />
         </TabsContent>
 
-        <TabsContent value="conflicts" className="mt-0 outline-none focus-visible:ring-0">
+        <TabsContent
+          value="conflicts"
+          className="mt-0 outline-none focus-visible:ring-0"
+        >
           <ConflictManager
             conflicts={conflicts?.items ?? []}
             conflictDetail={conflictDetail}
@@ -154,7 +184,10 @@ export function StudentsSheetsTabs({ dict }: { dict: any }) {
           />
         </TabsContent>
 
-        <TabsContent value="logs" className="mt-0 outline-none focus-visible:ring-0">
+        <TabsContent
+          value="logs"
+          className="mt-0 outline-none focus-visible:ring-0"
+        >
           <SyncLogs
             logs={status?.recentLogs ?? []}
             dict={dict}

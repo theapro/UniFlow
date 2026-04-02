@@ -32,7 +32,9 @@ export function requireRole(allowed: Role | Role[]) {
   };
 }
 
-export function requirePermission(permission: string) {
+export function requirePermission(permission: string | string[]) {
+  const required = Array.isArray(permission) ? permission : [permission];
+
   return async (req: Request, res: Response, next: NextFunction) => {
     const user = req.user;
     if (!user) return fail(res, 401, "Unauthorized");
@@ -47,7 +49,7 @@ export function requirePermission(permission: string) {
 
     const permissions = fromReq ?? (await resolvePermissionsForRole(user.role));
 
-    if (!permissions.includes(permission)) {
+    if (!required.some((p) => permissions.includes(p))) {
       return fail(res, 403, "Forbidden");
     }
 

@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.middleware";
-import { requireRole } from "../middlewares/access-control.middleware";
+import {
+  requirePermission,
+  requireRole,
+} from "../middlewares/access-control.middleware";
 import { Role } from "@prisma/client";
 import { AdminStudentController } from "../controllers/admin/AdminStudentController";
 import { AdminStudentService } from "../services/admin/AdminStudentService";
@@ -49,6 +52,8 @@ import { AdminStatsController } from "../controllers/admin/AdminStatsController"
 import { AdminStatsService } from "../services/admin/AdminStatsService";
 import { AdminAccessControlController } from "../controllers/admin/AdminAccessControlController";
 import { AdminAccessControlService } from "../services/admin/AdminAccessControlService";
+import { AdminAttendanceGradesController } from "../controllers/admin/AdminAttendanceGradesController";
+import { AdminAttendanceGradesService } from "../services/admin/AdminAttendanceGradesService";
 
 const router = Router();
 
@@ -129,6 +134,9 @@ const adminStatsController = new AdminStatsController(new AdminStatsService());
 const adminAccessControlController = new AdminAccessControlController(
   new AdminAccessControlService(),
 );
+const adminAttendanceGradesController = new AdminAttendanceGradesController(
+  new AdminAttendanceGradesService(),
+);
 
 // Inter-service wiring for Subjects <-> TeachersSheets
 adminSubjectController.setSyncService(
@@ -200,6 +208,35 @@ router.post("/rooms", adminRoomsController.create);
 router.put("/rooms/:id", adminRoomsController.update);
 router.delete("/rooms/:id", adminRoomsController.remove);
 router.get("/time-slots", adminTimeSlotsController.list);
+
+// Attendance/Grades (DB-first matrix editor)
+router.get(
+  "/attendance-grades/meta",
+  requirePermission(["VIEW_ATTENDANCE", "VIEW_GRADES"]),
+  adminAttendanceGradesController.getMeta,
+);
+
+router.get(
+  "/attendance/table",
+  requirePermission("VIEW_ATTENDANCE"),
+  adminAttendanceGradesController.getAttendanceTable,
+);
+router.post(
+  "/attendance/table",
+  requirePermission("EDIT_ATTENDANCE"),
+  adminAttendanceGradesController.saveAttendanceTable,
+);
+
+router.get(
+  "/grades/table",
+  requirePermission("VIEW_GRADES"),
+  adminAttendanceGradesController.getGradesTable,
+);
+router.post(
+  "/grades/table",
+  requirePermission("EDIT_GRADES"),
+  adminAttendanceGradesController.saveGradesTable,
+);
 
 // Attendance
 router.get("/attendance", adminAttendanceController.list);

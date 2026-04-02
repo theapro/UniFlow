@@ -15,6 +15,7 @@
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset --force",
     "db:seed": "prisma db seed",
+    "rbac:sync": "tsx src/scripts/sync-access-control.ts",
     "ai:test-models": "tsx src/scripts/test-ai-models.ts",
     "ai:test-schedule": "tsx src/scripts/test-schedule.ts",
     "students-sheets:worker": "tsx src/scripts/students-sheets-worker.ts",

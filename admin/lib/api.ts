@@ -178,8 +178,8 @@ export const scheduleApi = {
   list: (params?: {
     groupId?: string;
     teacherId?: string;
-    take?: number;
     skip?: number;
+    take?: number;
   }) => axios.get("/api/admin/schedule", { params }),
 
   getById: (id: string) => axios.get(`/api/admin/schedule/${id}`),
@@ -460,4 +460,44 @@ export const gradesSheetsApi = {
     gradeValues?: string[][];
     gradeStartRowNumber?: number;
   }) => axios.post("/api/admin/grades-sheets/update", data),
+};
+
+export const attendanceTableApi = {
+  meta: () => axios.get("/api/admin/attendance-grades/meta"),
+  table: (params: {
+    cohortId?: string;
+    groupId: string;
+    subjectId: string;
+    from: string;
+    to: string;
+  }) => axios.get("/api/admin/attendance/table", { params }),
+  save: (data: {
+    cohortId?: string;
+    groupId: string;
+    subjectId: string;
+    dates: string[];
+    records: Array<{ studentId: string; date: string; status: string }>;
+  }) => axios.post("/api/admin/attendance/table", data),
+};
+
+export const gradesTableApi = {
+  meta: () => axios.get("/api/admin/attendance-grades/meta"),
+  table: (params: {
+    cohortId?: string;
+    groupId: string;
+    subjectId: string;
+    from?: string;
+    to?: string;
+  }) => axios.get("/api/admin/grades/table", { params }),
+  save: (data: {
+    cohortId?: string;
+    groupId: string;
+    subjectId: string;
+    assignmentCount: number;
+    records: Array<{
+      studentId: string;
+      assignmentIndex: number;
+      grade: number | null;
+    }>;
+  }) => axios.post("/api/admin/grades/table", data),
 };

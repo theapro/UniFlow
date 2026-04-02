@@ -94,6 +94,10 @@ PORT=3001
 npx prisma migrate deploy
 npx prisma db seed
 
+# If you pulled new code that introduced new permissions
+# and you don't want to run the full seed in an existing DB:
+npm run rbac:sync
+
 # Dev reset (drops all tables, re-applies migrations, re-seeds)
 npm run db:reset
 

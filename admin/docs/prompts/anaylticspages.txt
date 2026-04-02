@@ -1,0 +1,23 @@
+Tasks: 
+
+Warning!!! Attendance va Gradeslarni pastda qisqa nom bilan eslatib o'taman
+
+1.Attendance/Grades ishlamayapti ya'ni created bo'lgan sahifani ochsam xatolik chiqmoqda 
+
+2.Logic : Attendance/Grades sahifalarida Sheets asosiy bo'lmasligi kerak ya'ni tab deb atalmasin sheets bu qo'shimcha function. Ya'ni asosiysi website
+
+3.Attendance/Grades pagelarida guruhdagi barcha userlar ko'rinishi kerak va user Attendance yoki Gradesni edit qila oladigan bo'lishi kerak table ko'rinishida bo'lishi kerak Schedule Websitedgi kabi minimalistic va zamonaviy designda
+
+    3.1. Attendance: Attendance bitta guruh+subjectni tanlab ichiga kirgandan so'ng u yerda table bo'lsin 
+
+    student_number, fullname       | dars kunlari masalan , 11/11/2026-kundagi dars
+    2300129,        ulanbek soliyev, dropdown bo'lishi kerak va bu studentni kelgan kelmaganligini belgilay olish kerak P/L/E kabilar
+
+    3.2. Grades: Grades bitta guruh+subjectni tanlab ichiga kirgandan so'ng u yerda table bo'lsin
+
+    student_number, fullname       | 1-dars, 2-dars, 3-dars
+    2300129,        ulanbek soliyev, dropdown bo'lishi kerak va bu student bahosini tanlay olishi kerak 0/1/2/3/4/5 gacha
+
+4.UI/UX Frontend structure: Iloji boricha pagelarni server side qilish kerak apini himoyalash maqsadida va Layout server side component bo'lisin pagelar o'ta og'ir bo'lib ketmasin va component kattalashib ketmasin
+
+5.Attendance/Grades lar Cohortlarga bo'linsin     

@@ -1,0 +1,16 @@
+Grades va Attendance page designini professional qilish kerak ya'ni:
+
+attendance/page.tsx bu yerda barcha attendance guruhlari bo'lishi kerak ya'ni cohort yoki guruh tanlash shart bo'lmasin barchasi chiqib turishi kerak huddi Group pagedagi kabi barcha Groups lar chiqib turadi cohort dropdown ga bo'lingan holatda
+attendance/[id]/page.tsx  bu yerda ustiga bosilgan attendance ochilishi kerak va o'sha attendanceni manage qiliniadigan pagez
+attendance/view/page.tsx bu yerda bitta tanlangan attendance ni ko'ra olishi kerak
+
+
+grades/page.tsx bu yerda barcha grades guruhlari bo'lishi kerak ya'ni cohort yoki guruh tanlash shart bo'lmasin barchasi chiqib turishi kerak huddi Group pagedagi kabi barcha Groups lar chiqib turadi cohort dropdown ga bo'lingan holatda
+grades/[id]/page.tsx  bu yerda ustiga bosilgan grades ochilishi kerak va o'sha gradesni manage qiliniadigan pagez
+grades/view/page.tsx bu yerda bitta tanlangan grades ni ko'ra olishi kerak
+
+WARNING TOP TASK!!!
+Butun pagelar SSR bo'lishi kerak api lar  SERVER side componentlarda chaqrilisin
+Static va initial data — serverda, interactive — clientda
+
+Va pagelar juda maydalashib ketgan ya'ni grades/page.tsx>GardePage>GradeView bu yerda grades/page.tsx va GradePage bo'sh bo'lib qolgan hullas men chalkashib ketdim Prodcution darajasida bularni fix qil confusing bo'lmasin

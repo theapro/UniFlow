@@ -1,8 +1,4 @@
-"use client";
-
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
-import { Toaster } from "@/components/ui/sonner";
+import { AppProviders } from "@/components/providers/app-providers";
 
 export default function LangLayout({
   children,
@@ -11,12 +7,7 @@ export default function LangLayout({
   children: React.ReactNode;
   params: { lang: string };
 }) {
-  const [queryClient] = useState(() => new QueryClient());
+  void lang;
 
-  return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-      <Toaster />
-    </QueryClientProvider>
-  );
+  return <AppProviders>{children}</AppProviders>;
 }

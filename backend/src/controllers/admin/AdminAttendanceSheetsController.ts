@@ -271,20 +271,59 @@ export class AdminAttendanceSheetsController {
   };
 
   previewTab = async (req: Request, res: Response) => {
-    const sheetTitle =
+    const rawSheetTitle =
       typeof req.query.sheetTitle === "string" ? req.query.sheetTitle : "";
-    const takeRows =
-      typeof req.query.takeRows === "string" ? Number(req.query.takeRows) : 25;
+    const sheetTitle = (() => {
+      // Some clients end up double-encoding titles (e.g. 19%252F20%252F21_Web%2520Development).
+      // Decode up to 2 times, but never throw.
+      let current = String(rawSheetTitle ?? "").trim();
+      for (let i = 0; i < 2; i++) {
+        try {
+          const decoded = decodeURIComponent(current);
+          if (decoded === current) break;
+          current = decoded;
+        } catch {
+          break;
+        }
+      }
+      return current.trim();
+    })();
 
-    const settings = new SheetsSettingsService();
-    const spreadsheetId =
-      await settings.getEffectiveAttendanceSpreadsheetId(prisma);
-    const svc = new AttendanceSheetsSyncService(prisma);
-    const preview = await svc.previewTab({
-      sheetTitle,
-      takeRows,
-      spreadsheetId: spreadsheetId ?? undefined,
-    });
-    return ok(res, "Attendance Sheets preview fetched", preview);
+    if (!sheetTitle) {
+      return fail(res, 400, "sheetTitle is required");
+    }
+
+    const takeRowsRaw =
+      typeof req.query.takeRows === "string" ? Number(req.query.takeRows) : 25;
+    const takeRows = Number.isFinite(takeRowsRaw)
+      ? Math.min(Math.max(takeRowsRaw, 1), 200)
+      : 25;
+
+    try {
+      const settings = new SheetsSettingsService();
+      const spreadsheetId =
+        await settings.getEffectiveAttendanceSpreadsheetId(prisma);
+      const svc = new AttendanceSheetsSyncService(prisma);
+      const preview = await svc.previewTab({
+        sheetTitle,
+        takeRows,
+        spreadsheetId: spreadsheetId ?? undefined,
+      });
+      return ok(res, "Attendance Sheets preview fetched", preview);
+    } catch (err: any) {
+      const msg = String(err?.message ?? "Failed to preview attendance tab");
+      const isClientError =
+        msg === "TAB_REQUIRED" ||
+        msg === "ATTENDANCE_SHEETS_DISABLED" ||
+        msg === "ATTENDANCE_SHEETS_MISSING_SPREADSHEET_ID" ||
+        msg === "ATTENDANCE_SHEETS_MISSING_CLIENT_EMAIL" ||
+        msg === "ATTENDANCE_SHEETS_MISSING_PRIVATE_KEY" ||
+        msg === "SHEET_ID_NOT_FOUND";
+
+      if (isClientError) return fail(res, 400, msg);
+
+      // Never crash; avoid leaking unexpected internal errors.
+      return fail(res, 500, "Failed to preview attendance tab");
+    }
   };
 }
