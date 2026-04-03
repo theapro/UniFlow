@@ -1,0 +1,10 @@
+leia-assistant papkasidan users pakasiga 3d modelni ko'chirish kerak 
+
+1. yangi mode qo'sh 3D LEIA nomli ya'ni chat, voice chat, 3d leaia
+2. leia assitant papkasidan modelni  modelni users/3dleia ga olib o't
+3. 3d model user bilan gaplasha olishi kerak animationlarini ham olib o't
+4. Production leveldagi 3d character chatni ishlab chiq
+5. Design voice chatdagi kabi bo'lsin 3d model o'rtada tursin sphere kabi va debug qo'sh
+6. Backend va datani voice chat va chat kabi olinsin 
+
+Production Levelda qilish kerak va clean designda

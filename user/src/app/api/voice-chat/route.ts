@@ -322,7 +322,13 @@ async function groqTts(params: { text: string; apiKey: string }) {
   const preferredModel =
     process.env.GROQ_TTS_MODEL || "canopylabs/orpheus-v1-english";
 
-  const attempt = async (model: string) => {
+  const preferredVoice =
+    process.env.GROQ_TTS_VOICE?.trim().toLowerCase() || "autumn";
+  const voiceCandidates = Array.from(
+    new Set([preferredVoice, "autumn", "diana", "hannah"].filter(Boolean)),
+  );
+
+  const attempt = async (model: string, voice: string) => {
     const res = await fetch(`${GROQ_BASE_URL}/audio/speech`, {
       method: "POST",
       headers: {
@@ -332,7 +338,7 @@ async function groqTts(params: { text: string; apiKey: string }) {
       body: JSON.stringify({
         model,
         input: params.text,
-        voice: "austin",
+        voice,
         response_format: "wav",
       }),
     });
@@ -347,22 +353,35 @@ async function groqTts(params: { text: string; apiKey: string }) {
     return { ok: true as const, audio, contentType };
   };
 
-  const first = await attempt(preferredModel);
-  if (first.ok) return { audio: first.audio, contentType: first.contentType };
+  const modelsToTry =
+    preferredModel === "canopylabs/orpheus-v1-english"
+      ? [preferredModel]
+      : [preferredModel, "canopylabs/orpheus-v1-english"];
 
-  // Fallback for older/alternate Groq model naming.
-  if (preferredModel !== "canopylabs/orpheus-v1-english") {
-    const second = await attempt("canopylabs/orpheus-v1-english");
-    if (second.ok)
-      return { audio: second.audio, contentType: second.contentType };
+  let lastFailure: {
+    res: Response;
+    errText: string;
+    model: string;
+    voice: string;
+  } | null = null;
+
+  for (const model of modelsToTry) {
+    for (const voice of voiceCandidates) {
+      const result = await attempt(model, voice);
+      if (result.ok) {
+        return { audio: result.audio, contentType: result.contentType };
+      }
+      lastFailure = { res: result.res, errText: result.errText, model, voice };
+    }
+  }
+
+  if (lastFailure) {
     throw new Error(
-      `TTS_FAILED:${second.res.status}:${second.res.statusText}:${second.errText}`,
+      `TTS_FAILED:${lastFailure.res.status}:${lastFailure.res.statusText}:${lastFailure.model}:${lastFailure.voice}:${lastFailure.errText}`,
     );
   }
 
-  throw new Error(
-    `TTS_FAILED:${first.res.status}:${first.res.statusText}:${first.errText}`,
-  );
+  throw new Error("TTS_FAILED");
 }
 
 function arrayBufferToBase64(buf: ArrayBuffer): string {
