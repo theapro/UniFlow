@@ -16,6 +16,9 @@ export type VoiceChatResult = {
 };
 
 export type UseVoiceChatOptions = {
+  // API endpoint to send recorded audio to.
+  // Defaults to the existing voice-chat route for backwards compatibility.
+  endpoint?: string;
   maxDurationMs?: number;
   silenceMs?: number;
   // Keep microphone stream alive across turns (enables barge-in / continuous mode UX).
@@ -75,6 +78,7 @@ function pickMimeType(): string | undefined {
 
 export function useVoiceChat(options: UseVoiceChatOptions = {}) {
   const {
+    endpoint = "/api/voice-chat",
     maxDurationMs = 10000,
     silenceMs = 2500,
     keepStreamAlive = false,
@@ -547,11 +551,12 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
         console.debug("[voice] sending audio", {
           bytes: blob.size,
           type: blob.type,
+          endpoint,
           sessionId: params.sessionId,
           chatModel: params.chatModel,
         });
 
-        const res = await fetch("/api/voice-chat", {
+        const res = await fetch(endpoint, {
           method: "POST",
           body: form,
           signal: controller.signal,
@@ -618,7 +623,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
         setIsProcessing(false);
       }
     },
-    [playAudio],
+    [endpoint, playAudio],
   );
 
   const start = useCallback(async () => {

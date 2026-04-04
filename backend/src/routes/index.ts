@@ -5,6 +5,7 @@ import aiRoutes from "./ai.routes";
 import authRoutes from "./auth.routes";
 import webhooksRoutes from "./webhooks.routes";
 import scheduleRoutes from "./schedule.routes";
+import receptionistRoutes from "./receptionist.routes";
 
 const router = Router();
 
@@ -13,6 +14,7 @@ router.use("/schedule", scheduleRoutes);
 router.use("/admin", adminRoutes);
 router.use("/user", userRoutes);
 router.use("/ai", aiRoutes);
+router.use("/receptionist", receptionistRoutes);
 router.use("/webhooks", webhooksRoutes);
 
 export default router;

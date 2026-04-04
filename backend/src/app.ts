@@ -3,6 +3,7 @@ import cors from "cors";
 import { env } from "./config/env";
 import apiRoutes from "./routes";
 import { createRequestId, logError, logInfo, redact } from "./utils/logger";
+import path from "path";
 
 const app = express();
 
@@ -85,6 +86,14 @@ app.use(
 app.get("/health", (_req, res) => {
   return res.status(200).json({ success: true, message: "OK" });
 });
+
+// Static uploads (e.g. receptionist avatar models)
+app.use(
+  "/uploads",
+  express.static(path.resolve(process.cwd(), "uploads"), {
+    fallthrough: true,
+  }),
+);
 
 app.use("/api", apiRoutes);
 

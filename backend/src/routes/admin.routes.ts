@@ -54,6 +54,9 @@ import { AdminAccessControlController } from "../controllers/admin/AdminAccessCo
 import { AdminAccessControlService } from "../services/admin/AdminAccessControlService";
 import { AdminAttendanceGradesController } from "../controllers/admin/AdminAttendanceGradesController";
 import { AdminAttendanceGradesService } from "../services/admin/AdminAttendanceGradesService";
+import { AdminReceptionistController } from "../controllers/admin/AdminReceptionistController";
+import { AdminReceptionistService } from "../services/receptionist/AdminReceptionistService";
+import multer from "multer";
 
 const router = Router();
 
@@ -138,6 +141,17 @@ const adminAttendanceGradesController = new AdminAttendanceGradesController(
   new AdminAttendanceGradesService(),
 );
 
+const adminReceptionistController = new AdminReceptionistController(
+  new AdminReceptionistService(),
+);
+
+const receptionistUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 60 * 1024 * 1024,
+  },
+});
+
 // Inter-service wiring for Subjects <-> TeachersSheets
 adminSubjectController.setSyncService(
   adminTeachersSheetsController.getSyncService(),
@@ -208,6 +222,83 @@ router.post("/rooms", adminRoomsController.create);
 router.put("/rooms/:id", adminRoomsController.update);
 router.delete("/rooms/:id", adminRoomsController.remove);
 router.get("/time-slots", adminTimeSlotsController.list);
+
+// Receptionist (LEIA)
+router.get(
+  "/receptionist/knowledge-base",
+  adminReceptionistController.listKnowledgeBase,
+);
+router.post(
+  "/receptionist/knowledge-base",
+  adminReceptionistController.createKnowledgeBase,
+);
+router.put(
+  "/receptionist/knowledge-base/:id",
+  adminReceptionistController.updateKnowledgeBase,
+);
+router.delete(
+  "/receptionist/knowledge-base/:id",
+  adminReceptionistController.deleteKnowledgeBase,
+);
+
+router.get(
+  "/receptionist/locations",
+  adminReceptionistController.listLocations,
+);
+router.post(
+  "/receptionist/locations",
+  adminReceptionistController.createLocation,
+);
+router.put(
+  "/receptionist/locations/:id",
+  adminReceptionistController.updateLocation,
+);
+router.delete(
+  "/receptionist/locations/:id",
+  adminReceptionistController.deleteLocation,
+);
+
+router.get(
+  "/receptionist/directions",
+  adminReceptionistController.listDirections,
+);
+router.post(
+  "/receptionist/directions",
+  adminReceptionistController.createDirection,
+);
+router.put(
+  "/receptionist/directions/:id",
+  adminReceptionistController.updateDirection,
+);
+router.delete(
+  "/receptionist/directions/:id",
+  adminReceptionistController.deleteDirection,
+);
+
+router.get("/receptionist/avatar", adminReceptionistController.getAvatar);
+router.patch("/receptionist/avatar", adminReceptionistController.patchAvatar);
+router.post(
+  "/receptionist/avatar/model",
+  receptionistUpload.single("model"),
+  adminReceptionistController.uploadAvatarModel,
+);
+
+router.get(
+  "/receptionist/announcements",
+  adminReceptionistController.listAnnouncements,
+);
+router.post(
+  "/receptionist/announcements",
+  adminReceptionistController.createAnnouncement,
+);
+router.put(
+  "/receptionist/announcements/:id",
+  adminReceptionistController.updateAnnouncement,
+);
+router.delete(
+  "/receptionist/announcements/:id",
+  adminReceptionistController.deleteAnnouncement,
+);
 
 // Attendance/Grades (DB-first matrix editor)
 router.get(

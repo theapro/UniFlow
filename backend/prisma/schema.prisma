@@ -716,6 +716,117 @@ model LoginCode {
   @@map("LoginCode")
 }
 
+// --- AI Receptionist (LEIA) ---
+
+model ReceptionistKnowledgeBaseEntry {
+  id        String              @id @default(uuid()) @db.Char(36)
+  title     String              @db.VarChar(255)
+  content   String              @db.LongText
+  category  String              @db.VarChar(64)
+  language  ReceptionistLanguage
+  tags      Json?
+  priority  Int                 @default(0)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@index([category, language, priority])
+  @@index([language, priority])
+  @@map("knowledge_base")
+}
+
+model ReceptionistLocation {
+  id          String                 @id @default(uuid()) @db.Char(36)
+  name        String                 @db.VarChar(140)
+  building    String?                @db.VarChar(140)
+  floor       String?                @db.VarChar(40)
+  description String?                @db.LongText
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  directionsFrom ReceptionistDirection[] @relation("ReceptionistDirectionFrom")
+  directionsTo   ReceptionistDirection[] @relation("ReceptionistDirectionTo")
+
+  @@unique([name])
+  @@index([building])
+  @@map("locations")
+}
+
+model ReceptionistDirection {
+  id             String               @id @default(uuid()) @db.Char(36)
+  fromLocationId String               @db.Char(36)
+  toLocationId   String               @db.Char(36)
+  instructions   String               @db.LongText
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  fromLocation ReceptionistLocation @relation("ReceptionistDirectionFrom", fields: [fromLocationId], references: [id], onDelete: Cascade)
+  toLocation   ReceptionistLocation @relation("ReceptionistDirectionTo", fields: [toLocationId], references: [id], onDelete: Cascade)
+
+  @@unique([fromLocationId, toLocationId])
+  @@index([fromLocationId])
+  @@index([toLocationId])
+  @@map("directions")
+}
+
+// Singleton-ish settings row; use `key = "default"`.
+model ReceptionistAiAvatar {
+  id          String                 @id @default(uuid()) @db.Char(36)
+  key         String                 @unique @db.VarChar(64)
+  name        String                 @default("LEIA") @db.VarChar(80)
+  modelUrl    String?                @db.VarChar(512)
+  voice       String?                @db.VarChar(128)
+  language    ReceptionistLanguage   @default(UZ)
+  personality ReceptionistPersonality @default(FRIENDLY)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  @@map("ai_avatar")
+}
+
+model ReceptionistAnnouncement {
+  id             String               @id @default(uuid()) @db.Char(36)
+  title          String               @db.VarChar(200)
+  content        String               @db.LongText
+  targetAudience String               @db.VarChar(80)
+  language       ReceptionistLanguage?
+  isActive       Boolean              @default(true)
+  startsAt       DateTime?
+  endsAt         DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([isActive, startsAt, endsAt, createdAt])
+  @@map("announcements")
+}
+
+model ReceptionistConversation {
+  id           String               @id @default(uuid()) @db.Char(36)
+  language     ReceptionistLanguage @default(UZ)
+  lastActiveAt DateTime             @default(now())
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  messages ReceptionistMessage[]
+
+  @@index([updatedAt])
+  @@map("conversations")
+}
+
+model ReceptionistMessage {
+  id             String                    @id @default(uuid()) @db.Char(36)
+  conversationId String                    @db.Char(36)
+  sender         ReceptionistMessageSender
+  modality       ReceptionistMessageModality @default(TEXT)
+  text           String                    @db.LongText
+  meta           Json?
+  createdAt      DateTime                  @default(now())
+
+  conversation ReceptionistConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
 enum StudentStatus {
   ACTIVE
   INACTIVE
@@ -830,6 +941,35 @@ enum AiModality {
   MODERATION
 
   @@map("AiModality")
+}
+
+enum ReceptionistLanguage {
+  UZ
+  EN
+  JP
+
+  @@map("ReceptionistLanguage")
+}
+
+enum ReceptionistPersonality {
+  FRIENDLY
+  FORMAL
+
+  @@map("ReceptionistPersonality")
+}
+
+enum ReceptionistMessageSender {
+  USER
+  ASSISTANT
+
+  @@map("ReceptionistMessageSender")
+}
+
+enum ReceptionistMessageModality {
+  TEXT
+  VOICE
+
+  @@map("ReceptionistMessageModality")
 }
 
 enum Weekday {
