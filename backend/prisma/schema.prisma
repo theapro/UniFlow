@@ -180,6 +180,7 @@ model Subject {
   name            String          @unique
   code            String?         @unique
   weeklyLessons   Int             @default(0)
+  totalLessons    Int             @default(0)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   cohortId        String?         @db.Char(36)
@@ -776,7 +777,21 @@ model ReceptionistAiAvatar {
   modelUrl    String?                @db.VarChar(512)
   voice       String?                @db.VarChar(128)
   language    ReceptionistLanguage   @default(UZ)
+  inputLanguage  ReceptionistLanguage @default(UZ)
+  outputLanguage ReceptionistLanguage @default(UZ)
   personality ReceptionistPersonality @default(FRIENDLY)
+
+  // --- Personality / Response generation ---
+  systemPrompt      String? @db.LongText
+  responseStyle     String? @db.LongText
+  maxResponseTokens Int     @default(900)
+  temperature       Float   @default(0.4)
+
+  // --- Knowledge control ---
+  autoRefreshKnowledge Boolean @default(true)
+  allowedTopics        Json?
+  blockedTopics        Json?
+
   createdAt   DateTime               @default(now())
   updatedAt   DateTime               @updatedAt
 

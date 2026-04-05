@@ -1,10 +1,31 @@
-import { ReceptionistLanguage, ReceptionistPersonality } from "@prisma/client";
+import {
+  Prisma,
+  ReceptionistLanguage,
+  ReceptionistPersonality,
+} from "@prisma/client";
 import { prisma } from "../../config/prisma";
-import { normalizeText } from "./receptionistText";
+import { normalizeText, stripDangerousWhitespace } from "./receptionistText";
 
 function clampInt(n: number, min: number, max: number): number {
   if (!Number.isFinite(n)) return min;
   return Math.max(min, Math.min(max, Math.floor(n)));
+}
+
+function clampNumber(n: number, min: number, max: number): number {
+  if (!Number.isFinite(n)) return min;
+  return Math.max(min, Math.min(max, n));
+}
+
+function normalizeTopicList(raw: unknown): string[] | null {
+  if (raw === null) return null;
+  if (!Array.isArray(raw)) return null;
+
+  const out = raw
+    .map((x) => normalizeText(String(x)))
+    .filter(Boolean)
+    .slice(0, 60);
+
+  return out.length ? out : null;
 }
 
 export class AdminReceptionistService {
@@ -263,6 +284,8 @@ export class AdminReceptionistService {
         key: "default",
         name: "LEIA",
         language: "UZ",
+        inputLanguage: "UZ",
+        outputLanguage: "UZ",
         personality: "FRIENDLY",
       },
     });
@@ -274,10 +297,28 @@ export class AdminReceptionistService {
       modelUrl: string | null;
       voice: string | null;
       language: ReceptionistLanguage;
+      inputLanguage: ReceptionistLanguage;
+      outputLanguage: ReceptionistLanguage;
       personality: ReceptionistPersonality;
+
+      systemPrompt: string | null;
+      responseStyle: string | null;
+      maxResponseTokens: number;
+      temperature: number;
+
+      autoRefreshKnowledge: boolean;
+      allowedTopics: string[] | null;
+      blockedTopics: string[] | null;
     }>,
   ) {
     await this.getAvatar();
+
+    const outputLanguage =
+      patch.outputLanguage !== undefined
+        ? patch.outputLanguage
+        : patch.language !== undefined
+          ? patch.language
+          : undefined;
 
     return prisma.receptionistAiAvatar.update({
       where: { key: "default" },
@@ -301,9 +342,67 @@ export class AdminReceptionistService {
                   : null,
             }
           : {}),
-        ...(patch.language !== undefined ? { language: patch.language } : {}),
+        ...(patch.inputLanguage !== undefined
+          ? { inputLanguage: patch.inputLanguage }
+          : {}),
+        ...(outputLanguage !== undefined
+          ? { outputLanguage, language: outputLanguage }
+          : {}),
         ...(patch.personality !== undefined
           ? { personality: patch.personality }
+          : {}),
+
+        ...(patch.systemPrompt !== undefined
+          ? {
+              systemPrompt:
+                typeof patch.systemPrompt === "string" &&
+                patch.systemPrompt.trim()
+                  ? stripDangerousWhitespace(patch.systemPrompt)
+                      .trim()
+                      .slice(0, 12000)
+                  : null,
+            }
+          : {}),
+        ...(patch.responseStyle !== undefined
+          ? {
+              responseStyle:
+                typeof patch.responseStyle === "string" &&
+                patch.responseStyle.trim()
+                  ? stripDangerousWhitespace(patch.responseStyle)
+                      .trim()
+                      .slice(0, 6000)
+                  : null,
+            }
+          : {}),
+        ...(patch.maxResponseTokens !== undefined
+          ? {
+              maxResponseTokens: clampInt(
+                Number(patch.maxResponseTokens),
+                80,
+                2000,
+              ),
+            }
+          : {}),
+        ...(patch.temperature !== undefined
+          ? {
+              temperature: clampNumber(Number(patch.temperature), 0, 1),
+            }
+          : {}),
+
+        ...(patch.autoRefreshKnowledge !== undefined
+          ? { autoRefreshKnowledge: Boolean(patch.autoRefreshKnowledge) }
+          : {}),
+        ...(patch.allowedTopics !== undefined
+          ? {
+              allowedTopics:
+                normalizeTopicList(patch.allowedTopics) ?? Prisma.DbNull,
+            }
+          : {}),
+        ...(patch.blockedTopics !== undefined
+          ? {
+              blockedTopics:
+                normalizeTopicList(patch.blockedTopics) ?? Prisma.DbNull,
+            }
           : {}),
       },
     });

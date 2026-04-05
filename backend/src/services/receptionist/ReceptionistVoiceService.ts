@@ -13,6 +13,16 @@ function arrayBufferToBase64(buf: ArrayBuffer): string {
   return Buffer.from(buf).toString("base64");
 }
 
+function asSttLanguageCode(raw: unknown): string {
+  const v = String(raw ?? "")
+    .trim()
+    .toUpperCase();
+  if (v === "UZ") return "uz";
+  if (v === "EN") return "en";
+  if (v === "JP" || v === "JA") return "ja";
+  return "";
+}
+
 async function readTextSafe(res: Response): Promise<string> {
   return await res.text().catch(() => "");
 }
@@ -34,84 +44,158 @@ export class ReceptionistVoiceService {
     filename: string;
     mimeType: string;
     model?: string;
+    language?: string;
     abortSignal?: AbortSignal;
   }): Promise<{ text: string }> {
     const apiKey = this.requireGroqKey();
 
-    const form = new FormData();
-    // DOM typings for BlobPart don't accept Node Buffer (it can be backed by SharedArrayBuffer).
-    // Copy into a plain ArrayBuffer for type-safety and broad compatibility.
-    const arrayBuffer = new ArrayBuffer(params.audioBytes.byteLength);
-    new Uint8Array(arrayBuffer).set(params.audioBytes);
-    const blob = new Blob([arrayBuffer], { type: params.mimeType });
+    const language = asSttLanguageCode(params.language);
 
-    form.set("file", blob, params.filename || "audio.webm");
-    form.set("model", params.model ?? "whisper-large-v3-turbo");
-    form.set("response_format", "json");
+    const run = async (opts: { withLanguage: boolean }) => {
+      const form = new FormData();
 
-    const res = await fetch(`${this.groqBaseUrl}/audio/transcriptions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: form,
-      signal: params.abortSignal,
-    });
+      // DOM typings for BlobPart don't accept Node Buffer (it can be backed by SharedArrayBuffer).
+      // Copy into a plain ArrayBuffer for type-safety and broad compatibility.
+      const arrayBuffer = new ArrayBuffer(params.audioBytes.byteLength);
+      new Uint8Array(arrayBuffer).set(params.audioBytes);
+      const blob = new Blob([arrayBuffer], { type: params.mimeType });
 
-    const text = await readTextSafe(res);
-    if (!res.ok) {
-      throw new Error(
-        `STT_FAILED:${res.status}:${res.statusText}:${text}`.slice(0, 4000),
-      );
-    }
+      form.set("file", blob, params.filename || "audio.webm");
+      form.set("model", params.model ?? "whisper-large-v3-turbo");
+      form.set("response_format", "json");
+      if (opts.withLanguage && language) {
+        form.set("language", language);
+      }
 
-    let json: any;
+      const res = await fetch(`${this.groqBaseUrl}/audio/transcriptions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: form,
+        signal: params.abortSignal,
+      });
+
+      const text = await readTextSafe(res);
+      if (!res.ok) {
+        throw new Error(
+          `STT_FAILED:${res.status}:${res.statusText}:${text}`.slice(0, 4000),
+        );
+      }
+
+      let json: any;
+      try {
+        json = text ? JSON.parse(text) : null;
+      } catch {
+        json = null;
+      }
+
+      return { text: String(json?.text ?? "").trim() };
+    };
+
     try {
-      json = text ? JSON.parse(text) : null;
-    } catch {
-      json = null;
+      return await run({ withLanguage: true });
+    } catch (e) {
+      // Compatibility fallback: if the provider rejects the language param, retry once without it.
+      if (language) {
+        try {
+          return await run({ withLanguage: false });
+        } catch {
+          // original error is more useful
+        }
+      }
+      throw e;
     }
-
-    return { text: String(json?.text ?? "").trim() };
   }
 
   async tts(params: {
     text: string;
     model?: string;
+    voice?: string;
     format?: "mp3" | "wav";
     abortSignal?: AbortSignal;
   }): Promise<{ audioBase64: string; mime: string }> {
     const apiKey = this.requireGroqKey();
 
-    const model = params.model ?? "canopylabs/orpheus-v1-english";
-    const format = params.format ?? "mp3";
+    const preferredModel = pickFirstNonEmpty(
+      params.model,
+      process.env.GROQ_TTS_MODEL,
+      "canopylabs/orpheus-v1-english",
+    );
 
-    const res = await fetch(`${this.groqBaseUrl}/audio/speech`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        input: params.text,
-        format,
-      }),
-      signal: params.abortSignal,
-    });
+    const preferredVoice = pickFirstNonEmpty(
+      params.voice,
+      process.env.GROQ_TTS_VOICE,
+      "autumn",
+    )
+      .trim()
+      .toLowerCase();
 
-    if (!res.ok) {
-      const errText = await readTextSafe(res);
-      throw new Error(
-        `TTS_FAILED:${res.status}:${res.statusText}:${errText}`.slice(0, 4000),
-      );
+    const voiceCandidates = Array.from(
+      new Set([preferredVoice, "autumn", "diana", "hannah"].filter(Boolean)),
+    );
+
+    const responseFormat = (params.format ?? "wav") as "mp3" | "wav";
+
+    const modelsToTry =
+      preferredModel === "canopylabs/orpheus-v1-english"
+        ? [preferredModel]
+        : [preferredModel, "canopylabs/orpheus-v1-english"];
+
+    let lastFailure: {
+      status: number;
+      statusText: string;
+      errText: string;
+      model: string;
+      voice: string;
+    } | null = null;
+
+    for (const model of modelsToTry) {
+      for (const voice of voiceCandidates) {
+        const res = await fetch(`${this.groqBaseUrl}/audio/speech`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            input: params.text,
+            voice,
+            response_format: responseFormat,
+          }),
+          signal: params.abortSignal,
+        });
+
+        if (!res.ok) {
+          const errText = await readTextSafe(res);
+          lastFailure = {
+            status: res.status,
+            statusText: res.statusText,
+            errText,
+            model,
+            voice,
+          };
+          continue;
+        }
+
+        const audio = await res.arrayBuffer();
+        const mime =
+          res.headers.get("content-type") ||
+          (responseFormat === "wav" ? "audio/wav" : "audio/mpeg");
+
+        return { audioBase64: arrayBufferToBase64(audio), mime };
+      }
     }
 
-    const audio = await res.arrayBuffer();
-    const mime =
-      res.headers.get("content-type") ||
-      (format === "wav" ? "audio/wav" : "audio/mpeg");
+    const meta = lastFailure
+      ? `:${lastFailure.model}:${lastFailure.voice}:${lastFailure.errText}`
+      : "";
 
-    return { audioBase64: arrayBufferToBase64(audio), mime };
+    throw new Error(
+      `TTS_FAILED:${lastFailure?.status ?? 500}:${
+        lastFailure?.statusText ?? "Unknown"
+      }${meta}`.slice(0, 4000),
+    );
   }
 }

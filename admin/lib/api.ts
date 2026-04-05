@@ -380,6 +380,109 @@ export const aiAdminApi = {
   }) => axios.post("/api/admin/ai/test-tool", data),
 };
 
+export const receptionistAdminApi = {
+  knowledgeBase: {
+    list: (params?: {
+      q?: string;
+      category?: string;
+      language?: "UZ" | "EN" | "JP";
+      take?: number;
+      skip?: number;
+    }) => axios.get("/api/admin/receptionist/knowledge-base", { params }),
+
+    create: (data: {
+      title: string;
+      content: string;
+      category: string;
+      language: "UZ" | "EN" | "JP";
+      tags?: any;
+      priority?: number;
+    }) => axios.post("/api/admin/receptionist/knowledge-base", data),
+
+    update: (id: string, patch: any) =>
+      axios.put(`/api/admin/receptionist/knowledge-base/${id}`, patch),
+
+    remove: (id: string) =>
+      axios.delete(`/api/admin/receptionist/knowledge-base/${id}`),
+  },
+
+  locations: {
+    list: (params?: { q?: string; take?: number; skip?: number }) =>
+      axios.get("/api/admin/receptionist/locations", { params }),
+
+    create: (data: {
+      name: string;
+      building?: string | null;
+      floor?: string | null;
+      description?: string | null;
+    }) => axios.post("/api/admin/receptionist/locations", data),
+
+    update: (id: string, patch: any) =>
+      axios.put(`/api/admin/receptionist/locations/${id}`, patch),
+
+    remove: (id: string) =>
+      axios.delete(`/api/admin/receptionist/locations/${id}`),
+  },
+
+  directions: {
+    list: (params?: {
+      fromLocationId?: string;
+      toLocationId?: string;
+      take?: number;
+      skip?: number;
+    }) => axios.get("/api/admin/receptionist/directions", { params }),
+
+    create: (data: {
+      fromLocationId: string;
+      toLocationId: string;
+      instructions: string;
+    }) => axios.post("/api/admin/receptionist/directions", data),
+
+    update: (id: string, patch: any) =>
+      axios.put(`/api/admin/receptionist/directions/${id}`, patch),
+
+    remove: (id: string) =>
+      axios.delete(`/api/admin/receptionist/directions/${id}`),
+  },
+
+  avatar: {
+    get: () => axios.get("/api/admin/receptionist/avatar"),
+    patch: (patch: any) => axios.patch("/api/admin/receptionist/avatar", patch),
+    uploadModel: (file: File) => {
+      const form = new FormData();
+      form.append("model", file);
+      return axios.post("/api/admin/receptionist/avatar/model", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+    },
+  },
+
+  announcements: {
+    list: (params?: {
+      q?: string;
+      activeOnly?: boolean;
+      take?: number;
+      skip?: number;
+    }) => axios.get("/api/admin/receptionist/announcements", { params }),
+
+    create: (data: {
+      title: string;
+      content: string;
+      targetAudience: string;
+      language?: "UZ" | "EN" | "JP" | null;
+      isActive?: boolean;
+      startsAt?: string | null;
+      endsAt?: string | null;
+    }) => axios.post("/api/admin/receptionist/announcements", data),
+
+    update: (id: string, patch: any) =>
+      axios.put(`/api/admin/receptionist/announcements/${id}`, patch),
+
+    remove: (id: string) =>
+      axios.delete(`/api/admin/receptionist/announcements/${id}`),
+  },
+};
+
 export const maintenanceApi = {
   purgeAllNonAdmin: (data: { confirm: string; syncSheets?: boolean }) =>
     axios.post("/api/admin/purge", data),

@@ -8,6 +8,23 @@ export function normalizeText(input: string): string {
     .trim();
 }
 
+// Some LLMs (e.g., reasoning models) emit hidden thoughts wrapped in <think>...</think>.
+// We never want to store/speak/display those.
+export function stripThinkBlocks(input: string): string {
+  const s = String(input ?? "");
+
+  // Remove full blocks first (multiline-safe).
+  let out = s.replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, "");
+
+  // Remove any stray tags if the model produced malformed markup.
+  out = out.replace(/<\/?think\b[^>]*>/gi, "");
+
+  // Clean up excessive blank lines that can remain after stripping.
+  out = out.replace(/\n{3,}/g, "\n\n");
+
+  return out.trim();
+}
+
 export function detectReceptionistLanguage(
   input: string,
 ): ReceptionistLanguage {

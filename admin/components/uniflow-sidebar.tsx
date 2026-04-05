@@ -151,6 +151,11 @@ export function UniFlowSidebar({
       url: `${dashboardBase}/ai-models`,
       icon: SettingsIcon,
     },
+    {
+      title: dict?.nav?.receptionist ?? "Receptionist",
+      url: `${dashboardBase}/receptionist`,
+      icon: BrainIcon,
+    },
   ];
 
   const sheetsSubItems = [

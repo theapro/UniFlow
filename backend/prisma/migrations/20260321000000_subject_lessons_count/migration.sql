@@ -1,3 +1,3 @@
--- Placeholder migration file.
--- This folder existed but migration.sql was missing, which blocks Prisma Migrate.
--- No-op.
+-- Add Subject.totalLessons used by the schedule/subjects tooling.
+ALTER TABLE `Subject`
+	ADD COLUMN `totalLessons` INTEGER NOT NULL DEFAULT 0;

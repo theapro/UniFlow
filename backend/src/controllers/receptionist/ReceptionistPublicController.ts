@@ -6,7 +6,10 @@ import {
 import { ok, fail } from "../../utils/responses";
 import { ReceptionistPublicService } from "../../services/receptionist/ReceptionistPublicService";
 import { ReceptionistVoiceService } from "../../services/receptionist/ReceptionistVoiceService";
-import { normalizeText } from "../../services/receptionist/receptionistText";
+import {
+  normalizeText,
+  stripThinkBlocks,
+} from "../../services/receptionist/receptionistText";
 
 function coerceModality(raw: unknown, fallback: ReceptionistMessageModality) {
   const v = String(raw ?? "")
@@ -101,6 +104,8 @@ export class ReceptionistPublicController {
           ? req.body.conversationId
           : "";
 
+      const avatar = await this.receptionist.getAvatar();
+
       const language: ReceptionistLanguage | null =
         req.body?.language !== undefined
           ? ReceptionistPublicService.normalizeLanguage(req.body.language, "UZ")
@@ -110,6 +115,7 @@ export class ReceptionistPublicController {
         audioBytes: file.buffer,
         filename: file.originalname || "audio.webm",
         mimeType,
+        language: avatar.inputLanguage,
       });
 
       const transcript = normalizeText(stt.text);
@@ -125,21 +131,33 @@ export class ReceptionistPublicController {
         assistantModality: "VOICE",
       });
 
-      const avatar = await this.receptionist.getAvatar();
+      const replyText = stripThinkBlocks(chat.replyText) || chat.replyText;
 
-      const tts = await this.voice.tts({
-        text: chat.replyText,
-        model: avatar.voice ?? undefined,
-        format: "mp3",
-      });
+      let audioBase64 = "";
+      let mime = "audio/mpeg";
+      try {
+        const tts = await this.voice.tts({
+          text: replyText,
+          model: avatar.voice ?? undefined,
+          format: "wav",
+        });
+        audioBase64 = tts.audioBase64;
+        mime = tts.mime || mime;
+      } catch (e: any) {
+        // Text-only fallback is allowed when TTS is unavailable.
+        console.warn(
+          "[receptionist] TTS failed; returning text-only reply:",
+          String(e?.message ?? e),
+        );
+      }
 
       return ok(res, "Receptionist voice reply", {
         conversationId: chat.conversationId,
         transcript,
         intent: chat.intent,
-        replyText: chat.replyText,
-        audioBase64: tts.audioBase64,
-        mime: tts.mime,
+        replyText,
+        audioBase64,
+        mime,
       });
     } catch (err: any) {
       const msg = String(err?.message ?? "");

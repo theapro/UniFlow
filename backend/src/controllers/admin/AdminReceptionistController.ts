@@ -38,6 +38,58 @@ function safeExt(originalName: string): string {
   return "";
 }
 
+function coerceBoolean(raw: unknown): boolean | undefined {
+  if (raw === undefined) return undefined;
+  if (typeof raw === "boolean") return raw;
+  const s = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+  if (s === "1" || s === "true" || s === "yes" || s === "on") return true;
+  if (s === "0" || s === "false" || s === "no" || s === "off") return false;
+  return undefined;
+}
+
+function coerceNumber(raw: unknown): number | undefined {
+  if (raw === undefined) return undefined;
+  const n = typeof raw === "number" ? raw : Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function coerceStringOrNull(raw: unknown): string | null | undefined {
+  if (raw === undefined) return undefined;
+  if (raw === null) return null;
+  if (typeof raw === "string") return raw;
+  return undefined;
+}
+
+function coerceStringList(raw: unknown): string[] | null | undefined {
+  if (raw === undefined) return undefined;
+  if (raw === null) return null;
+
+  const toList = (items: unknown[]) =>
+    items
+      .map((x) => String(x ?? "").trim())
+      .filter(Boolean)
+      .slice(0, 60);
+
+  if (Array.isArray(raw)) {
+    const out = toList(raw);
+    return out.length ? out : null;
+  }
+
+  if (typeof raw === "string") {
+    const out = toList(
+      raw
+        .split(/[\n,]+/g)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+    return out.length ? out : null;
+  }
+
+  return undefined;
+}
+
 export class AdminReceptionistController {
   constructor(private readonly service: AdminReceptionistService) {}
 
@@ -317,6 +369,22 @@ export class AdminReceptionistController {
         return fail(res, 400, "language must be UZ|EN|JP");
       }
 
+      const inputLanguage =
+        patch.inputLanguage !== undefined
+          ? coerceLanguage(patch.inputLanguage)
+          : undefined;
+      if (patch.inputLanguage !== undefined && !inputLanguage) {
+        return fail(res, 400, "inputLanguage must be UZ|EN|JP");
+      }
+
+      const outputLanguage =
+        patch.outputLanguage !== undefined
+          ? coerceLanguage(patch.outputLanguage)
+          : undefined;
+      if (patch.outputLanguage !== undefined && !outputLanguage) {
+        return fail(res, 400, "outputLanguage must be UZ|EN|JP");
+      }
+
       const personality =
         patch.personality !== undefined
           ? coercePersonality(patch.personality)
@@ -325,13 +393,91 @@ export class AdminReceptionistController {
         return fail(res, 400, "personality must be FRIENDLY|FORMAL");
       }
 
+      const systemPrompt = coerceStringOrNull(patch.systemPrompt);
+      if (patch.systemPrompt !== undefined && systemPrompt === undefined) {
+        return fail(res, 400, "systemPrompt must be a string or null");
+      }
+
+      const responseStyle = coerceStringOrNull(patch.responseStyle);
+      if (patch.responseStyle !== undefined && responseStyle === undefined) {
+        return fail(res, 400, "responseStyle must be a string or null");
+      }
+
+      const maxResponseTokens = coerceNumber(patch.maxResponseTokens);
+      if (
+        patch.maxResponseTokens !== undefined &&
+        maxResponseTokens === undefined
+      ) {
+        return fail(res, 400, "maxResponseTokens must be a number");
+      }
+
+      const temperature = coerceNumber(patch.temperature);
+      if (patch.temperature !== undefined && temperature === undefined) {
+        return fail(res, 400, "temperature must be a number");
+      }
+
+      const autoRefreshKnowledge = coerceBoolean(patch.autoRefreshKnowledge);
+      if (
+        patch.autoRefreshKnowledge !== undefined &&
+        autoRefreshKnowledge === undefined
+      ) {
+        return fail(res, 400, "autoRefreshKnowledge must be a boolean");
+      }
+
+      const allowedTopics = coerceStringList(patch.allowedTopics);
+      if (patch.allowedTopics !== undefined && allowedTopics === undefined) {
+        return fail(
+          res,
+          400,
+          "allowedTopics must be a string[], string, or null",
+        );
+      }
+
+      const blockedTopics = coerceStringList(patch.blockedTopics);
+      if (patch.blockedTopics !== undefined && blockedTopics === undefined) {
+        return fail(
+          res,
+          400,
+          "blockedTopics must be a string[], string, or null",
+        );
+      }
+
       const data = await this.service.updateAvatar({
         ...(patch.name !== undefined ? { name: patch.name } : {}),
         ...(patch.modelUrl !== undefined ? { modelUrl: patch.modelUrl } : {}),
         ...(patch.voice !== undefined ? { voice: patch.voice } : {}),
         ...(patch.language !== undefined ? { language: language! } : {}),
+        ...(patch.inputLanguage !== undefined
+          ? { inputLanguage: inputLanguage! }
+          : {}),
+        ...(patch.outputLanguage !== undefined
+          ? { outputLanguage: outputLanguage! }
+          : {}),
         ...(patch.personality !== undefined
           ? { personality: personality! }
+          : {}),
+
+        ...(patch.systemPrompt !== undefined
+          ? { systemPrompt: systemPrompt! }
+          : {}),
+        ...(patch.responseStyle !== undefined
+          ? { responseStyle: responseStyle! }
+          : {}),
+        ...(patch.maxResponseTokens !== undefined
+          ? { maxResponseTokens: maxResponseTokens! }
+          : {}),
+        ...(patch.temperature !== undefined
+          ? { temperature: temperature! }
+          : {}),
+
+        ...(patch.autoRefreshKnowledge !== undefined
+          ? { autoRefreshKnowledge: autoRefreshKnowledge! }
+          : {}),
+        ...(patch.allowedTopics !== undefined
+          ? { allowedTopics: allowedTopics! }
+          : {}),
+        ...(patch.blockedTopics !== undefined
+          ? { blockedTopics: blockedTopics! }
           : {}),
       });
 

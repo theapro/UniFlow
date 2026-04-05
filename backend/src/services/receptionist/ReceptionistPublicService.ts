@@ -12,6 +12,7 @@ import {
   coerceReceptionistLanguage,
   detectReceptionistLanguage,
   normalizeText,
+  stripThinkBlocks,
 } from "./receptionistText";
 
 export type ReceptionistInitResponse = {
@@ -20,7 +21,10 @@ export type ReceptionistInitResponse = {
     name: string;
     modelUrl: string | null;
     voice: string | null;
+    // Back-compat (represents output language)
     language: ReceptionistLanguage;
+    inputLanguage: ReceptionistLanguage;
+    outputLanguage: ReceptionistLanguage;
     personality: ReceptionistPersonality;
   };
   announcements: Array<{
@@ -60,6 +64,23 @@ export class ReceptionistPublicService {
   private readonly classifier = new ReceptionistIntentClassifier();
   private readonly llm = new ReceptionistLlmService();
 
+  // In-process cache (used only when autoRefreshKnowledge=false).
+  // Keeps the last loaded snapshot per language.
+  private static kbCache = new Map<
+    ReceptionistLanguage,
+    {
+      loadedAt: number;
+      rows: Array<{
+        id: string;
+        title: string;
+        content: string;
+        category: string;
+        priority: number;
+        updatedAtMs: number;
+      }>;
+    }
+  >();
+
   async getAvatar() {
     return this.getOrCreateAvatar();
   }
@@ -71,19 +92,20 @@ export class ReceptionistPublicService {
   }): Promise<ReceptionistInitResponse> {
     const limit = clampInt(params.messageLimit ?? 80, 0, 400);
 
+    const avatar = await this.getOrCreateAvatar();
+
     const language: ReceptionistLanguage =
       params.language ??
       (params.conversationId
         ? await this.getConversationLanguage(params.conversationId)
         : null) ??
+      avatar.outputLanguage ??
       "UZ";
 
     const conversationId = await this.ensureConversation({
       conversationId: params.conversationId,
       language,
     });
-
-    const avatar = await this.getOrCreateAvatar();
 
     const announcements = await this.listActiveAnnouncements({
       language,
@@ -112,7 +134,9 @@ export class ReceptionistPublicService {
         name: avatar.name,
         modelUrl: avatar.modelUrl ?? null,
         voice: avatar.voice ?? null,
-        language: avatar.language,
+        language: avatar.outputLanguage,
+        inputLanguage: avatar.inputLanguage,
+        outputLanguage: avatar.outputLanguage,
         personality: avatar.personality,
       },
       announcements,
@@ -136,8 +160,10 @@ export class ReceptionistPublicService {
     const cleaned = normalizeText(params.message);
     if (!cleaned) throw new Error("message is required");
 
+    const avatar = await this.getOrCreateAvatar();
+
     const detected = detectReceptionistLanguage(cleaned);
-    const language = params.language ?? detected;
+    const language = params.language ?? avatar.outputLanguage ?? detected;
 
     const conversationId = await this.ensureConversation({
       conversationId: params.conversationId ?? undefined,
@@ -160,8 +186,6 @@ export class ReceptionistPublicService {
       select: { id: true },
     });
 
-    const avatar = await this.getOrCreateAvatar();
-
     const decision = await this.classifier.classify({
       message: cleaned,
       useLlm: true,
@@ -174,12 +198,15 @@ export class ReceptionistPublicService {
       avatar,
     });
 
+    // Ensure hidden LLM reasoning never reaches storage or clients.
+    const safeReplyText = stripThinkBlocks(replyText) || replyText;
+
     await prisma.receptionistMessage.create({
       data: {
         conversationId,
         sender: "ASSISTANT",
         modality: params.assistantModality ?? "TEXT",
-        text: replyText.slice(0, 9000),
+        text: safeReplyText.slice(0, 9000),
         meta: {
           intent: decision.intent,
           confidence: decision.confidence,
@@ -191,7 +218,7 @@ export class ReceptionistPublicService {
     return {
       conversationId,
       intent: decision.intent,
-      replyText,
+      replyText: safeReplyText,
     };
   }
 
@@ -237,6 +264,8 @@ export class ReceptionistPublicService {
         key: "default",
         name: "LEIA",
         language: "UZ",
+        inputLanguage: "UZ",
+        outputLanguage: "UZ",
         personality: "FRIENDLY",
       },
       select: {
@@ -246,7 +275,18 @@ export class ReceptionistPublicService {
         modelUrl: true,
         voice: true,
         language: true,
+        inputLanguage: true,
+        outputLanguage: true,
         personality: true,
+
+        systemPrompt: true,
+        responseStyle: true,
+        maxResponseTokens: true,
+        temperature: true,
+
+        autoRefreshKnowledge: true,
+        allowedTopics: true,
+        blockedTopics: true,
       },
     });
   }
@@ -303,9 +343,69 @@ export class ReceptionistPublicService {
       name: string;
       language: ReceptionistLanguage;
       personality: ReceptionistPersonality;
+
+      systemPrompt?: string | null;
+      responseStyle?: string | null;
+      maxResponseTokens?: number;
+      temperature?: number;
+
+      autoRefreshKnowledge?: boolean;
+      allowedTopics?: any;
+      blockedTopics?: any;
     };
   }): Promise<string> {
     const lang = params.language;
+
+    const msgNorm = normalizeText(params.message).toLowerCase();
+    const intentNorm = String(params.intent ?? "")
+      .trim()
+      .toLowerCase();
+
+    const toStringList = (raw: any): string[] => {
+      if (!raw) return [];
+      if (Array.isArray(raw)) {
+        return raw
+          .map((x) => normalizeText(String(x ?? "")))
+          .filter(Boolean)
+          .slice(0, 60);
+      }
+      if (typeof raw === "string") {
+        return raw
+          .split(/[\n,]+/g)
+          .map((s) => normalizeText(s))
+          .filter(Boolean)
+          .slice(0, 60);
+      }
+      return [];
+    };
+
+    const matchesTopic = (topicRaw: string) => {
+      const t = normalizeText(topicRaw).toLowerCase();
+      if (!t) return false;
+      if (t === intentNorm) return true;
+      return msgNorm.includes(t);
+    };
+
+    const blockedTopics = toStringList(params.avatar.blockedTopics);
+    if (blockedTopics.length > 0 && blockedTopics.some(matchesTopic)) {
+      return this.wrapLang(
+        lang,
+        "Sorry — I can't help with that topic.",
+        "Kechirasiz — bu mavzu bo'yicha yordam bera olmayman.",
+        "申し訳ありませんが、その話題には対応できません。",
+      );
+    }
+
+    const allowedTopics = toStringList(params.avatar.allowedTopics);
+    if (allowedTopics.length > 0 && !allowedTopics.some(matchesTopic)) {
+      const list = allowedTopics.join(", ").slice(0, 220);
+      return this.wrapLang(
+        lang,
+        `I can help with these topics: ${list}.`,
+        `Men quyidagi mavzular bo'yicha yordam bera olaman: ${list}.`,
+        `対応できる話題: ${list}。`,
+      );
+    }
 
     // Always attempt structured lookup first.
     const [locations, kb, schedule, announcements] = await Promise.all([
@@ -314,6 +414,7 @@ export class ReceptionistPublicService {
         query: params.message,
         language: lang,
         take: 5,
+        autoRefreshKnowledge: params.avatar.autoRefreshKnowledge !== false,
       }),
       this.findSchedule({ query: params.message, take: 12 }),
       this.findAnnouncementsByQuery({
@@ -322,6 +423,12 @@ export class ReceptionistPublicService {
         take: 5,
       }),
     ]);
+
+    const contextIsEmpty =
+      locations.length === 0 &&
+      kb.length === 0 &&
+      schedule.length === 0 &&
+      announcements.length === 0;
 
     // If intent is clear and we have deterministic answers, return without LLM.
     if (params.intent === "announcement" && announcements.length > 0) {
@@ -376,6 +483,34 @@ export class ReceptionistPublicService {
       language: lang,
     });
 
+    const systemPrompt =
+      typeof params.avatar.systemPrompt === "string" &&
+      params.avatar.systemPrompt.trim()
+        ? String(params.avatar.systemPrompt).trim().slice(0, 12000)
+        : "";
+
+    const responseStyle =
+      typeof params.avatar.responseStyle === "string" &&
+      params.avatar.responseStyle.trim()
+        ? String(params.avatar.responseStyle).trim().slice(0, 6000)
+        : "";
+
+    const temperatureRaw = Number(params.avatar.temperature);
+    const temperature =
+      Number.isFinite(temperatureRaw) &&
+      temperatureRaw >= 0 &&
+      temperatureRaw <= 1
+        ? temperatureRaw
+        : 0.4;
+
+    const maxTokensRaw = Number(params.avatar.maxResponseTokens);
+    const maxTokens =
+      Number.isFinite(maxTokensRaw) &&
+      maxTokensRaw >= 80 &&
+      maxTokensRaw <= 2000
+        ? Math.floor(maxTokensRaw)
+        : 900;
+
     const context = {
       locations,
       knowledgeBase: kb,
@@ -383,28 +518,84 @@ export class ReceptionistPublicService {
       announcements,
     };
 
+    // DB > Knowledge Base > AI: only allow AI fallback when intent is general.
+    if (contextIsEmpty && params.intent !== "general") {
+      return this.wrapLang(
+        lang,
+        "I don't have enough information for that right now. Please contact the university staff.",
+        "Hozir bu savol bo'yicha yetarli ma'lumotim yo'q. Iltimos, universitet xodimlariga murojaat qiling.",
+        "その質問に答えるための十分な情報がありません。大学の担当者にお問い合わせください。",
+      );
+    }
+
     try {
+      const baseRules =
+        "You are a real university receptionist. Be concise, helpful, and ask a clarifying question if needed. " +
+        "Do NOT include <think> tags or hidden reasoning. Return only the final answer.";
+
+      const styleRule = responseStyle
+        ? `\nResponse style:\n${responseStyle}`
+        : "";
+
+      const adminSystem = systemPrompt
+        ? `\nAdditional system instructions:\n${systemPrompt}`
+        : "";
+
+      // If we have context, strictly ground facts in it.
+      if (!contextIsEmpty) {
+        const messages: any[] = [
+          {
+            role: "system",
+            content:
+              persona +
+              adminSystem +
+              styleRule +
+              "\n" +
+              baseRules +
+              "\nUse ONLY the provided CONTEXT data as facts. If data is missing, say you are not sure and suggest contacting staff.",
+          },
+          {
+            role: "user",
+            content: `USER_QUESTION:\n${params.message}\n\nCONTEXT_JSON:\n${JSON.stringify(context)}`,
+          },
+        ];
+
+        const res = await this.llm.chat({
+          messages,
+          temperature,
+          maxTokens,
+        });
+
+        const content = normalizeText(stripThinkBlocks(res.content));
+        if (content) return content.slice(0, 3000);
+      }
+
+      // AI fallback (general only): do not invent university-specific facts.
       const messages: any[] = [
         {
           role: "system",
           content:
             persona +
-            "\nYou are a real university receptionist. Be concise, helpful, and ask a clarifying question if needed. " +
-            "Use ONLY the provided CONTEXT data as facts. If data is missing, say you are not sure and suggest contacting staff.",
+            adminSystem +
+            styleRule +
+            "\n" +
+            baseRules +
+            "\nYou may answer general questions. Do NOT guess or invent university-specific facts (fees, deadlines, rules, schedules, office locations). " +
+            "If the user asks for those, say you are not sure and suggest contacting staff.",
         },
         {
           role: "user",
-          content: `USER_QUESTION:\n${params.message}\n\nCONTEXT_JSON:\n${JSON.stringify(context)}`,
+          content: params.message,
         },
       ];
 
       const res = await this.llm.chat({
         messages,
-        temperature: 0.4,
-        maxTokens: 900,
+        temperature,
+        maxTokens,
       });
 
-      const content = normalizeText(res.content);
+      const content = normalizeText(stripThinkBlocks(res.content));
       if (content) return content.slice(0, 3000);
     } catch {
       // fall through
@@ -500,9 +691,12 @@ export class ReceptionistPublicService {
     query: string;
     language: ReceptionistLanguage;
     take: number;
+    autoRefreshKnowledge?: boolean;
   }) {
     const q = normalizeText(params.query);
     if (!q) return [];
+
+    const take = clampInt(params.take, 0, 20);
 
     const tokens = q
       .toLowerCase()
@@ -510,29 +704,89 @@ export class ReceptionistPublicService {
       .filter((t) => t.length >= 3)
       .slice(0, 10);
 
-    const or = tokens.flatMap((t) => [
-      { title: { contains: t } },
-      { content: { contains: t } },
-      { category: { contains: t } },
-    ]);
+    // Default behavior: always query DB (fresh).
+    if (params.autoRefreshKnowledge !== false) {
+      const or = tokens.flatMap((t) => [
+        { title: { contains: t } },
+        { content: { contains: t } },
+        { category: { contains: t } },
+      ]);
 
-    const rows = await prisma.receptionistKnowledgeBaseEntry.findMany({
-      where: {
-        language: params.language,
-        ...(or.length > 0 ? { OR: or as any } : {}),
-      },
-      orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
-      take: clampInt(params.take, 0, 20),
-      select: {
-        id: true,
-        title: true,
-        content: true,
-        category: true,
-        priority: true,
-      },
+      const rows = await prisma.receptionistKnowledgeBaseEntry.findMany({
+        where: {
+          language: params.language,
+          ...(or.length > 0 ? { OR: or as any } : {}),
+        },
+        orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
+        take,
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          category: true,
+          priority: true,
+        },
+      });
+
+      return rows.map((k) => ({
+        id: k.id,
+        title: k.title,
+        content: k.content,
+        category: k.category,
+        priority: k.priority,
+      }));
+    }
+
+    // Cache mode: load a language snapshot once and then do token matching in-memory.
+    const cached = ReceptionistPublicService.kbCache.get(params.language);
+    let snapshot = cached?.rows ?? null;
+
+    if (!snapshot) {
+      const all = await prisma.receptionistKnowledgeBaseEntry.findMany({
+        where: { language: params.language },
+        orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
+        take: 5000,
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          category: true,
+          priority: true,
+          updatedAt: true,
+        },
+      });
+
+      snapshot = all.map((k) => ({
+        id: k.id,
+        title: k.title,
+        content: k.content,
+        category: k.category,
+        priority: k.priority,
+        updatedAtMs: k.updatedAt instanceof Date ? k.updatedAt.getTime() : 0,
+      }));
+
+      ReceptionistPublicService.kbCache.set(params.language, {
+        loadedAt: Date.now(),
+        rows: snapshot,
+      });
+    }
+
+    const matches = snapshot.filter((row) => {
+      const title = row.title.toLowerCase();
+      const content = row.content.toLowerCase();
+      const category = row.category.toLowerCase();
+      return tokens.some(
+        (t) => title.includes(t) || content.includes(t) || category.includes(t),
+      );
     });
 
-    return rows.map((k) => ({
+    matches.sort(
+      (a, b) =>
+        (b.priority ?? 0) - (a.priority ?? 0) ||
+        (b.updatedAtMs ?? 0) - (a.updatedAtMs ?? 0),
+    );
+
+    return matches.slice(0, take).map((k) => ({
       id: k.id,
       title: k.title,
       content: k.content,
