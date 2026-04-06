@@ -202,6 +202,21 @@ export function ChatSidebar({
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname?.startsWith("/dashboard/3d-leia")}
+                    tooltip="3D Leia"
+                  >
+                    <Link
+                      href="/dashboard/3d-leia"
+                      className="flex items-center gap-2"
+                    >
+                      <Mic className="h-4 w-4" />
+                      <span>3D Leia</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
