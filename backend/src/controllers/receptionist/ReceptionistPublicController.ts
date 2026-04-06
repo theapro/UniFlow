@@ -7,9 +7,29 @@ import { ok, fail } from "../../utils/responses";
 import { ReceptionistPublicService } from "../../services/receptionist/ReceptionistPublicService";
 import { ReceptionistVoiceService } from "../../services/receptionist/ReceptionistVoiceService";
 import {
+  detectReceptionistLanguage,
   normalizeText,
   stripThinkBlocks,
 } from "../../services/receptionist/receptionistText";
+
+function enforceSupportedLanguageOrFail(
+  res: Response,
+  detected: ReceptionistLanguage,
+) {
+  if (detected === "UZ" || detected === "EN" || detected === "JP")
+    return detected;
+  fail(res, 400, "Please use Uzbek, English, or Japanese only");
+  return null;
+}
+
+function looksLikeClearSpeech(transcript: string): boolean {
+  const s = normalizeText(transcript);
+  if (!s) return false;
+  // Require at least one letter/number from common scripts.
+  return /[0-9A-Za-z\u3040-\u30FF\u4E00-\u9FFF\u0400-\u04FF\u0500-\u052F\u00D8\u00F8\u011E\u011F\u0130\u0131\u015E\u015F\u0490\u0491\u0492\u0493]/.test(
+    s,
+  );
+}
 
 function coerceModality(raw: unknown, fallback: ReceptionistMessageModality) {
   const v = String(raw ?? "")
@@ -69,10 +89,11 @@ export class ReceptionistPublicController {
       const conversationId =
         typeof body.conversationId === "string" ? body.conversationId : "";
 
-      const language: ReceptionistLanguage | null =
-        body.language !== undefined
-          ? ReceptionistPublicService.normalizeLanguage(body.language, "UZ")
-          : null;
+      // Policy: English-only responses; Japanese responses only when Japanese is detected.
+      // All other languages are rejected.
+      const detected = detectReceptionistLanguage(message);
+      const language = enforceSupportedLanguageOrFail(res, detected);
+      if (!language) return;
 
       const modality = coerceModality(body.modality, "TEXT");
 
@@ -106,22 +127,31 @@ export class ReceptionistPublicController {
 
       const avatar = await this.receptionist.getAvatar();
 
-      const language: ReceptionistLanguage | null =
-        req.body?.language !== undefined
-          ? ReceptionistPublicService.normalizeLanguage(req.body.language, "UZ")
-          : null;
+      const sttModel =
+        typeof req.body?.sttModel === "string" ? req.body.sttModel : undefined;
+      const sttLanguage =
+        typeof req.body?.sttLanguage === "string"
+          ? req.body.sttLanguage
+          : avatar.inputLanguage || avatar.outputLanguage;
 
       const stt = await this.voice.stt({
         audioBytes: file.buffer,
         filename: file.originalname || "audio.webm",
         mimeType,
-        language: avatar.inputLanguage,
+        model: sttModel,
+        // Hint STT with the configured input language (improves accuracy).
+        language: sttLanguage,
       });
 
       const transcript = normalizeText(stt.text);
-      if (!transcript) {
-        return fail(res, 400, "Could not detect speech (empty transcript)");
+      if (!transcript || !looksLikeClearSpeech(transcript)) {
+        // Client treats this as a soft, ignorable turn.
+        return fail(res, 400, "No speech detected");
       }
+
+      const detected = detectReceptionistLanguage(transcript);
+      const language = enforceSupportedLanguageOrFail(res, detected);
+      if (!language) return;
 
       const chat = await this.receptionist.chat({
         conversationId,
@@ -138,7 +168,7 @@ export class ReceptionistPublicController {
       try {
         const tts = await this.voice.tts({
           text: replyText,
-          model: avatar.voice ?? undefined,
+          voice: avatar.voice ?? undefined,
           format: "wav",
         });
         audioBase64 = tts.audioBase64;

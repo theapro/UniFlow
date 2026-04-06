@@ -8,35 +8,86 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, type VRM } from "@pixiv/three-vrm";
 
 import { createVrmLipSync, type VrmLipSyncController } from "./VrmLipSync";
+import {
+  createAssistantAnimationSystem,
+  STATES,
+  type AssistantAnimState,
+  type AssistantAnimationSystem,
+} from "./VrmAssistantAnimationSystem";
 
 export type ThreeDLeiaMode = "idle" | "listening" | "processing" | "speaking";
+
+const AVATAR_TRANSFORM_ENABLED_KEY = "receptionistAvatarTransformEnabled";
+const AVATAR_TRANSFORM_KEY = "receptionistAvatarTransform";
+const AVATAR_TRANSFORM_EVENT = "receptionist:avatar-transform";
+
+type AvatarTransform = {
+  position: { x: number; y: number; z: number };
+  rotationDeg: { x: number; y: number; z: number };
+  scale: number;
+};
+
+const DEFAULT_AVATAR_TRANSFORM: AvatarTransform = {
+  position: { x: 0, y: 0, z: 0 },
+  rotationDeg: { x: 0, y: 0, z: 0 },
+  scale: 1,
+};
+
+function toFiniteNumber(v: unknown, fallback: number) {
+  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function readAvatarTransformFromStorage(): {
+  enabled: boolean;
+  transform: AvatarTransform;
+} {
+  if (typeof window === "undefined") {
+    return { enabled: false, transform: DEFAULT_AVATAR_TRANSFORM };
+  }
+
+  const enabledRaw = window.localStorage.getItem(AVATAR_TRANSFORM_ENABLED_KEY);
+  const enabled = enabledRaw === "1" || enabledRaw === "true";
+
+  let transform = DEFAULT_AVATAR_TRANSFORM;
+  try {
+    const raw = window.localStorage.getItem(AVATAR_TRANSFORM_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<AvatarTransform>;
+      transform = {
+        position: {
+          x: toFiniteNumber(parsed.position?.x, 0),
+          y: toFiniteNumber(parsed.position?.y, 0),
+          z: toFiniteNumber(parsed.position?.z, 0),
+        },
+        rotationDeg: {
+          x: toFiniteNumber(parsed.rotationDeg?.x, 0),
+          y: toFiniteNumber(parsed.rotationDeg?.y, 0),
+          z: toFiniteNumber(parsed.rotationDeg?.z, 0),
+        },
+        scale: toFiniteNumber(parsed.scale, 1),
+      };
+    }
+  } catch {
+    // ignore invalid JSON
+  }
+
+  return { enabled, transform };
+}
 
 function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
-function lerp(a: number, b: number, t: number) {
-  return a + (b - a) * t;
-}
-
-type BoneKey =
-  | "hips"
-  | "spine"
-  | "chest"
-  | "neck"
-  | "head"
-  | "rightUpperArm"
-  | "leftUpperArm";
-
-type BoneRig = Record<BoneKey, THREE.Object3D | null>;
-
-type RestPose = Record<BoneKey, { x: number; y: number; z: number }>;
+type BoneKey = "neck" | "head" | "rightUpperArm" | "leftUpperArm";
 
 function getBone(vrm: VRM, name: BoneKey) {
-  // three-vrm typings are strict; the runtime accepts the string bone names.
+  // Use RAW bones for animation stability. The VRM "normalized" rig is made of
+  // plain Object3D nodes and is meant to *drive* raw bones via autoUpdate.
+  // For external animation playback we animate raw bones directly.
   const humanoid = (vrm as any)?.humanoid;
   if (!humanoid) return null;
-  return humanoid.getNormalizedBoneNode(name) as THREE.Object3D | null;
+  return humanoid.getRawBoneNode(name) as THREE.Object3D | null;
 }
 
 function safeSetExpression(vrm: VRM, key: string, value: number) {
@@ -85,7 +136,7 @@ export function VrmAvatarStage(props: {
   const lipSyncOptions = useMemo(
     () => ({
       // Tuned for analyser output in 0..1 range.
-      minLevel: 0.02,
+      minLevel: 0.01,
       pickIntervalMs: { min: 70, max: 130 },
       openSpeed: 18,
       closeSpeed: 26,
@@ -100,6 +151,60 @@ export function VrmAvatarStage(props: {
     let mounted = true;
 
     const scene = new THREE.Scene();
+
+    // Avatar container group: keeps base orientation/position stable and
+    // lets us apply debug transform overrides without fighting the mixer.
+    const avatarGroup = new THREE.Group();
+    scene.add(avatarGroup);
+
+    // Base placement. The VRM itself is grounded via its bounding box so the
+    // feet sit on Y=0; this group stays as a stable parent for debug offsets.
+    const baseAvatarPosition = new THREE.Vector3(0, 0, 0);
+    const baseAvatarRotation = new THREE.Euler(0, 0, 0);
+
+    const avatarTransformRef = {
+      enabled: false,
+      transform: DEFAULT_AVATAR_TRANSFORM,
+    };
+
+    const refreshAvatarTransform = () => {
+      const next = readAvatarTransformFromStorage();
+      avatarTransformRef.enabled = next.enabled;
+      avatarTransformRef.transform = next.transform;
+    };
+
+    const applyAvatarTransform = () => {
+      const { enabled, transform } = avatarTransformRef;
+
+      if (!enabled) {
+        avatarGroup.position.copy(baseAvatarPosition);
+        avatarGroup.rotation.copy(baseAvatarRotation);
+        avatarGroup.scale.setScalar(1);
+        return;
+      }
+
+      avatarGroup.position.set(
+        baseAvatarPosition.x + transform.position.x,
+        baseAvatarPosition.y + transform.position.y,
+        baseAvatarPosition.z + transform.position.z,
+      );
+
+      avatarGroup.rotation.set(
+        baseAvatarRotation.x +
+          THREE.MathUtils.degToRad(transform.rotationDeg.x),
+        baseAvatarRotation.y +
+          THREE.MathUtils.degToRad(transform.rotationDeg.y),
+        baseAvatarRotation.z +
+          THREE.MathUtils.degToRad(transform.rotationDeg.z),
+      );
+
+      const s = Math.max(0.001, transform.scale);
+      avatarGroup.scale.setScalar(s);
+    };
+
+    // Initialize from persisted settings (if any).
+    refreshAvatarTransform();
+    applyAvatarTransform();
 
     const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 100);
     camera.position.set(0, 1.42, 1.55);
@@ -126,11 +231,16 @@ export function VrmAvatarStage(props: {
     let haloMaterial: THREE.PointsMaterial | null = null;
     let haloGeometry: THREE.BufferGeometry | null = null;
     let haloPoints: THREE.Points | null = null;
+    let haloPositionAttr: THREE.BufferAttribute | null = null;
+    let haloBasePositions: Float32Array | null = null;
+    let haloSeeds: Float32Array | null = null;
 
     const createHalo = () => {
       // Disc-like nebula behind the avatar (no particles in front of the mesh).
       const count = 1100;
+      const basePositions = new Float32Array(count * 3);
       const positions = new Float32Array(count * 3);
+      const seeds = new Float32Array(count * 3);
 
       const rMin = 0.32;
       const rMax = 1.02;
@@ -149,16 +259,26 @@ export function VrmAvatarStage(props: {
         const z = -(0.08 + Math.random() * 0.36);
 
         const idx = i * 3;
+        basePositions[idx] = x;
+        basePositions[idx + 1] = y;
+        basePositions[idx + 2] = z;
         positions[idx] = x;
         positions[idx + 1] = y;
         positions[idx + 2] = z;
+
+        // Per-particle drift seeds.
+        seeds[idx] = Math.random();
+        seeds[idx + 1] = Math.random();
+        seeds[idx + 2] = Math.random();
       }
 
       haloGeometry = new THREE.BufferGeometry();
-      haloGeometry.setAttribute(
-        "position",
-        new THREE.BufferAttribute(positions, 3),
-      );
+      haloPositionAttr = new THREE.BufferAttribute(positions, 3);
+      haloPositionAttr.setUsage(THREE.DynamicDrawUsage);
+      haloGeometry.setAttribute("position", haloPositionAttr);
+
+      haloBasePositions = basePositions;
+      haloSeeds = seeds;
 
       haloMaterial = new THREE.PointsMaterial({
         color: 0xffffff,
@@ -196,8 +316,22 @@ export function VrmAvatarStage(props: {
     const clock = new THREE.Clock();
 
     let vrm: VRM | null = null;
-    let rig: BoneRig | null = null;
-    let rest: RestPose | null = null;
+    let headBone: THREE.Object3D | null = null;
+    let neckBone: THREE.Object3D | null = null;
+    let animSystem: AssistantAnimationSystem | null = null;
+    let lookAtTarget: THREE.Object3D | null = null;
+
+    const micro = {
+      head: { x: 0, y: 0, z: 0 },
+      neck: { x: 0, y: 0, z: 0 },
+    };
+
+    const externalOverride = {
+      state: null as AssistantAnimState | null,
+      untilMs: 0,
+    };
+
+    let lastRequestedState: AssistantAnimState = STATES.IDLE;
 
     let lipSync: VrmLipSyncController | null = null;
 
@@ -216,6 +350,43 @@ export function VrmAvatarStage(props: {
     const loader = new GLTFLoader();
     loader.register((parser) => new VRMLoaderPlugin(parser));
 
+    const onAvatarState = (ev: Event) => {
+      const detail = (ev as CustomEvent<any>)?.detail;
+      if (!detail) return;
+      const state = detail.state as AssistantAnimState | undefined;
+      if (!state) return;
+      if (
+        state !== STATES.IDLE &&
+        state !== STATES.THINKING &&
+        state !== STATES.TALKING
+      ) {
+        return;
+      }
+      const ttlMs = typeof detail.ttlMs === "number" ? detail.ttlMs : 0;
+      externalOverride.state = state;
+      externalOverride.untilMs =
+        ttlMs > 0
+          ? (typeof performance === "undefined"
+              ? Date.now()
+              : performance.now()) + ttlMs
+          : Number.POSITIVE_INFINITY;
+    };
+
+    window.addEventListener(
+      "receptionist:avatar-state",
+      onAvatarState as EventListener,
+    );
+
+    const onAvatarTransformChanged = () => {
+      refreshAvatarTransform();
+    };
+
+    window.addEventListener(
+      AVATAR_TRANSFORM_EVENT,
+      onAvatarTransformChanged as EventListener,
+    );
+    window.addEventListener("storage", onAvatarTransformChanged);
+
     (async () => {
       try {
         const gltf = await loader.loadAsync(modelUrl);
@@ -228,88 +399,86 @@ export function VrmAvatarStage(props: {
 
         vrm = loaded;
 
-        // Face the camera.
-        vrm.scene.rotation.y = Math.PI;
+        // Remove unwanted physics / jiggle (spring bones).
+        // This disables secondary motion like chest/hair jiggle.
+        try {
+          const sb = (vrm as any)?.springBoneManager;
+          if (sb?.joints && typeof sb.joints.clear === "function") {
+            sb.joints.clear();
+          }
+        } catch {
+          // ignore
+        }
 
-        // Slightly lower the model to center it.
-        vrm.scene.position.set(0, -0.02, 0);
+        // Ensure normalized rig updates propagate to the rendered skeleton.
+        // We animate RAW bones (SkinnedMesh skeleton) and must prevent VRMHumanoid
+        // from overwriting them each frame.
+        try {
+          const humanoid = (vrm as any)?.humanoid;
+          if (humanoid && typeof humanoid === "object") {
+            humanoid.autoUpdateHumanBones = false;
+          }
+        } catch {
+          // ignore
+        }
 
-        scene.add(vrm.scene);
+        // === MODEL TRANSFORM FIX ===
+        // Keep a consistent base scale, reset position, and rotate to face forward.
+        // Ground the model by lifting it so its bounding-box min-Y becomes 0.
+        vrm.scene.scale.set(1, 1, 1);
+        vrm.scene.position.set(0, 0, 0);
+        vrm.scene.rotation.set(0, Math.PI, 0);
 
-        rig = {
-          hips: getBone(vrm, "hips"),
-          spine: getBone(vrm, "spine"),
-          chest: getBone(vrm, "chest"),
-          neck: getBone(vrm, "neck"),
-          head: getBone(vrm, "head"),
-          rightUpperArm: getBone(vrm, "rightUpperArm"),
-          leftUpperArm: getBone(vrm, "leftUpperArm"),
-        };
+        try {
+          vrm.scene.updateWorldMatrix(true, true);
+          const box = new THREE.Box3().setFromObject(vrm.scene);
+          if (
+            Number.isFinite(box.min.y) &&
+            Number.isFinite(box.max.y) &&
+            box.max.y - box.min.y > 0.2
+          ) {
+            vrm.scene.position.y -= box.min.y;
+            vrm.scene.updateWorldMatrix(true, true);
+          }
+        } catch {
+          // ignore
+        }
 
-        rest = {
-          hips: {
-            x: rig.hips?.rotation.x ?? 0,
-            y: rig.hips?.rotation.y ?? 0,
-            z: rig.hips?.rotation.z ?? 0,
-          },
-          spine: {
-            x: rig.spine?.rotation.x ?? 0,
-            y: rig.spine?.rotation.y ?? 0,
-            z: rig.spine?.rotation.z ?? 0,
-          },
-          chest: {
-            x: rig.chest?.rotation.x ?? 0,
-            y: rig.chest?.rotation.y ?? 0,
-            z: rig.chest?.rotation.z ?? 0,
-          },
-          neck: {
-            x: rig.neck?.rotation.x ?? 0,
-            y: rig.neck?.rotation.y ?? 0,
-            z: rig.neck?.rotation.z ?? 0,
-          },
-          head: {
-            x: rig.head?.rotation.x ?? 0,
-            y: rig.head?.rotation.y ?? 0,
-            z: rig.head?.rotation.z ?? 0,
-          },
-          rightUpperArm: {
-            x: rig.rightUpperArm?.rotation.x ?? 0,
-            y: rig.rightUpperArm?.rotation.y ?? 0,
-            z: rig.rightUpperArm?.rotation.z ?? 0,
-          },
-          leftUpperArm: {
-            x: rig.leftUpperArm?.rotation.x ?? 0,
-            y: rig.leftUpperArm?.rotation.y ?? 0,
-            z: rig.leftUpperArm?.rotation.z ?? 0,
-          },
-        };
+        avatarGroup.add(vrm.scene);
+
+        headBone = getBone(vrm, "head");
+        neckBone = getBone(vrm, "neck");
+        const rightUpperArm = getBone(vrm, "rightUpperArm");
+        const leftUpperArm = getBone(vrm, "leftUpperArm");
 
         // Pose correction: nudge toward a relaxed A-pose.
         const ARM_DOWN = 1.15;
         const ARM_FORWARD = 0.08;
         const ARM_YAW = 0.08;
 
-        rest.rightUpperArm.z -= ARM_DOWN;
-        rest.leftUpperArm.z += ARM_DOWN;
-        rest.rightUpperArm.x += ARM_FORWARD;
-        rest.leftUpperArm.x += ARM_FORWARD;
-        rest.rightUpperArm.y += ARM_YAW;
-        rest.leftUpperArm.y -= ARM_YAW;
-
         // Apply immediately so the first frame isn't a T-pose.
-        if (rig.rightUpperArm) {
-          rig.rightUpperArm.rotation.set(
-            rest.rightUpperArm.x,
-            rest.rightUpperArm.y,
-            rest.rightUpperArm.z,
-          );
+        if (rightUpperArm) {
+          rightUpperArm.rotation.z -= ARM_DOWN;
+          rightUpperArm.rotation.x += ARM_FORWARD;
+          rightUpperArm.rotation.y += ARM_YAW;
         }
-        if (rig.leftUpperArm) {
-          rig.leftUpperArm.rotation.set(
-            rest.leftUpperArm.x,
-            rest.leftUpperArm.y,
-            rest.leftUpperArm.z,
-          );
+        if (leftUpperArm) {
+          leftUpperArm.rotation.z += ARM_DOWN;
+          leftUpperArm.rotation.x += ARM_FORWARD;
+          leftUpperArm.rotation.y -= ARM_YAW;
+        }
+
+        // Look-at target drift for micro eye motion.
+        lookAtTarget = new THREE.Object3D();
+        lookAtTarget.position.set(
+          camera.position.x,
+          1.34,
+          camera.position.z - 0.55,
+        );
+        scene.add(lookAtTarget);
+        const lookAt = (vrm as any)?.lookAt;
+        if (lookAt && typeof lookAt === "object" && "target" in lookAt) {
+          (lookAt as any).target = lookAtTarget;
         }
 
         // Initialize blink schedule.
@@ -318,7 +487,33 @@ export function VrmAvatarStage(props: {
         // initialize lip sync
         lipSync = createVrmLipSync(vrm, lipSyncOptions);
 
+        // Consider the avatar "loaded" as soon as the model is ready.
         setStatus({ loaded: true, error: null });
+
+        // Load animation clips in the background (don't block initial render).
+        void (async () => {
+          try {
+            const mixerRoot = vrm.scene;
+            const sys = await createAssistantAnimationSystem({
+              vrm,
+              mixerRoot,
+              animationsBasePath: "/animations",
+              fadeSeconds: 0.35,
+              minThinkingMs: 700,
+            });
+            if (!mounted) {
+              sys.dispose();
+              return;
+            }
+            animSystem = sys;
+          } catch (e) {
+            console.warn(
+              "[receptionist-avatar] animation system init failed; falling back to procedural idle",
+              e,
+            );
+            animSystem = null;
+          }
+        })();
       } catch (e) {
         const msg = e instanceof Error ? e.message : "VRM load failed";
         console.error("[receptionist-avatar] VRM load error", e);
@@ -340,171 +535,6 @@ export function VrmAvatarStage(props: {
     ro.observe(wrapper);
 
     let raf = 0;
-
-    const applyPose = (t: number, speak: number, listen: number) => {
-      if (!rig || !rest) return;
-
-      const m = modeRef.current;
-
-      const speaking = m === "speaking";
-      const listening = m === "listening";
-      const processing = m === "processing";
-
-      const breath1 = Math.sin(t * 1.15) * 0.012;
-      const breath2 = Math.sin(t * 1.15 + 0.45) * 0.008;
-
-      const headSwayY = Math.sin(t * 0.42) * 0.022;
-      const headSwayZ = Math.sin(t * 0.25) * 0.014;
-      const headSwayX = Math.sin(t * 0.3) * 0.009;
-
-      const talkBob = speaking ? Math.sin(t * 6.0) * 0.03 * speak : 0;
-      const listenNod = listening ? Math.sin(t * 4.5) * 0.02 * listen : 0;
-
-      const headTarget = {
-        x:
-          rest.head.x +
-          headSwayX +
-          talkBob +
-          listenNod +
-          (processing ? -0.08 : 0),
-        y: rest.head.y + headSwayY + (processing ? 0.08 : 0),
-        z: rest.head.z + headSwayZ + (processing ? 0.12 : 0),
-      };
-
-      const neckTarget = {
-        x:
-          rest.neck.x +
-          headSwayX * 0.35 +
-          talkBob * 0.4 +
-          listenNod * 0.35 +
-          (processing ? -0.05 : 0),
-        y: rest.neck.y + headSwayY * 0.35,
-        z: rest.neck.z + (processing ? 0.05 : 0),
-      };
-
-      const chestTarget = {
-        x: rest.chest.x + breath1 + (speaking ? 0.01 * speak : 0),
-        y: rest.chest.y,
-        z: rest.chest.z,
-      };
-
-      const spineTarget = {
-        x: rest.spine.x + breath2,
-        y: rest.spine.y,
-        z: rest.spine.z,
-      };
-
-      const gestureA = speaking ? Math.sin(t * 2.2) * 0.11 * speak : 0;
-      const gestureB = speaking ? Math.sin(t * 3.4 + 1.1) * 0.07 * speak : 0;
-      const armRaise = speaking
-        ? 0.22 * speak
-        : listening
-          ? 0.05 * listen
-          : processing
-            ? 0.08
-            : 0;
-
-      const rightUpperArmTarget = {
-        x:
-          rest.rightUpperArm.x +
-          (processing ? 0.12 : 0) +
-          gestureB +
-          0.06 * speak,
-        y: rest.rightUpperArm.y + (speaking ? -0.06 * speak : 0),
-        z: rest.rightUpperArm.z + armRaise + gestureA,
-      };
-
-      const leftUpperArmTarget = {
-        x:
-          rest.leftUpperArm.x +
-          (processing ? 0.1 : 0) -
-          gestureB +
-          0.05 * speak,
-        y: rest.leftUpperArm.y + (speaking ? 0.06 * speak : 0),
-        z: rest.leftUpperArm.z - armRaise - gestureA,
-      };
-
-      const smooth = 0.08;
-
-      if (rig.head) {
-        rig.head.rotation.x = lerp(rig.head.rotation.x, headTarget.x, smooth);
-        rig.head.rotation.y = lerp(rig.head.rotation.y, headTarget.y, smooth);
-        rig.head.rotation.z = lerp(rig.head.rotation.z, headTarget.z, smooth);
-      }
-      if (rig.neck) {
-        rig.neck.rotation.x = lerp(rig.neck.rotation.x, neckTarget.x, smooth);
-        rig.neck.rotation.y = lerp(rig.neck.rotation.y, neckTarget.y, smooth);
-        rig.neck.rotation.z = lerp(rig.neck.rotation.z, neckTarget.z, smooth);
-      }
-      if (rig.chest) {
-        rig.chest.rotation.x = lerp(
-          rig.chest.rotation.x,
-          chestTarget.x,
-          smooth,
-        );
-        rig.chest.rotation.y = lerp(
-          rig.chest.rotation.y,
-          chestTarget.y,
-          smooth,
-        );
-        rig.chest.rotation.z = lerp(
-          rig.chest.rotation.z,
-          chestTarget.z,
-          smooth,
-        );
-      }
-      if (rig.spine) {
-        rig.spine.rotation.x = lerp(
-          rig.spine.rotation.x,
-          spineTarget.x,
-          smooth,
-        );
-        rig.spine.rotation.y = lerp(
-          rig.spine.rotation.y,
-          spineTarget.y,
-          smooth,
-        );
-        rig.spine.rotation.z = lerp(
-          rig.spine.rotation.z,
-          spineTarget.z,
-          smooth,
-        );
-      }
-      if (rig.rightUpperArm) {
-        rig.rightUpperArm.rotation.x = lerp(
-          rig.rightUpperArm.rotation.x,
-          rightUpperArmTarget.x,
-          smooth,
-        );
-        rig.rightUpperArm.rotation.y = lerp(
-          rig.rightUpperArm.rotation.y,
-          rightUpperArmTarget.y,
-          smooth,
-        );
-        rig.rightUpperArm.rotation.z = lerp(
-          rig.rightUpperArm.rotation.z,
-          rightUpperArmTarget.z,
-          smooth,
-        );
-      }
-      if (rig.leftUpperArm) {
-        rig.leftUpperArm.rotation.x = lerp(
-          rig.leftUpperArm.rotation.x,
-          leftUpperArmTarget.x,
-          smooth,
-        );
-        rig.leftUpperArm.rotation.y = lerp(
-          rig.leftUpperArm.rotation.y,
-          leftUpperArmTarget.y,
-          smooth,
-        );
-        rig.leftUpperArm.rotation.z = lerp(
-          rig.leftUpperArm.rotation.z,
-          leftUpperArmTarget.z,
-          smooth,
-        );
-      }
-    };
 
     const updateBlink = (t: number) => {
       if (!vrm) return;
@@ -535,45 +565,172 @@ export function VrmAvatarStage(props: {
       const delta = clock.getDelta();
       const t = clock.getElapsedTime();
 
-      if (vrm) {
-        const speak = clamp01(speakingLevelRef.current);
-        const listen = clamp01(listeningLevelRef.current);
+      const speak = clamp01(speakingLevelRef.current);
+      const listen = clamp01(listeningLevelRef.current);
+      const activity = Math.max(speak, listen * 0.85);
 
-        const activity = Math.max(speak, listen * 0.85);
-        haloGroup.rotation.y += delta * 0.18;
-        haloGroup.rotation.z = Math.sin(t * 0.12) * 0.06;
-        const haloScale = 1 + activity * 0.12;
-        haloGroup.scale.setScalar(haloScale);
-        if (haloMaterial) {
-          haloMaterial.opacity = 0.14 + activity * 0.34;
+      // Drift particles (no rotation/spinning).
+      if (haloPositionAttr && haloBasePositions && haloSeeds) {
+        const pos = haloPositionAttr.array as Float32Array;
+        const base = haloBasePositions;
+        const seeds = haloSeeds;
+
+        const driftXY = 0.018;
+        const driftZ = 0.01;
+        for (let i = 0; i < pos.length; i += 3) {
+          const sx = seeds[i];
+          const sy = seeds[i + 1];
+          const sz = seeds[i + 2];
+
+          pos[i] =
+            base[i] +
+            Math.sin(t * (0.16 + sx * 0.22) + sy * Math.PI * 2) * driftXY;
+          pos[i + 1] =
+            base[i + 1] +
+            Math.cos(t * (0.14 + sy * 0.2) + sz * Math.PI * 2) *
+              (driftXY * 0.85);
+          const zBase = base[i + 2];
+          const zDrift =
+            Math.sin(t * (0.12 + sz * 0.22) + sx * Math.PI * 2) * driftZ;
+          pos[i + 2] = Math.min(-0.05, zBase + zDrift);
         }
+        haloPositionAttr.needsUpdate = true;
+      }
 
-        updateBlink(t);
+      // Gentle group float (still behind the model).
+      haloGroup.position.x = Math.sin(t * 0.06) * 0.03;
+      haloGroup.position.y = 1.28 + Math.sin(t * 0.07 + 1.1) * 0.03;
 
-        const m = modeRef.current;
-        const lipEnabled = m === "speaking" || m === "listening";
-        const lipLevel =
-          m === "speaking" ? speak : m === "listening" ? listen : 0;
-        const lipFreq =
-          m === "speaking"
-            ? speakingFrequencyDataRef?.current
-            : m === "listening"
-              ? listeningFrequencyDataRef?.current
-              : null;
+      const haloScale = 1 + activity * 0.12;
+      haloGroup.scale.setScalar(haloScale);
+      if (haloMaterial) {
+        haloMaterial.opacity = 0.14 + activity * 0.34;
+      }
 
-        lipSync?.update({
-          now: t,
-          delta,
-          level: lipLevel,
-          frequencyData: lipFreq,
-          enabled: lipEnabled,
-        });
-        applyPose(t, speak, listen);
+      // Keep avatar base placement stable (and apply debug overrides).
+      applyAvatarTransform();
 
+      if (vrm) {
         try {
-          vrm.update(delta);
-        } catch {
-          // ignore
+          updateBlink(t);
+
+          // Animation state (voice lifecycle has priority; optional external override for chat).
+          const m = modeRef.current;
+          const nowMs =
+            typeof performance === "undefined" ? Date.now() : performance.now();
+          const externalActive =
+            externalOverride.state && nowMs < externalOverride.untilMs
+              ? externalOverride.state
+              : null;
+          if (!externalActive) {
+            externalOverride.state = null;
+          }
+
+          const desired: AssistantAnimState =
+            m === "speaking"
+              ? STATES.TALKING
+              : m === "processing"
+                ? STATES.THINKING
+                : externalActive
+                  ? externalActive
+                  : STATES.IDLE;
+
+          if (desired !== lastRequestedState && animSystem) {
+            animSystem.setState(desired);
+            lastRequestedState = desired;
+          }
+
+          // Undo previous micro offsets so the mixer always writes cleanly.
+          if (headBone) {
+            headBone.rotation.x -= micro.head.x;
+            headBone.rotation.y -= micro.head.y;
+            headBone.rotation.z -= micro.head.z;
+          }
+          if (neckBone) {
+            neckBone.rotation.x -= micro.neck.x;
+            neckBone.rotation.y -= micro.neck.y;
+            neckBone.rotation.z -= micro.neck.z;
+          }
+
+          animSystem?.update(delta);
+
+          const stateForMicro = animSystem?.getCurrentState?.() ?? desired;
+
+          // Micro head motion (subtle; shouldn't override the main clips).
+          const baseSwayY = Math.sin(t * 0.22) * 0.02;
+          const baseSwayZ = Math.sin(t * 0.18) * 0.012;
+          const baseSwayX = Math.sin(t * 0.27) * 0.01;
+
+          const thinking = stateForMicro === STATES.THINKING;
+          const talking = stateForMicro === STATES.TALKING;
+
+          const thinkTiltX = thinking ? -0.07 + Math.sin(t * 0.55) * 0.015 : 0;
+          const thinkTiltY = thinking
+            ? 0.055 + Math.sin(t * 0.4 + 1.7) * 0.015
+            : 0;
+          const thinkTiltZ = thinking
+            ? 0.08 + Math.sin(t * 0.36 + 0.4) * 0.02
+            : 0;
+
+          const talkBob = talking ? Math.sin(t * 5.8) * 0.014 * speak : 0;
+
+          micro.head.x = baseSwayX + thinkTiltX + talkBob;
+          micro.head.y = baseSwayY + thinkTiltY;
+          micro.head.z = baseSwayZ + thinkTiltZ;
+
+          micro.neck.x = micro.head.x * 0.35;
+          micro.neck.y = micro.head.y * 0.35;
+          micro.neck.z = micro.head.z * 0.25;
+
+          if (headBone) {
+            headBone.rotation.x += micro.head.x;
+            headBone.rotation.y += micro.head.y;
+            headBone.rotation.z += micro.head.z;
+          }
+          if (neckBone) {
+            neckBone.rotation.x += micro.neck.x;
+            neckBone.rotation.y += micro.neck.y;
+            neckBone.rotation.z += micro.neck.z;
+          }
+
+          // Slow eye/look drift.
+          if (lookAtTarget) {
+            const ampX = thinking ? 0.11 : 0.08;
+            const ampY = thinking ? 0.05 : 0.035;
+            const baseX = camera.position.x;
+            const baseY = 1.34;
+            const baseZ = camera.position.z - 0.55;
+            lookAtTarget.position.x = baseX + Math.sin(t * 0.35) * ampX;
+            lookAtTarget.position.y =
+              baseY + Math.sin(t * 0.27 + 1.1) * ampY + (thinking ? -0.04 : 0);
+            lookAtTarget.position.z = baseZ;
+          }
+
+          const lipEnabled = m === "speaking" || m === "listening";
+          const lipLevel =
+            m === "speaking" ? speak : m === "listening" ? listen : 0;
+          const lipFreq =
+            m === "speaking"
+              ? speakingFrequencyDataRef?.current
+              : m === "listening"
+                ? listeningFrequencyDataRef?.current
+                : null;
+
+          lipSync?.update({
+            now: t,
+            delta,
+            level: lipLevel,
+            frequencyData: lipFreq,
+            enabled: lipEnabled,
+          });
+
+          try {
+            vrm.update(delta);
+          } catch {
+            // ignore
+          }
+        } catch (e) {
+          console.error("[receptionist-avatar] frame update failed", e);
         }
       }
 
@@ -587,6 +744,15 @@ export function VrmAvatarStage(props: {
       mounted = false;
       ro.disconnect();
       window.cancelAnimationFrame(raf);
+      window.removeEventListener(
+        "receptionist:avatar-state",
+        onAvatarState as EventListener,
+      );
+      window.removeEventListener(
+        AVATAR_TRANSFORM_EVENT,
+        onAvatarTransformChanged as EventListener,
+      );
+      window.removeEventListener("storage", onAvatarTransformChanged);
 
       try {
         wrapper.removeChild(renderer.domElement);
@@ -596,6 +762,12 @@ export function VrmAvatarStage(props: {
 
       try {
         renderer.dispose();
+      } catch {
+        // ignore
+      }
+
+      try {
+        animSystem?.dispose();
       } catch {
         // ignore
       }

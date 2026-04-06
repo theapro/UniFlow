@@ -483,6 +483,135 @@ export const receptionistAdminApi = {
   },
 };
 
+// University public info + AI knowledge (admin CRUD)
+export const universityDataApi = {
+  universities: {
+    list: (params?: { q?: string; take?: number; skip?: number }) =>
+      axios.get("/api/universities", { params }),
+    create: (data: { name: string; description?: string | null }) =>
+      axios.post("/api/universities", data),
+    update: (
+      id: string,
+      patch: { name?: string; description?: string | null },
+    ) => axios.put(`/api/universities/${id}`, patch),
+    remove: (id: string) => axios.delete(`/api/universities/${id}`),
+  },
+
+  diplomas: {
+    list: (params?: {
+      q?: string;
+      universityId?: string;
+      take?: number;
+      skip?: number;
+    }) => axios.get("/api/diplomas", { params }),
+    create: (data: {
+      universityId: string;
+      name: string;
+      description?: string | null;
+    }) => axios.post("/api/diplomas", data),
+    update: (id: string, patch: any) => axios.put(`/api/diplomas/${id}`, patch),
+    remove: (id: string) => axios.delete(`/api/diplomas/${id}`),
+  },
+
+  departments: {
+    list: (params?: {
+      q?: string;
+      universityId?: string;
+      take?: number;
+      skip?: number;
+    }) => axios.get("/api/departments", { params }),
+    create: (data: {
+      universityId: string;
+      name: string;
+      description?: string | null;
+    }) => axios.post("/api/departments", data),
+    update: (id: string, patch: any) =>
+      axios.put(`/api/departments/${id}`, patch),
+    remove: (id: string) => axios.delete(`/api/departments/${id}`),
+  },
+
+  specialties: {
+    list: (params?: {
+      q?: string;
+      departmentId?: string;
+      take?: number;
+      skip?: number;
+    }) => axios.get("/api/specialties", { params }),
+    create: (data: {
+      departmentId: string;
+      name: string;
+      description?: string | null;
+    }) => axios.post("/api/specialties", data),
+    update: (id: string, patch: any) =>
+      axios.put(`/api/specialties/${id}`, patch),
+    remove: (id: string) => axios.delete(`/api/specialties/${id}`),
+  },
+
+  fees: {
+    list: (params?: {
+      q?: string;
+      universityId?: string;
+      specialtyId?: string;
+      take?: number;
+      skip?: number;
+    }) => axios.get("/api/fees", { params }),
+    create: (data: {
+      universityId: string;
+      specialtyId?: string | null;
+      title: string;
+      amount?: number | string | null;
+      currency?: string;
+      description?: string | null;
+    }) => axios.post("/api/fees", data),
+    update: (id: string, patch: any) => axios.put(`/api/fees/${id}`, patch),
+    remove: (id: string) => axios.delete(`/api/fees/${id}`),
+  },
+
+  facilities: {
+    list: (params?: {
+      q?: string;
+      universityId?: string;
+      take?: number;
+      skip?: number;
+    }) => axios.get("/api/facilities", { params }),
+    create: (data: {
+      universityId: string;
+      name: string;
+      description?: string | null;
+    }) => axios.post("/api/facilities", data),
+    update: (id: string, patch: any) =>
+      axios.put(`/api/facilities/${id}`, patch),
+    remove: (id: string) => axios.delete(`/api/facilities/${id}`),
+  },
+
+  announcements: {
+    list: (params?: {
+      q?: string;
+      universityId?: string;
+      take?: number;
+      skip?: number;
+    }) => axios.get("/api/announcements", { params }),
+    create: (data: any) => axios.post("/api/announcements", data),
+    update: (id: string, patch: any) =>
+      axios.put(`/api/announcements/${id}`, patch),
+    remove: (id: string) => axios.delete(`/api/announcements/${id}`),
+  },
+
+  aiKnowledge: {
+    list: (params?: {
+      q?: string;
+      category?: string;
+      language?: "UZ" | "EN" | "JP";
+      take?: number;
+      skip?: number;
+    }) => axios.get("/api/ai-knowledge", { params }),
+    create: (data: any) => axios.post("/api/ai-knowledge", data),
+    update: (id: string, patch: any) =>
+      axios.put(`/api/ai-knowledge/${id}`, patch),
+    remove: (id: string) => axios.delete(`/api/ai-knowledge/${id}`),
+  },
+};
+
 export const maintenanceApi = {
   purgeAllNonAdmin: (data: { confirm: string; syncSheets?: boolean }) =>
     axios.post("/api/admin/purge", data),

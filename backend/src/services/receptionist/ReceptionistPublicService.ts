@@ -407,28 +407,62 @@ export class ReceptionistPublicService {
       );
     }
 
-    // Always attempt structured lookup first.
-    const [locations, kb, schedule, announcements] = await Promise.all([
-      this.findLocations({ query: params.message, take: 5 }),
-      this.findKnowledgeBase({
-        query: params.message,
-        language: lang,
-        take: 5,
-        autoRefreshKnowledge: params.avatar.autoRefreshKnowledge !== false,
-      }),
-      this.findSchedule({ query: params.message, take: 12 }),
-      this.findAnnouncementsByQuery({
-        query: params.message,
-        language: lang,
-        take: 5,
-      }),
-    ]);
+    // Priority pipeline:
+    // 1) AI knowledge (highest priority, ordered by priority desc)
+    // 2) Structured DB (locations/schedule/announcements + university public info)
+    // 3) General AI fallback (only for intent=general)
+    const aiKnowledge = await this.findKnowledgeBase({
+      query: params.message,
+      language: lang,
+      take: 5,
+      autoRefreshKnowledge: params.avatar.autoRefreshKnowledge !== false,
+    });
+
+    if (aiKnowledge.length > 0) {
+      if (aiKnowledge.length === 1) {
+        const content = normalizeText(aiKnowledge[0].content);
+        if (content) return content.slice(0, 3000);
+      }
+
+      const lines = aiKnowledge.slice(0, 3).map((k) => {
+        const title = normalizeText(k.title).slice(0, 140);
+        const content = normalizeText(k.content).slice(0, 700);
+        return `- ${title}: ${content}`.slice(0, 900);
+      });
+
+      return this.wrapLang(
+        lang,
+        `Here is what I found:\n${lines.join("\n")}`,
+        `Mana topilgan ma'lumot:\n${lines.join("\n")}`,
+        `見つかった情報です。\n${lines.join("\n")}`,
+      );
+    }
+
+    const [locations, schedule, announcements, universityInfo] =
+      await Promise.all([
+        this.findLocations({ query: params.message, take: 5 }),
+        this.findSchedule({ query: params.message, take: 12 }),
+        this.findAnnouncementsByQuery({
+          query: params.message,
+          language: lang,
+          take: 5,
+        }),
+        this.findUniversityInfo({ query: params.message, take: 6 }),
+      ]);
+
+    const universityInfoIsEmpty =
+      universityInfo.universities.length === 0 &&
+      universityInfo.diplomas.length === 0 &&
+      universityInfo.departments.length === 0 &&
+      universityInfo.specialties.length === 0 &&
+      universityInfo.fees.length === 0 &&
+      universityInfo.facilities.length === 0;
 
     const contextIsEmpty =
       locations.length === 0 &&
-      kb.length === 0 &&
       schedule.length === 0 &&
-      announcements.length === 0;
+      announcements.length === 0 &&
+      universityInfoIsEmpty;
 
     // If intent is clear and we have deterministic answers, return without LLM.
     if (params.intent === "announcement" && announcements.length > 0) {
@@ -512,13 +546,13 @@ export class ReceptionistPublicService {
         : 900;
 
     const context = {
+      universityInfo,
       locations,
-      knowledgeBase: kb,
       schedule,
       announcements,
     };
 
-    // DB > Knowledge Base > AI: only allow AI fallback when intent is general.
+    // Structured DB > AI fallback: only allow AI fallback when intent is general.
     if (contextIsEmpty && params.intent !== "general") {
       return this.wrapLang(
         lang,
@@ -884,6 +918,161 @@ export class ReceptionistPublicService {
       room: r.room?.name ?? null,
       time: `${String(r.timeSlot.startTime).slice(11, 16)}-${String(r.timeSlot.endTime).slice(11, 16)}`,
     }));
+  }
+
+  private async findUniversityInfo(params: { query: string; take: number }) {
+    const q = normalizeText(params.query);
+    if (!q) {
+      return {
+        universities: [],
+        diplomas: [],
+        departments: [],
+        specialties: [],
+        fees: [],
+        facilities: [],
+      };
+    }
+
+    const takeEach = clampInt(params.take, 0, 20);
+
+    const tokens = q
+      .toLowerCase()
+      .split(/\s+/)
+      .map((t) =>
+        t.replace(/[^a-z0-9а-яёўқғҳ\u3040-\u30FF\u4E00-\u9FFF]/gi, ""),
+      )
+      .filter((t) => t.length >= 3)
+      .slice(0, 10);
+
+    const searchTokens =
+      tokens.length > 0 ? tokens : q.length >= 3 ? [q.toLowerCase()] : [];
+    if (searchTokens.length === 0) {
+      return {
+        universities: [],
+        diplomas: [],
+        departments: [],
+        specialties: [],
+        fees: [],
+        facilities: [],
+      };
+    }
+
+    const orNameDesc = searchTokens.flatMap((t) => [
+      { name: { contains: t } },
+      { description: { contains: t } },
+    ]);
+
+    const orTitleDesc = searchTokens.flatMap((t) => [
+      { title: { contains: t } },
+      { description: { contains: t } },
+    ]);
+
+    const [universities, diplomas, departments, specialties, fees, facilities] =
+      await Promise.all([
+        prisma.university.findMany({
+          where: { OR: orNameDesc as any },
+          orderBy: [{ updatedAt: "desc" }],
+          take: takeEach,
+          select: { id: true, name: true, description: true },
+        }),
+        prisma.universityDiploma.findMany({
+          where: { OR: orNameDesc as any },
+          orderBy: [{ updatedAt: "desc" }],
+          take: takeEach,
+          include: { university: { select: { id: true, name: true } } },
+        }),
+        prisma.universityDepartment.findMany({
+          where: { OR: orNameDesc as any },
+          orderBy: [{ updatedAt: "desc" }],
+          take: takeEach,
+          include: { university: { select: { id: true, name: true } } },
+        }),
+        prisma.universitySpecialty.findMany({
+          where: { OR: orNameDesc as any },
+          orderBy: [{ updatedAt: "desc" }],
+          take: takeEach,
+          include: {
+            department: {
+              include: { university: { select: { id: true, name: true } } },
+            },
+          },
+        }),
+        prisma.universityFee.findMany({
+          where: { OR: orTitleDesc as any },
+          orderBy: [{ updatedAt: "desc" }],
+          take: takeEach,
+          include: {
+            university: { select: { id: true, name: true } },
+            specialty: {
+              select: {
+                id: true,
+                name: true,
+                department: { select: { id: true, name: true } },
+              },
+            },
+          },
+        }),
+        prisma.universityFacility.findMany({
+          where: { OR: orNameDesc as any },
+          orderBy: [{ updatedAt: "desc" }],
+          take: takeEach,
+          include: { university: { select: { id: true, name: true } } },
+        }),
+      ]);
+
+    const sliceDesc = (raw: string | null | undefined, max: number) => {
+      const s = typeof raw === "string" ? raw.trim() : "";
+      return s ? s.slice(0, max) : null;
+    };
+
+    return {
+      universities: universities.map((u) => ({
+        id: u.id,
+        name: u.name,
+        description: sliceDesc(u.description, 900),
+      })),
+      diplomas: diplomas.map((d) => ({
+        id: d.id,
+        university: d.university,
+        name: d.name,
+        description: sliceDesc(d.description, 900),
+      })),
+      departments: departments.map((d) => ({
+        id: d.id,
+        university: d.university,
+        name: d.name,
+        description: sliceDesc(d.description, 900),
+      })),
+      specialties: specialties.map((s) => ({
+        id: s.id,
+        name: s.name,
+        description: sliceDesc(s.description, 900),
+        department: { id: s.department.id, name: s.department.name },
+        university: s.department.university,
+      })),
+      fees: fees.map((f) => ({
+        id: f.id,
+        university: f.university,
+        specialty: f.specialty
+          ? {
+              id: f.specialty.id,
+              name: f.specialty.name,
+              department: f.specialty.department,
+            }
+          : null,
+        title: f.title,
+        amount:
+          f.amount !== null && f.amount !== undefined ? String(f.amount) : null,
+        currency: f.currency,
+        description: sliceDesc(f.description, 900),
+      })),
+      facilities: facilities.map((f) => ({
+        id: f.id,
+        university: f.university,
+        name: f.name,
+        description: sliceDesc(f.description, 900),
+      })),
+    };
   }
 
   // Used for API input normalization when needed.

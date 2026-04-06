@@ -640,7 +640,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
           audioMime: String(json?.audioMime ?? ""),
         };
 
-        if (!result.transcript || !result.text) {
+        if (!result.text) {
           const msg = "Voice chat returned an incomplete response";
           setError(msg);
           onErrorRef.current?.(msg);
@@ -742,7 +742,20 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
 
       const stream = canReuse
         ? existing!
-        : await navigator.mediaDevices.getUserMedia({ audio: true });
+        : await (async () => {
+            try {
+              return await navigator.mediaDevices.getUserMedia({
+                audio: {
+                  echoCancellation: true,
+                  noiseSuppression: true,
+                  autoGainControl: true,
+                  channelCount: 1,
+                },
+              });
+            } catch {
+              return await navigator.mediaDevices.getUserMedia({ audio: true });
+            }
+          })();
 
       streamRef.current = stream;
 
@@ -916,6 +929,23 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}) {
 
         // If `cancel()` was used, do nothing further.
         if (!sendOnStopRef.current || !sendParamsRef.current) {
+          return;
+        }
+
+        // If we never detected voice activity, ignore this turn.
+        // This prevents random background noise / empty turns from hitting STT.
+        if (
+          !heardSpeechThisTurnRef.current &&
+          stopReason !== "manual" &&
+          stopReason !== "recorderError" &&
+          stopReason !== "streamEnded"
+        ) {
+          const msg = "No speech detected";
+          setError(msg);
+          onErrorRef.current?.(msg);
+          sendOnStopRef.current = false;
+          sendParamsRef.current = null;
+          onSpeakingEndedRef.current?.();
           return;
         }
 

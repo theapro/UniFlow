@@ -5,9 +5,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 import { ReceptionistActions } from "../components/ReceptionistActions";
-import {
-  useReceptionistDebugEnabled,
-} from "../components/ReceptionistDebugOverlay";
 import { ReceptionistDebugModal } from "../components/ReceptionistDebugModal";
 import { useAudioAnalyzer } from "../voice/useAudioAnalyzer";
 import { useVoiceChat } from "../voice/use-voice-chat";
@@ -35,11 +32,9 @@ export function AvatarExperienceClient(props: {
     smoothingTimeConstant: 0.86,
   });
 
-  const debugEnabled = useReceptionistDebugEnabled();
   const [debugLevels, setDebugLevels] = useState({ input: 0, output: 0 });
 
   useEffect(() => {
-    if (!debugEnabled) return;
     const t = window.setInterval(() => {
       setDebugLevels({
         input: analyzer.inputLevelRef.current,
@@ -47,12 +42,7 @@ export function AvatarExperienceClient(props: {
       });
     }, 200);
     return () => window.clearInterval(t);
-  }, [
-    analyzer.inputLevelRef,
-    analyzer.outputLevelRef,
-    debugEnabled,
-    setDebugLevels,
-  ]);
+  }, [analyzer.inputLevelRef, analyzer.outputLevelRef, setDebugLevels]);
 
   const beginTurnRef = useRef<
     | ((params: { sessionId?: string; chatModel?: string }) => Promise<void>)
@@ -407,8 +397,9 @@ export function AvatarExperienceClient(props: {
       </div>
 
       <ReceptionistDebugModal
-        enabled={debugEnabled}
+        enabled
         title="AVATAR DEBUG"
+        showAvatarTransformControls
         fields={[
           { label: "state", value: debugStateLabel },
           {

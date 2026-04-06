@@ -156,6 +156,11 @@ export function UniFlowSidebar({
       url: `${dashboardBase}/receptionist`,
       icon: BrainIcon,
     },
+    {
+      title: dict?.nav?.universityData ?? "University Data",
+      url: `${dashboardBase}/university-data`,
+      icon: BrainIcon,
+    },
   ];
 
   const sheetsSubItems = [
@@ -198,7 +203,8 @@ export function UniFlowSidebar({
     pathname.startsWith(`${dashboardBase}/ai-monitor`) ||
     pathname.startsWith(`${dashboardBase}/ai-debug-console`) ||
     pathname.startsWith(`${dashboardBase}/testai`) ||
-    pathname.startsWith(`${dashboardBase}/ai-models`);
+    pathname.startsWith(`${dashboardBase}/ai-models`) ||
+    pathname.startsWith(`${dashboardBase}/university-data`);
 
   const canSeeAiSettings = hasPermission(user, "ACCESS_AI_SETTINGS");
 

@@ -25,6 +25,21 @@ function isoNow() {
   return new Date().toISOString();
 }
 
+function emitAvatarState(
+  state: "idle" | "thinking" | "talking",
+  ttlMs?: number,
+) {
+  try {
+    window.dispatchEvent(
+      new CustomEvent("receptionist:avatar-state", {
+        detail: { state, ttlMs },
+      }),
+    );
+  } catch {
+    // ignore
+  }
+}
+
 function welcomeFor(
   language: ReceptionistInitData["avatar"]["language"],
   name: string,
@@ -67,7 +82,7 @@ export function ReceptionistChatPanel(props: {
           }))
         : [],
     );
-  }, [initialData?.conversationId, initialData?.messages]);
+  }, [initialData]);
 
   const endRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -115,6 +130,9 @@ export function ReceptionistChatPanel(props: {
 
       setMessages((prev) => [...prev, optimistic]);
 
+      // Let the avatar show THINKING while we wait.
+      emitAvatarState("thinking");
+
       try {
         const res = await fetch("/api/receptionist/chat", {
           method: "POST",
@@ -140,6 +158,8 @@ export function ReceptionistChatPanel(props: {
         }
 
         if (replyText) {
+          // Show TALKING briefly while text appears.
+          emitAvatarState("talking", 1600);
           setMessages((prev) => [
             ...prev,
             {
@@ -150,9 +170,12 @@ export function ReceptionistChatPanel(props: {
               createdAt: isoNow(),
             },
           ]);
+        } else {
+          emitAvatarState("idle", 1);
         }
       } catch (e: any) {
         toast.error(String(e?.message ?? "Failed to send"));
+        emitAvatarState("idle", 1);
       } finally {
         setSending(false);
       }

@@ -20,18 +20,42 @@ function isTruthyFlag(v: string | null): boolean {
   return s === "1" || s === "true" || s === "yes" || s === "on";
 }
 
+function computeEnabledFromClient(): boolean {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("debug");
+    const ls = window.localStorage.getItem("receptionistDebug");
+    return isTruthyFlag(q) || isTruthyFlag(ls);
+  } catch {
+    return false;
+  }
+}
+
+export function setReceptionistDebugEnabled(next: boolean) {
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("receptionistDebug", next ? "1" : "0");
+    window.dispatchEvent(new Event("receptionist-debug-changed"));
+  } catch {
+    // ignore
+  }
+}
+
 export function useReceptionistDebugEnabled() {
   const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const q = params.get("debug");
-      const ls = window.localStorage.getItem("receptionistDebug");
-      setEnabled(isTruthyFlag(q) || isTruthyFlag(ls));
-    } catch {
-      setEnabled(false);
-    }
+    const update = () => setEnabled(computeEnabledFromClient());
+    update();
+
+    window.addEventListener("receptionist-debug-changed", update);
+    window.addEventListener("storage", update);
+    window.addEventListener("popstate", update);
+    return () => {
+      window.removeEventListener("receptionist-debug-changed", update);
+      window.removeEventListener("storage", update);
+      window.removeEventListener("popstate", update);
+    };
   }, []);
 
   return enabled;

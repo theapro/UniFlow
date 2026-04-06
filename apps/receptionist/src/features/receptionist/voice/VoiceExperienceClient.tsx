@@ -8,9 +8,6 @@ import { ParticleSphere, type VoiceVizMode } from "./ParticleSphere";
 import { useAudioAnalyzer } from "./useAudioAnalyzer";
 import { useVoiceChat } from "./use-voice-chat";
 import { ReceptionistActions } from "../components/ReceptionistActions";
-import {
-  useReceptionistDebugEnabled,
-} from "../components/ReceptionistDebugOverlay";
 import { ReceptionistDebugModal } from "../components/ReceptionistDebugModal";
 
 export function VoiceExperienceClient(props: {
@@ -61,11 +58,9 @@ export function VoiceExperienceClient(props: {
 
   const zeroLevelRef = useRef(0);
 
-  const debugEnabled = useReceptionistDebugEnabled();
   const [debugLevels, setDebugLevels] = useState({ input: 0, output: 0 });
 
   useEffect(() => {
-    if (!debugEnabled) return;
     const t = window.setInterval(() => {
       setDebugLevels({
         input: analyzer.inputLevelRef.current,
@@ -73,12 +68,7 @@ export function VoiceExperienceClient(props: {
       });
     }, 200);
     return () => window.clearInterval(t);
-  }, [
-    analyzer.inputLevelRef,
-    analyzer.outputLevelRef,
-    debugEnabled,
-    setDebugLevels,
-  ]);
+  }, [analyzer.inputLevelRef, analyzer.outputLevelRef, setDebugLevels]);
 
   const voice = useVoiceChat({
     endpoint: "/api/receptionist/voice",
@@ -159,7 +149,8 @@ export function VoiceExperienceClient(props: {
       err.includes("failed to access microphone");
     if (fatalMicError) return;
 
-    const delay = voice.error ? 1500 : 120;
+    const delay =
+      voice.error && voice.error !== "No speech detected" ? 1500 : 120;
     const t = window.setTimeout(() => {
       if (!sessionActiveRef.current) return;
       void beginTurnRef.current?.({
@@ -421,7 +412,7 @@ export function VoiceExperienceClient(props: {
       </div>
 
       <ReceptionistDebugModal
-        enabled={debugEnabled}
+        enabled
         title="VOICE DEBUG"
         fields={[
           {

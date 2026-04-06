@@ -51,7 +51,10 @@ export class ReceptionistVoiceService {
 
     const language = asSttLanguageCode(params.language);
 
-    const run = async (opts: { withLanguage: boolean }) => {
+    const run = async (opts: {
+      withLanguage: boolean;
+      withTemperature: boolean;
+    }) => {
       const form = new FormData();
 
       // DOM typings for BlobPart don't accept Node Buffer (it can be backed by SharedArrayBuffer).
@@ -63,6 +66,7 @@ export class ReceptionistVoiceService {
       form.set("file", blob, params.filename || "audio.webm");
       form.set("model", params.model ?? "whisper-large-v3-turbo");
       form.set("response_format", "json");
+      if (opts.withTemperature) form.set("temperature", "0");
       if (opts.withLanguage && language) {
         form.set("language", language);
       }
@@ -93,19 +97,24 @@ export class ReceptionistVoiceService {
       return { text: String(json?.text ?? "").trim() };
     };
 
-    try {
-      return await run({ withLanguage: true });
-    } catch (e) {
-      // Compatibility fallback: if the provider rejects the language param, retry once without it.
-      if (language) {
-        try {
-          return await run({ withLanguage: false });
-        } catch {
-          // original error is more useful
-        }
+    const attempts: Array<{ withLanguage: boolean; withTemperature: boolean }> =
+      [
+        { withLanguage: true, withTemperature: true },
+        { withLanguage: false, withTemperature: true },
+        { withLanguage: true, withTemperature: false },
+        { withLanguage: false, withTemperature: false },
+      ];
+
+    let firstError: unknown = null;
+    for (const a of attempts) {
+      try {
+        return await run(a);
+      } catch (e) {
+        if (!firstError) firstError = e;
       }
-      throw e;
     }
+
+    throw firstError;
   }
 
   async tts(params: {
@@ -126,13 +135,13 @@ export class ReceptionistVoiceService {
     const preferredVoice = pickFirstNonEmpty(
       params.voice,
       process.env.GROQ_TTS_VOICE,
-      "autumn",
+      "hannah",
     )
       .trim()
       .toLowerCase();
 
     const voiceCandidates = Array.from(
-      new Set([preferredVoice, "autumn", "diana", "hannah"].filter(Boolean)),
+      new Set([preferredVoice, "hannah", "diana", "autumn"].filter(Boolean)),
     );
 
     const responseFormat = (params.format ?? "wav") as "mp3" | "wav";
